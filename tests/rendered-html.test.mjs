@@ -35,21 +35,47 @@ test("server-renders the chart studio", async () => {
   assert.match(html, /图作/);
   assert.match(html, /透明图表工具/);
   assert.match(html, /上传 CSV/);
+  assert.match(html, /从 20 种模板中选择/);
+  assert.match(html, /数据表/);
+  assert.match(html, /透明背景/);
+  assert.match(html, /四周边距/);
   assert.match(html, /PNG/);
   assert.match(html, /SVG/);
   assert.doesNotMatch(html, /codex-preview|Building your site|SkeletonPreview/);
 });
 
-test("removes the disposable starter preview", async () => {
-  const [page, layout, packageJson] = await Promise.all([
+test("keeps the chart canvas mounted while editing data", async () => {
+  const [page, styles] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /workspaceMode !== "preview" \? "workspace-hidden"/);
+  assert.match(page, /workspaceMode !== "data" \? "workspace-hidden"/);
+  assert.match(page, /\[height, option, width, workspaceMode\]/);
+  assert.match(styles, /\.workspace-hidden\s*\{[^}]*display:\s*none\s*!important/s);
+});
+
+test("includes the complete chart studio implementation", async () => {
+  const [page, model, layout, packageJson] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/chart-model.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
+  const templateDefinitions =
+    model
+      .match(/export const CHART_TEMPLATES:[\s\S]*?\n\];/)?.[0]
+      .match(/\{\s*id:/g) ?? [];
+
+  assert.equal(templateDefinitions.length, 20);
   assert.match(page, /renderer:\s*"svg"/);
   assert.match(page, /svgToPngBlob/);
   assert.match(page, /parseDelimited/);
+  assert.match(page, /backgroundColor/);
+  assert.match(model, /populationPyramid/);
+  assert.match(model, /streamgraph/);
   assert.match(layout, /lang="zh-CN"/);
   assert.doesNotMatch(layout, /Starter Project|codex-preview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);

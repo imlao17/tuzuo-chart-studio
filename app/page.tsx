@@ -1,21 +1,29 @@
 "use client";
 
-import type { ECharts, EChartsOption, SeriesOption } from "echarts";
+import type { ECharts } from "echarts";
 import {
   AreaChart,
   BarChart3,
   Check,
   Clipboard,
+  Columns3,
   Download,
   FileUp,
   ImageDown,
+  LayoutGrid,
   LineChart,
   LoaderCircle,
+  Lock,
+  LockOpen,
+  Palette,
   PieChart,
+  Plus,
   RefreshCcw,
-  ScatterChart,
+  Search,
   Settings2,
   Table2,
+  Trash2,
+  X,
 } from "lucide-react";
 import {
   ChangeEvent,
@@ -25,264 +33,31 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  buildChartOption,
+  buildThumbnailOption,
+  CHART_TEMPLATES,
+  ChartFamily,
+  ChartType,
+  INITIAL_TABLE,
+  Margins,
+  parseDelimitedTable,
+  tableToParsed,
+  THEMES,
+} from "./chart-model";
 
-type ChartType =
-  | "bar"
-  | "horizontalBar"
-  | "line"
-  | "area"
-  | "pie"
-  | "scatter";
-
-type ParsedData = {
-  headers: string[];
-  rows: string[][];
-  numericHeaders: string[];
-  delimiter: "," | "\t";
-  error?: string;
+const DEFAULT_MARGINS: Margins = {
+  top: 28,
+  right: 32,
+  bottom: 36,
+  left: 38,
 };
-
-type ThemePreset = {
-  id: string;
-  name: string;
-  colors: string[];
-  text: string;
-  grid: string;
-};
-
-type SavedState = {
-  rawData: string;
-  chartType: ChartType;
-  title: string;
-  subtitle: string;
-  width: number;
-  height: number;
-  xColumn: string;
-  yColumn: string;
-  y2Column: string;
-  themeId: string;
-  primaryColor: string;
-  secondaryColor: string;
-  transparent: boolean;
-  showLabels: boolean;
-  showLegend: boolean;
-  showGrid: boolean;
-  smooth: boolean;
-  fontSize: number;
-  pixelRatio: number;
-};
-
-const INITIAL_DATA = `月份\t实际收入\t目标
-一月\t128\t110
-二月\t146\t125
-三月\t138\t140
-四月\t172\t150
-五月\t189\t165
-六月\t218\t190`;
-
-const THEMES: ThemePreset[] = [
-  {
-    id: "editorial",
-    name: "编辑蓝",
-    colors: ["#2563eb", "#f15a3a", "#16a36a", "#e8ae17"],
-    text: "#17202a",
-    grid: "#dfe3e8",
-  },
-  {
-    id: "fresh",
-    name: "清新",
-    colors: ["#0f8b8d", "#ff7a45", "#4c78df", "#f2b134"],
-    text: "#163331",
-    grid: "#dce7e5",
-  },
-  {
-    id: "magazine",
-    name: "杂志",
-    colors: ["#171717", "#e5484d", "#168aad", "#f4a261"],
-    text: "#171717",
-    grid: "#dedede",
-  },
-  {
-    id: "soft",
-    name: "柔和",
-    colors: ["#6577c9", "#e07a5f", "#5a9367", "#e9b44c"],
-    text: "#30343b",
-    grid: "#e1e2e5",
-  },
-  {
-    id: "mono",
-    name: "黑白",
-    colors: ["#222222", "#777777", "#a7a7a7", "#d0d0d0"],
-    text: "#191919",
-    grid: "#dedede",
-  },
-];
-
-const CHART_TYPES: {
-  id: ChartType;
-  label: string;
-  icon: typeof BarChart3;
-}[] = [
-  { id: "bar", label: "柱状", icon: BarChart3 },
-  { id: "horizontalBar", label: "条形", icon: BarChart3 },
-  { id: "line", label: "折线", icon: LineChart },
-  { id: "area", label: "面积", icon: AreaChart },
-  { id: "pie", label: "环形", icon: PieChart },
-  { id: "scatter", label: "散点", icon: ScatterChart },
-];
-
-const DEFAULT_STATE: SavedState = {
-  rawData: INITIAL_DATA,
-  chartType: "bar",
-  title: "上半年收入趋势",
-  subtitle: "单位：万元",
-  width: 960,
-  height: 540,
-  xColumn: "月份",
-  yColumn: "实际收入",
-  y2Column: "目标",
-  themeId: "editorial",
-  primaryColor: THEMES[0].colors[0],
-  secondaryColor: THEMES[0].colors[1],
-  transparent: true,
-  showLabels: true,
-  showLegend: true,
-  showGrid: true,
-  smooth: true,
-  fontSize: 14,
-  pixelRatio: 2,
-};
-
-function countDelimiter(line: string, delimiter: "," | "\t") {
-  let count = 0;
-  let quoted = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    if (line[index] === '"') quoted = !quoted;
-    if (!quoted && line[index] === delimiter) count += 1;
-  }
-
-  return count;
-}
-
-function parseDelimited(raw: string): ParsedData {
-  const input = raw.replace(/^\uFEFF/, "").trim();
-  const firstLine = input.split(/\r?\n/).find((line) => line.trim()) ?? "";
-  const delimiter: "," | "\t" =
-    countDelimiter(firstLine, "\t") > countDelimiter(firstLine, ",")
-      ? "\t"
-      : ",";
-
-  if (!input) {
-    return {
-      headers: [],
-      rows: [],
-      numericHeaders: [],
-      delimiter,
-      error: "请粘贴或上传数据",
-    };
-  }
-
-  const parsedRows: string[][] = [];
-  let currentRow: string[] = [];
-  let currentCell = "";
-  let quoted = false;
-
-  for (let index = 0; index <= input.length; index += 1) {
-    const character = input[index] ?? "\n";
-    const nextCharacter = input[index + 1];
-
-    if (character === '"' && quoted && nextCharacter === '"') {
-      currentCell += '"';
-      index += 1;
-      continue;
-    }
-
-    if (character === '"') {
-      quoted = !quoted;
-      continue;
-    }
-
-    if (!quoted && character === delimiter) {
-      currentRow.push(currentCell.trim());
-      currentCell = "";
-      continue;
-    }
-
-    if (!quoted && (character === "\n" || character === "\r")) {
-      if (character === "\r" && nextCharacter === "\n") index += 1;
-      currentRow.push(currentCell.trim());
-      currentCell = "";
-
-      if (currentRow.some((cell) => cell !== "")) parsedRows.push(currentRow);
-      currentRow = [];
-      continue;
-    }
-
-    currentCell += character;
-  }
-
-  if (parsedRows.length < 2) {
-    return {
-      headers: parsedRows[0] ?? [],
-      rows: [],
-      numericHeaders: [],
-      delimiter,
-      error: "至少需要一行标题和一行数据",
-    };
-  }
-
-  const columnCount = Math.max(...parsedRows.map((row) => row.length));
-  const headers = Array.from({ length: columnCount }, (_, index) => {
-    return parsedRows[0][index]?.trim() || `列 ${index + 1}`;
-  });
-  const rows = parsedRows.slice(1).map((row) => {
-    return Array.from({ length: columnCount }, (_, index) => row[index] ?? "");
-  });
-  const numericHeaders = headers.filter((_, columnIndex) => {
-    const populated = rows
-      .map((row) => row[columnIndex])
-      .filter((value) => value !== "");
-
-    if (!populated.length) return false;
-
-    return (
-      populated.filter((value) => Number.isFinite(toNumber(value))).length /
-        populated.length >=
-      0.7
-    );
-  });
-
-  return { headers, rows, numericHeaders, delimiter };
-}
-
-function toNumber(value: string) {
-  const normalized = value
-    .trim()
-    .replace(/[￥¥$,\s]/g, "")
-    .replace(/%$/, "");
-  const negative =
-    normalized.startsWith("(") && normalized.endsWith(")")
-      ? `-${normalized.slice(1, -1)}`
-      : normalized;
-  const number = Number(negative);
-  return Number.isFinite(number) ? number : Number.NaN;
-}
-
-function columnIndex(headers: string[], name: string) {
-  return Math.max(0, headers.indexOf(name));
-}
 
 function downloadDataUrl(dataUrl: string, filename: string) {
   const link = document.createElement("a");
   link.href = dataUrl;
   link.download = filename;
   link.click();
-}
-
-function svgDataUrlToBlob(dataUrl: string) {
-  const content = decodeURIComponent(dataUrl.split(",")[1] ?? "");
-  return new Blob([content], { type: "image/svg+xml;charset=utf-8" });
 }
 
 async function svgToPngBlob(
@@ -307,12 +82,13 @@ async function svgToPngBlob(
   const context = canvas.getContext("2d");
 
   if (!context) throw new Error("无法创建图片画布");
-
   context.scale(pixelRatio, pixelRatio);
+
   if (background) {
     context.fillStyle = background;
     context.fillRect(0, 0, width, height);
   }
+
   context.drawImage(image, 0, 0, width, height);
 
   return new Promise<Blob>((resolve, reject) => {
@@ -323,13 +99,24 @@ async function svgToPngBlob(
   });
 }
 
-function blobToDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("文件读取失败"));
-    reader.readAsDataURL(blob);
-  });
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  downloadDataUrl(url, filename);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1200);
+}
+
+function ChartFamilyIcon({
+  family,
+  size,
+}: {
+  family: ChartFamily;
+  size: number;
+}) {
+  if (family === "line") return <LineChart size={size} />;
+  if (family === "area") return <AreaChart size={size} />;
+  if (family === "pie") return <PieChart size={size} />;
+  if (family === "bar") return <BarChart3 size={size} />;
+  return <LayoutGrid size={size} />;
 }
 
 function Toggle({
@@ -356,32 +143,158 @@ function Toggle({
   );
 }
 
+function TemplateThumbnail({ type }: { type: ChartType }) {
+  const elementRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let chart: ECharts | null = null;
+    let observer: ResizeObserver | null = null;
+    let frame = 0;
+
+    async function mount() {
+      if (!elementRef.current) return;
+      const echarts = await import("echarts");
+      const initialize = () => {
+        if (cancelled || !elementRef.current) return;
+        if (
+          elementRef.current.clientWidth === 0 ||
+          elementRef.current.clientHeight === 0
+        ) {
+          frame = window.requestAnimationFrame(initialize);
+          return;
+        }
+        chart = echarts.init(elementRef.current, undefined, { renderer: "svg" });
+        chart.setOption(buildThumbnailOption(type), true);
+        observer = new ResizeObserver(() => chart?.resize());
+        observer.observe(elementRef.current);
+      };
+      frame = window.requestAnimationFrame(initialize);
+    }
+
+    mount();
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      chart?.dispose();
+    };
+  }, [type]);
+
+  return <div className="template-thumbnail" ref={elementRef} />;
+}
+
+function TemplateGallery({
+  open,
+  selected,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  selected: ChartType;
+  onClose: () => void;
+  onSelect: (type: ChartType) => void;
+}) {
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, open]);
+
+  if (!open) return null;
+
+  const filtered = CHART_TEMPLATES.filter((template) =>
+    template.name.includes(query.trim()),
+  );
+
+  return (
+    <div className="template-overlay" role="dialog" aria-modal="true">
+      <div className="template-dialog">
+        <div className="template-gallery-header">
+          <h1>折线、柱状与饼图</h1>
+          <div className="gallery-actions">
+            <label className="template-search">
+              <Search size={16} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索图表"
+                autoFocus
+              />
+            </label>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={onClose}
+              aria-label="关闭模板库"
+              title="关闭"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="template-grid">
+          {filtered.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              className={`template-card ${
+                selected === template.id ? "selected" : ""
+              }`}
+              onClick={() => onSelect(template.id)}
+            >
+              <TemplateThumbnail type={template.id} />
+              <span className="template-name">{template.name}</span>
+              {selected === template.id && (
+                <span className="template-selected">
+                  <Check size={13} />
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        {!filtered.length && <div className="empty-search">没有匹配的图表</div>}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
-  const [rawData, setRawData] = useState(DEFAULT_STATE.rawData);
-  const [chartType, setChartType] = useState<ChartType>(
-    DEFAULT_STATE.chartType,
+  const [tableData, setTableData] = useState<string[][]>(() =>
+    INITIAL_TABLE.map((row) => [...row]),
   );
-  const [title, setTitle] = useState(DEFAULT_STATE.title);
-  const [subtitle, setSubtitle] = useState(DEFAULT_STATE.subtitle);
-  const [width, setWidth] = useState(DEFAULT_STATE.width);
-  const [height, setHeight] = useState(DEFAULT_STATE.height);
-  const [xColumn, setXColumn] = useState(DEFAULT_STATE.xColumn);
-  const [yColumn, setYColumn] = useState(DEFAULT_STATE.yColumn);
-  const [y2Column, setY2Column] = useState(DEFAULT_STATE.y2Column);
-  const [themeId, setThemeId] = useState(DEFAULT_STATE.themeId);
-  const [primaryColor, setPrimaryColor] = useState(
-    DEFAULT_STATE.primaryColor,
+  const [chartType, setChartType] = useState<ChartType>("groupedColumn");
+  const [workspaceMode, setWorkspaceMode] = useState<"preview" | "data">(
+    "preview",
   );
-  const [secondaryColor, setSecondaryColor] = useState(
-    DEFAULT_STATE.secondaryColor,
-  );
-  const [transparent, setTransparent] = useState(DEFAULT_STATE.transparent);
-  const [showLabels, setShowLabels] = useState(DEFAULT_STATE.showLabels);
-  const [showLegend, setShowLegend] = useState(DEFAULT_STATE.showLegend);
-  const [showGrid, setShowGrid] = useState(DEFAULT_STATE.showGrid);
-  const [smooth, setSmooth] = useState(DEFAULT_STATE.smooth);
-  const [fontSize, setFontSize] = useState(DEFAULT_STATE.fontSize);
-  const [pixelRatio, setPixelRatio] = useState(DEFAULT_STATE.pixelRatio);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [title, setTitle] = useState("上半年收入趋势");
+  const [subtitle, setSubtitle] = useState("单位：万元");
+  const [width, setWidth] = useState(960);
+  const [height, setHeight] = useState(540);
+  const [categoryColumn, setCategoryColumn] = useState("月份");
+  const [seriesColumns, setSeriesColumns] = useState([
+    "实际收入",
+    "目标",
+  ]);
+  const [themeId, setThemeId] = useState("editorial");
+  const [primaryColor, setPrimaryColor] = useState(THEMES[0].colors[0]);
+  const [secondaryColor, setSecondaryColor] = useState("#4aa7f3");
+  const [transparent, setTransparent] = useState(true);
+  const [backgroundColor, setBackgroundColor] = useState("#ffffff");
+  const [margins, setMargins] = useState<Margins>(DEFAULT_MARGINS);
+  const [marginsLinked, setMarginsLinked] = useState(false);
+  const [showLabels, setShowLabels] = useState(true);
+  const [showLegend, setShowLegend] = useState(true);
+  const [showGrid, setShowGrid] = useState(true);
+  const [smooth, setSmooth] = useState(true);
+  const [fontSize, setFontSize] = useState(14);
+  const [pixelRatio, setPixelRatio] = useState(2);
   const [previewScale, setPreviewScale] = useState(1);
   const [status, setStatus] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -391,284 +304,69 @@ export default function Home() {
   const chartRef = useRef<ECharts | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const parsed = useMemo(() => parseDelimited(rawData), [rawData]);
+  const parsed = useMemo(() => tableToParsed(tableData), [tableData]);
   const theme =
     THEMES.find((candidate) => candidate.id === themeId) ?? THEMES[0];
-  const isCartesian = chartType !== "pie";
-  const canSmooth = chartType === "line" || chartType === "area";
-  const selectedXColumn = parsed.headers.includes(xColumn)
-    ? xColumn
+  const selectedTemplate =
+    CHART_TEMPLATES.find((template) => template.id === chartType) ??
+    CHART_TEMPLATES[0];
+  const selectedCategory = parsed.headers.includes(categoryColumn)
+    ? categoryColumn
     : parsed.headers.find(
         (header) => !parsed.numericHeaders.includes(header),
       ) ?? parsed.headers[0] ?? "";
-  const selectedYColumn = parsed.headers.includes(yColumn)
-    ? yColumn
-    : parsed.numericHeaders[0] ?? parsed.headers[1] ?? "";
-  const selectedY2Column =
-    y2Column && parsed.headers.includes(y2Column) ? y2Column : "";
+  const selectedSeries = seriesColumns.filter((header) =>
+    parsed.numericHeaders.includes(header),
+  );
+  const effectiveSeries = selectedSeries.length
+    ? selectedSeries
+    : parsed.numericHeaders.slice(0, 1);
 
-  const option = useMemo<EChartsOption>(() => {
-    const xIndex = columnIndex(parsed.headers, selectedXColumn);
-    const yIndex = columnIndex(parsed.headers, selectedYColumn);
-    const y2Index = columnIndex(parsed.headers, selectedY2Column);
-    const categories = parsed.rows.map((row) => row[xIndex]);
-    const primaryValues = parsed.rows.map((row) => toNumber(row[yIndex]));
-    const secondaryValues = parsed.rows.map((row) =>
-      selectedY2Column ? toNumber(row[y2Index]) : Number.NaN,
-    );
-    const titleTop = subtitle ? 24 : 32;
-    const gridTop = title || subtitle ? 104 : 48;
-    const labelColor = theme.text;
-    const axisLine = { lineStyle: { color: "#aeb6bf" } };
-    const splitLine = {
-      show: showGrid,
-      lineStyle: { color: theme.grid, type: "dashed" as const },
-    };
-    const axisLabel = {
-      color: labelColor,
+  const option = useMemo(
+    () =>
+      buildChartOption({
+        type: chartType,
+        parsed,
+        categoryColumn: selectedCategory,
+        seriesColumns: effectiveSeries,
+        title,
+        subtitle,
+        width,
+        height,
+        margins,
+        theme,
+        primaryColor,
+        secondaryColor,
+        backgroundColor,
+        transparent,
+        showLabels,
+        showLegend,
+        showGrid,
+        smooth,
+        fontSize,
+      }),
+    [
+      backgroundColor,
+      chartType,
+      effectiveSeries,
       fontSize,
-      hideOverlap: true,
-    };
-    let series: SeriesOption[] = [];
-
-    if (chartType === "pie") {
-      series = [
-        {
-          name: selectedYColumn,
-          type: "pie",
-          radius: ["40%", "70%"],
-          center: ["50%", "57%"],
-          avoidLabelOverlap: true,
-          itemStyle: {
-            borderColor: transparent ? "rgba(255,255,255,0.82)" : "#ffffff",
-            borderWidth: 2,
-            borderRadius: 4,
-          },
-          label: {
-            show: showLabels,
-            color: labelColor,
-            fontSize,
-            formatter: "{b}\n{d}%",
-            lineHeight: fontSize + 6,
-          },
-          emphasis: { scaleSize: 8 },
-          data: categories.map((name, index) => ({
-            name,
-            value: primaryValues[index],
-          })),
-        },
-      ];
-    } else if (chartType === "scatter") {
-      const scatterLabelIndex = parsed.headers.findIndex(
-        (header) => !parsed.numericHeaders.includes(header),
-      );
-      series = [
-        {
-          name: selectedYColumn,
-          type: "scatter",
-          symbolSize: (value: unknown) => {
-            const pair = value as number[];
-            return Math.max(10, Math.min(26, 10 + Math.abs(pair[1]) / 20));
-          },
-          itemStyle: {
-            color: primaryColor,
-            opacity: 0.84,
-          },
-          label: {
-            show: showLabels,
-            position: "top",
-            color: labelColor,
-            fontSize,
-            formatter: (params: unknown) => {
-              const item = params as { dataIndex: number };
-              return scatterLabelIndex >= 0
-                ? parsed.rows[item.dataIndex][scatterLabelIndex]
-                : "";
-            },
-          },
-          data: parsed.rows.map((row) => [
-            toNumber(row[xIndex]),
-            toNumber(row[yIndex]),
-          ]),
-        },
-      ];
-    } else {
-      const seriesType = chartType === "bar" || chartType === "horizontalBar"
-        ? "bar"
-        : "line";
-      const baseSeries = {
-        type: seriesType,
-        barMaxWidth: 48,
-        smooth: canSmooth && smooth,
-        symbol: "circle",
-        symbolSize: 7,
-        label: {
-          show: showLabels,
-          position: (chartType === "horizontalBar" ? "right" : "top") as
-            | "right"
-            | "top",
-          color: labelColor,
-          fontSize,
-        },
-        emphasis: { focus: "series" as const },
-      };
-
-      series = [
-        {
-          ...baseSeries,
-          name: selectedYColumn,
-          data: primaryValues,
-          itemStyle: {
-            color: primaryColor,
-            borderRadius:
-              seriesType === "bar"
-                ? chartType === "horizontalBar"
-                  ? [0, 4, 4, 0]
-                  : [4, 4, 0, 0]
-                : 0,
-          },
-          lineStyle: { color: primaryColor, width: 3 },
-          areaStyle:
-            chartType === "area"
-              ? { color: primaryColor, opacity: 0.18 }
-              : undefined,
-        },
-      ];
-
-      if (selectedY2Column) {
-        series.push({
-          ...baseSeries,
-          name: selectedY2Column,
-          data: secondaryValues,
-          itemStyle: {
-            color: secondaryColor,
-            borderRadius:
-              seriesType === "bar"
-                ? chartType === "horizontalBar"
-                  ? [0, 4, 4, 0]
-                  : [4, 4, 0, 0]
-                : 0,
-          },
-          lineStyle: { color: secondaryColor, width: 3 },
-          areaStyle:
-            chartType === "area"
-              ? { color: secondaryColor, opacity: 0.12 }
-              : undefined,
-        });
-      }
-    }
-
-    const categoryAxis = {
-      type: "category" as const,
-      data: categories,
-      axisLine,
-      axisTick: { show: false },
-      axisLabel,
-    };
-    const valueAxis = {
-      type: "value" as const,
-      axisLine: { show: false },
-      axisTick: { show: false },
-      axisLabel,
-      splitLine,
-    };
-
-    return {
-      animation: true,
-      animationDuration: 520,
-      animationEasing: "cubicOut",
-      backgroundColor: transparent ? "transparent" : "#ffffff",
-      color: [primaryColor, secondaryColor, ...theme.colors.slice(2)],
-      textStyle: {
-        fontFamily:
-          '"Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
-        color: labelColor,
-      },
-      title: {
-        show: Boolean(title || subtitle),
-        left: 32,
-        top: titleTop,
-        text: title,
-        subtext: subtitle,
-        itemGap: 8,
-        textStyle: {
-          color: labelColor,
-          fontSize: Math.max(22, fontSize + 10),
-          fontWeight: 700,
-        },
-        subtextStyle: {
-          color: "#68727d",
-          fontSize: Math.max(12, fontSize - 1),
-        },
-      },
-      legend: {
-        show:
-          showLegend &&
-          (chartType === "pie" ||
-            (Boolean(selectedY2Column) && isCartesian)),
-        top: 30,
-        right: 32,
-        icon: "roundRect",
-        itemWidth: 12,
-        itemHeight: 8,
-        textStyle: { color: labelColor, fontSize },
-      },
-      tooltip: {
-        trigger: chartType === "pie" ? "item" : "axis",
-        backgroundColor: "rgba(24, 28, 33, 0.92)",
-        borderWidth: 0,
-        textStyle: { color: "#ffffff", fontSize },
-        padding: [10, 12],
-      },
-      grid:
-        chartType === "pie"
-          ? undefined
-          : {
-              top: gridTop,
-              right: showLabels ? 52 : 36,
-              bottom: 48,
-              left: chartType === "horizontalBar" ? 88 : 66,
-              containLabel: true,
-            },
-      xAxis:
-        chartType === "pie"
-          ? undefined
-          : chartType === "horizontalBar"
-            ? valueAxis
-            : chartType === "scatter"
-              ? valueAxis
-              : categoryAxis,
-      yAxis:
-        chartType === "pie"
-          ? undefined
-          : chartType === "horizontalBar"
-            ? categoryAxis
-            : valueAxis,
-      series,
-    };
-  }, [
-    canSmooth,
-    chartType,
-    fontSize,
-    isCartesian,
-    parsed.headers,
-    parsed.numericHeaders,
-    parsed.rows,
-    primaryColor,
-    secondaryColor,
-    showGrid,
-    showLabels,
-    showLegend,
-    smooth,
-    subtitle,
-    theme,
-    title,
-    transparent,
-    selectedXColumn,
-    selectedY2Column,
-    selectedYColumn,
-  ]);
-
+      height,
+      margins,
+      parsed,
+      primaryColor,
+      secondaryColor,
+      selectedCategory,
+      showGrid,
+      showLabels,
+      showLegend,
+      smooth,
+      subtitle,
+      theme,
+      title,
+      transparent,
+      width,
+    ],
+  );
   const initialChartStateRef = useRef({ height, option, width });
 
   useEffect(() => {
@@ -688,7 +386,6 @@ export default function Home() {
     }
 
     mountChart();
-
     return () => {
       cancelled = true;
       chartRef.current?.dispose();
@@ -697,17 +394,20 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    chartRef.current?.resize({ width, height });
-    chartRef.current?.setOption(option, true);
-  }, [height, option, width]);
+    const frame = window.requestAnimationFrame(() => {
+      chartRef.current?.resize({ width, height });
+      chartRef.current?.setOption(option, true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [height, option, width, workspaceMode]);
 
   useEffect(() => {
     const host = previewHostRef.current;
     if (!host) return;
 
     const updateScale = () => {
-      const availableWidth = Math.max(280, host.clientWidth - 48);
-      const availableHeight = Math.max(260, host.clientHeight - 48);
+      const availableWidth = Math.max(300, host.clientWidth - 54);
+      const availableHeight = Math.max(280, host.clientHeight - 56);
       setPreviewScale(
         Math.min(1, availableWidth / width, availableHeight / height),
       );
@@ -716,7 +416,7 @@ export default function Home() {
     observer.observe(host);
     updateScale();
     return () => observer.disconnect();
-  }, [height, width]);
+  }, [height, width, workspaceMode]);
 
   useEffect(() => {
     if (!status) return;
@@ -724,30 +424,122 @@ export default function Home() {
     return () => window.clearTimeout(timeout);
   }, [status]);
 
-  function selectTheme(nextTheme: ThemePreset) {
+  function selectTheme(nextTheme: (typeof THEMES)[number]) {
     setThemeId(nextTheme.id);
     setPrimaryColor(nextTheme.colors[0]);
     setSecondaryColor(nextTheme.colors[1]);
   }
 
-  function selectChartType(nextType: ChartType) {
-    setChartType(nextType);
-    if (nextType === "scatter") {
-      setXColumn(parsed.numericHeaders[0] ?? xColumn);
-      setYColumn(
-        parsed.numericHeaders[1] ??
-          parsed.numericHeaders[0] ??
-          selectedYColumn,
+  function selectTemplate(type: ChartType) {
+    setChartType(type);
+    setTemplateOpen(false);
+    setWorkspaceMode("preview");
+  }
+
+  function toggleSeries(header: string) {
+    setSeriesColumns((current) => {
+      if (current.includes(header)) {
+        return current.length > 1
+          ? current.filter((candidate) => candidate !== header)
+          : current;
+      }
+      return [...current, header];
+    });
+  }
+
+  function updateMargin(side: keyof Margins, value: number) {
+    const next = Math.min(240, Math.max(0, value || 0));
+    setMargins((current) => {
+      if (marginsLinked) {
+        return { top: next, right: next, bottom: next, left: next };
+      }
+      return { ...current, [side]: next };
+    });
+  }
+
+  function updateCell(rowIndex: number, columnIndex: number, value: string) {
+    setTableData((current) => {
+      const next = current.map((row) => [...row]);
+      const previousHeader = next[0]?.[columnIndex] ?? "";
+      next[rowIndex][columnIndex] = value;
+
+      if (rowIndex === 0 && previousHeader !== value) {
+        if (categoryColumn === previousHeader) setCategoryColumn(value);
+        setSeriesColumns((columns) =>
+          columns.map((column) => (column === previousHeader ? value : column)),
+        );
+      }
+
+      return next;
+    });
+  }
+
+  function pasteIntoTable(
+    event: React.ClipboardEvent<HTMLInputElement>,
+    startRow: number,
+    startColumn: number,
+  ) {
+    const clipboardText = event.clipboardData.getData("text/plain");
+    if (!clipboardText.includes("\t") && !clipboardText.includes("\n")) return;
+    event.preventDefault();
+    const pasted = parseDelimitedTable(clipboardText);
+
+    setTableData((current) => {
+      const requiredRows = Math.max(current.length, startRow + pasted.length);
+      const requiredColumns = Math.max(
+        current[0]?.length ?? 2,
+        startColumn + Math.max(...pasted.map((row) => row.length)),
       );
-      setY2Column("");
-    } else if (chartType === "scatter") {
-      setXColumn(
-        parsed.headers.find(
-          (header) => !parsed.numericHeaders.includes(header),
-        ) ?? parsed.headers[0],
+      const next = Array.from({ length: requiredRows }, (_, rowIndex) =>
+        Array.from(
+          { length: requiredColumns },
+          (_, columnIndex) => current[rowIndex]?.[columnIndex] ?? "",
+        ),
       );
-      setYColumn(parsed.numericHeaders[0] ?? selectedYColumn);
-      setY2Column(parsed.numericHeaders[1] ?? "");
+
+      pasted.forEach((row, rowOffset) => {
+        row.forEach((value, columnOffset) => {
+          next[startRow + rowOffset][startColumn + columnOffset] = value;
+        });
+      });
+      return next;
+    });
+    setStatus(`已粘贴 ${pasted.length} 行数据`);
+  }
+
+  function addRow() {
+    setTableData((current) => [
+      ...current,
+      Array.from({ length: current[0]?.length ?? 2 }, () => ""),
+    ]);
+  }
+
+  function deleteRow(index: number) {
+    setTableData((current) =>
+      current.length > 2 ? current.filter((_, rowIndex) => rowIndex !== index) : current,
+    );
+  }
+
+  function addColumn() {
+    setTableData((current) =>
+      current.map((row, rowIndex) => [
+        ...row,
+        rowIndex === 0 ? `系列 ${row.length}` : "",
+      ]),
+    );
+  }
+
+  function deleteColumn(index: number) {
+    if ((tableData[0]?.length ?? 0) <= 2) return;
+    const removedHeader = tableData[0]?.[index] ?? "";
+    setTableData((current) =>
+      current.map((row) => row.filter((_, columnIndex) => columnIndex !== index)),
+    );
+    setSeriesColumns((current) =>
+      current.filter((header) => header !== removedHeader),
+    );
+    if (categoryColumn === removedHeader) {
+      setCategoryColumn(tableData[0]?.[index === 0 ? 1 : 0] ?? "");
     }
   }
 
@@ -756,8 +548,9 @@ export default function Home() {
     if (!file) return;
 
     try {
-      const text = await file.text();
-      setRawData(text);
+      const matrix = parseDelimitedTable(await file.text());
+      setTableData(matrix);
+      setWorkspaceMode("data");
       setStatus(`已载入 ${file.name}`);
     } catch {
       setStatus("文件读取失败");
@@ -768,22 +561,22 @@ export default function Home() {
 
   async function createPngBlob() {
     if (!chartRef.current) throw new Error("图表尚未准备好");
-    const svgDataUrl = chartRef.current.getSvgDataURL();
     return svgToPngBlob(
-      svgDataUrl,
+      chartRef.current.getSvgDataURL(),
       width,
       height,
       pixelRatio,
-      transparent ? null : "#ffffff",
+      transparent ? null : backgroundColor,
     );
   }
 
   async function exportPng() {
     setExporting(true);
     try {
-      const blob = await createPngBlob();
-      const dataUrl = await blobToDataUrl(blob);
-      downloadDataUrl(dataUrl, `${title || "图表"}@${pixelRatio}x.png`);
+      downloadBlob(
+        await createPngBlob(),
+        `${title || "图表"}@${pixelRatio}x.png`,
+      );
       setStatus("PNG 已导出");
     } catch {
       setStatus("PNG 导出失败");
@@ -794,10 +587,10 @@ export default function Home() {
 
   function exportSvg() {
     if (!chartRef.current) return;
-    const blob = svgDataUrlToBlob(chartRef.current.getSvgDataURL());
-    const url = URL.createObjectURL(blob);
-    downloadDataUrl(url, `${title || "图表"}.svg`);
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadDataUrl(
+      chartRef.current.getSvgDataURL(),
+      `${title || "图表"}.svg`,
+    );
     setStatus("SVG 已导出");
   }
 
@@ -815,25 +608,28 @@ export default function Home() {
   }
 
   function resetAll() {
-    setRawData(DEFAULT_STATE.rawData);
-    setChartType(DEFAULT_STATE.chartType);
-    setTitle(DEFAULT_STATE.title);
-    setSubtitle(DEFAULT_STATE.subtitle);
-    setWidth(DEFAULT_STATE.width);
-    setHeight(DEFAULT_STATE.height);
-    setXColumn(DEFAULT_STATE.xColumn);
-    setYColumn(DEFAULT_STATE.yColumn);
-    setY2Column(DEFAULT_STATE.y2Column);
-    setThemeId(DEFAULT_STATE.themeId);
-    setPrimaryColor(DEFAULT_STATE.primaryColor);
-    setSecondaryColor(DEFAULT_STATE.secondaryColor);
-    setTransparent(DEFAULT_STATE.transparent);
-    setShowLabels(DEFAULT_STATE.showLabels);
-    setShowLegend(DEFAULT_STATE.showLegend);
-    setShowGrid(DEFAULT_STATE.showGrid);
-    setSmooth(DEFAULT_STATE.smooth);
-    setFontSize(DEFAULT_STATE.fontSize);
-    setPixelRatio(DEFAULT_STATE.pixelRatio);
+    setTableData(INITIAL_TABLE.map((row) => [...row]));
+    setChartType("groupedColumn");
+    setWorkspaceMode("preview");
+    setTitle("上半年收入趋势");
+    setSubtitle("单位：万元");
+    setWidth(960);
+    setHeight(540);
+    setCategoryColumn("月份");
+    setSeriesColumns(["实际收入", "目标"]);
+    setThemeId("editorial");
+    setPrimaryColor(THEMES[0].colors[0]);
+    setSecondaryColor("#4aa7f3");
+    setTransparent(true);
+    setBackgroundColor("#ffffff");
+    setMargins(DEFAULT_MARGINS);
+    setMarginsLinked(false);
+    setShowLabels(true);
+    setShowLegend(true);
+    setShowGrid(true);
+    setSmooth(true);
+    setFontSize(14);
+    setPixelRatio(2);
     setStatus("已恢复示例");
   }
 
@@ -843,19 +639,40 @@ export default function Home() {
     "--chart-width": `${width}px`,
     "--chart-height": `${height}px`,
     "--preview-scale": previewScale,
+    "--solid-background": backgroundColor,
   } as CSSProperties;
-
   return (
     <main className="studio-shell">
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
-            <span />
-            <span />
-            <span />
+            <BarChart3 size={17} />
           </span>
           <span className="brand-name">图作</span>
           <span className="brand-subtitle">透明图表工具</span>
+        </div>
+
+        <div className="workspace-tabs" role="tablist">
+          <button
+            type="button"
+            className={workspaceMode === "preview" ? "active" : ""}
+            onClick={() => setWorkspaceMode("preview")}
+            role="tab"
+            aria-selected={workspaceMode === "preview"}
+          >
+            <AreaChart size={16} />
+            预览
+          </button>
+          <button
+            type="button"
+            className={workspaceMode === "data" ? "active" : ""}
+            onClick={() => setWorkspaceMode("data")}
+            role="tab"
+            aria-selected={workspaceMode === "data"}
+          >
+            <Table2 size={16} />
+            数据
+          </button>
         </div>
 
         <div className="export-toolbar">
@@ -876,8 +693,8 @@ export default function Home() {
             type="button"
             className="icon-button"
             onClick={copyPng}
-            title="复制透明 PNG"
-            aria-label="复制透明 PNG"
+            title="复制 PNG"
+            aria-label="复制 PNG"
             disabled={exporting}
           >
             <Clipboard size={17} />
@@ -910,103 +727,32 @@ export default function Home() {
         <aside className="panel panel-left">
           <section className="panel-section">
             <div className="section-heading">
-              <span>图表</span>
+              <span>图表模板</span>
               <span className="step-index">01</span>
             </div>
-            <div className="chart-type-grid">
-              {CHART_TYPES.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={chartType === item.id ? "selected" : ""}
-                    onClick={() => selectChartType(item.id)}
-                    aria-pressed={chartType === item.id}
-                    data-chart-type={item.id}
-                  >
-                    <Icon
-                      size={19}
-                      className={
-                        item.id === "horizontalBar" ? "rotate-icon" : ""
-                      }
-                    />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="panel-section data-section">
-            <div className="section-heading">
-              <span>数据</span>
-              <span className="step-index">02</span>
-            </div>
-            <div className="data-actions">
-              <button
-                type="button"
-                className="button button-secondary upload-button"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <FileUp size={16} />
-                上传 CSV / TSV
-              </button>
-              <input
-                ref={fileInputRef}
-                className="sr-only"
-                type="file"
-                accept=".csv,.tsv,text/csv,text/tab-separated-values"
-                onChange={handleFile}
-                data-testid="file-input"
-              />
-              <span
-                className={`data-status ${parsed.error ? "error" : ""}`}
-                title={parsed.error}
-              >
-                {parsed.error
-                  ? parsed.error
-                  : `${parsed.rows.length} 行 · ${parsed.headers.length} 列`}
-              </span>
-            </div>
-            <textarea
-              className="data-editor"
-              value={rawData}
-              onChange={(event) => setRawData(event.target.value)}
-              spellCheck={false}
-              aria-label="图表数据"
-              data-testid="data-editor"
-            />
-            <div className="data-foot">
-              <Table2 size={14} />
-              <span>{parsed.delimiter === "\t" ? "制表符" : "逗号"}分隔</span>
-            </div>
-          </section>
-        </aside>
-
-        <section className="canvas-panel" ref={previewHostRef}>
-          <div className="canvas-meta">
-            <span>
-              {width} × {height}
-            </span>
-            <span>{Math.round(previewScale * 100)}%</span>
-          </div>
-          <div className="preview-stage" style={previewStyle}>
-            <div
-              className={`preview-document ${
-                transparent ? "is-transparent" : "is-solid"
-              }`}
+            <button
+              type="button"
+              className="current-template"
+              onClick={() => setTemplateOpen(true)}
             >
-              <div ref={chartElementRef} className="chart-root" />
-            </div>
-          </div>
-        </section>
+              <span className="current-template-icon">
+                <ChartFamilyIcon
+                  family={selectedTemplate.family}
+                  size={22}
+                />
+              </span>
+              <span>
+                <strong>{selectedTemplate.name}</strong>
+                <small>从 20 种模板中选择</small>
+              </span>
+              <Columns3 size={17} />
+            </button>
+          </section>
 
-        <aside className="panel panel-right">
           <section className="panel-section">
             <div className="section-heading">
               <span>内容</span>
-              <Settings2 size={15} />
+              <span className="step-index">02</span>
             </div>
             <label className="field">
               <span>标题</span>
@@ -1022,61 +768,225 @@ export default function Home() {
                 onChange={(event) => setSubtitle(event.target.value)}
               />
             </label>
-            <div className="field-row">
-              <label className="field">
-                <span>{chartType === "scatter" ? "横轴数值" : "分类"}</span>
-                <select
-                  value={selectedXColumn}
-                  onChange={(event) => setXColumn(event.target.value)}
-                >
-                  {(chartType === "scatter"
-                    ? parsed.numericHeaders
-                    : parsed.headers
-                  ).map((header) => (
-                    <option key={header} value={header}>
-                      {header}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>数值</span>
-                <select
-                  value={selectedYColumn}
-                  onChange={(event) => setYColumn(event.target.value)}
-                >
-                  {parsed.numericHeaders.map((header) => (
-                    <option key={header} value={header}>
-                      {header}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            {chartType !== "pie" && chartType !== "scatter" && (
-              <label className="field">
-                <span>对比数值</span>
-                <select
-                  value={selectedY2Column}
-                  onChange={(event) => setY2Column(event.target.value)}
-                >
-                  <option value="">不显示</option>
-                  {parsed.numericHeaders
-                    .filter((header) => header !== selectedYColumn)
-                    .map((header) => (
-                      <option key={header} value={header}>
-                        {header}
-                      </option>
-                    ))}
-                </select>
-              </label>
-            )}
           </section>
 
           <section className="panel-section">
             <div className="section-heading">
-              <span>样式</span>
-              <span className="step-index">03</span>
+              <span>数据字段</span>
+              <Table2 size={15} />
+            </div>
+            <label className="field">
+              <span>分类</span>
+              <select
+                value={selectedCategory}
+                onChange={(event) => setCategoryColumn(event.target.value)}
+              >
+                {parsed.headers.map((header) => (
+                  <option key={header} value={header}>
+                    {header}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="series-list">
+              <span className="field-caption">数值系列</span>
+              {parsed.numericHeaders.map((header, index) => (
+                <label key={header} className="series-option">
+                  <input
+                    type="checkbox"
+                    checked={effectiveSeries.includes(header)}
+                    onChange={() => toggleSeries(header)}
+                  />
+                  <span
+                    className="series-color"
+                    style={{
+                      background:
+                        index === 0
+                          ? primaryColor
+                          : index === 1
+                            ? secondaryColor
+                            : theme.colors[index % theme.colors.length],
+                    }}
+                  />
+                  <span>{header}</span>
+                  {effectiveSeries.includes(header) && <Check size={13} />}
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => setWorkspaceMode("data")}
+            >
+              <Table2 size={14} />
+              编辑数据表
+            </button>
+          </section>
+        </aside>
+
+        <section
+          className={`canvas-panel ${
+            workspaceMode !== "preview" ? "workspace-hidden" : ""
+          }`}
+          ref={previewHostRef}
+          aria-hidden={workspaceMode !== "preview"}
+        >
+            <div className="canvas-meta">
+              <span>
+                {width} × {height}
+              </span>
+              <span>{Math.round(previewScale * 100)}%</span>
+            </div>
+            <div className="preview-stage" style={previewStyle}>
+              <div
+                className={`preview-document ${
+                  transparent ? "is-transparent" : "is-solid"
+                }`}
+              >
+                <div ref={chartElementRef} className="chart-root" />
+              </div>
+            </div>
+        </section>
+
+        <section
+          className={`data-workspace ${
+            workspaceMode !== "data" ? "workspace-hidden" : ""
+          }`}
+          aria-hidden={workspaceMode !== "data"}
+        >
+            <div className="data-toolbar">
+              <div>
+                <h2>数据表</h2>
+                <span>
+                  {parsed.rows.length} 行 · {parsed.headers.length} 列
+                </span>
+              </div>
+              <div className="data-toolbar-actions">
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <FileUp size={16} />
+                  上传 CSV / TSV
+                </button>
+                <input
+                  ref={fileInputRef}
+                  className="sr-only"
+                  type="file"
+                  accept=".csv,.tsv,text/csv,text/tab-separated-values"
+                  onChange={handleFile}
+                />
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={addColumn}
+                >
+                  <Columns3 size={16} />
+                  添加列
+                </button>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={addRow}
+                >
+                  <Plus size={16} />
+                  添加行
+                </button>
+              </div>
+            </div>
+
+            <div className="sheet-shell">
+              <div className="sheet-scroll">
+                <table className="data-sheet">
+                  <thead>
+                    <tr>
+                      <th className="row-gutter">
+                        <Table2 size={15} />
+                      </th>
+                      {tableData[0]?.map((header, columnIndex) => (
+                        <th key={`header-${columnIndex}`}>
+                          <input
+                            value={header}
+                            onChange={(event) =>
+                              updateCell(0, columnIndex, event.target.value)
+                            }
+                            onPaste={(event) =>
+                              pasteIntoTable(event, 0, columnIndex)
+                            }
+                            aria-label={`第 ${columnIndex + 1} 列标题`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => deleteColumn(columnIndex)}
+                            disabled={(tableData[0]?.length ?? 0) <= 2}
+                            title="删除列"
+                            aria-label={`删除第 ${columnIndex + 1} 列`}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableData.slice(1).map((row, rowOffset) => {
+                      const rowIndex = rowOffset + 1;
+                      return (
+                        <tr key={`row-${rowIndex}`}>
+                          <th className="row-gutter">
+                            <span>{rowIndex}</span>
+                            <button
+                              type="button"
+                              onClick={() => deleteRow(rowIndex)}
+                              disabled={tableData.length <= 2}
+                              title="删除行"
+                              aria-label={`删除第 ${rowIndex} 行`}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </th>
+                          {tableData[0].map((_, columnIndex) => (
+                            <td key={`cell-${rowIndex}-${columnIndex}`}>
+                              <input
+                                value={row[columnIndex] ?? ""}
+                                onChange={(event) =>
+                                  updateCell(
+                                    rowIndex,
+                                    columnIndex,
+                                    event.target.value,
+                                  )
+                                }
+                                onPaste={(event) =>
+                                  pasteIntoTable(
+                                    event,
+                                    rowIndex,
+                                    columnIndex,
+                                  )
+                                }
+                                aria-label={`第 ${rowIndex} 行第 ${columnIndex + 1} 列`}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="add-row-bar" onClick={addRow}>
+                <Plus size={15} />
+                添加一行
+              </button>
+            </div>
+            <p className="sheet-hint">可直接从 Excel 或表格软件复制后粘贴到任意单元格</p>
+        </section>
+
+        <aside className="panel panel-right">
+          <section className="panel-section">
+            <div className="section-heading">
+              <span>配色</span>
+              <Palette size={15} />
             </div>
             <div className="theme-list">
               {THEMES.map((candidate) => (
@@ -1123,43 +1033,33 @@ export default function Home() {
                 </span>
               </label>
             </div>
+          </section>
+
+          <section className="panel-section">
+            <div className="section-heading">
+              <span>画布</span>
+              <Settings2 size={15} />
+            </div>
             <Toggle
               label="透明背景"
               checked={transparent}
               onChange={setTransparent}
             />
-            <Toggle
-              label="数据标签"
-              checked={showLabels}
-              onChange={setShowLabels}
-            />
-            <Toggle
-              label="图例"
-              checked={showLegend}
-              onChange={setShowLegend}
-            />
-            {isCartesian && (
-              <Toggle
-                label="网格线"
-                checked={showGrid}
-                onChange={setShowGrid}
-              />
+            {!transparent && (
+              <label className="background-field">
+                <span>背景色</span>
+                <span className="color-input-wrap">
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(event) => setBackgroundColor(event.target.value)}
+                    aria-label="背景色"
+                  />
+                  <span>{backgroundColor.toUpperCase()}</span>
+                </span>
+              </label>
             )}
-            {canSmooth && (
-              <Toggle
-                label="平滑曲线"
-                checked={smooth}
-                onChange={setSmooth}
-              />
-            )}
-          </section>
-
-          <section className="panel-section size-section">
-            <div className="section-heading">
-              <span>画布</span>
-              <span className="step-index">04</span>
-            </div>
-            <div className="field-row">
+            <div className="field-row canvas-size-row">
               <label className="field">
                 <span>宽度</span>
                 <input
@@ -1197,7 +1097,68 @@ export default function Home() {
                 />
               </label>
             </div>
-            <label className="field">
+            <div className="margin-heading">
+              <span>四周边距</span>
+              <button
+                type="button"
+                onClick={() => setMarginsLinked((current) => !current)}
+                title={marginsLinked ? "取消联动" : "联动四边"}
+                aria-label={marginsLinked ? "取消联动边距" : "联动四周边距"}
+              >
+                {marginsLinked ? <Lock size={14} /> : <LockOpen size={14} />}
+              </button>
+            </div>
+            <div className="margin-grid">
+              {(
+                [
+                  ["top", "上"],
+                  ["right", "右"],
+                  ["bottom", "下"],
+                  ["left", "左"],
+                ] as [keyof Margins, string][]
+              ).map(([side, label]) => (
+                <label key={side}>
+                  <span>{label}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={240}
+                    value={margins[side]}
+                    onChange={(event) =>
+                      updateMargin(side, Number(event.target.value))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel-section">
+            <div className="section-heading">
+              <span>显示</span>
+              <span className="step-index">04</span>
+            </div>
+            <Toggle
+              label="数据标签"
+              checked={showLabels}
+              onChange={setShowLabels}
+            />
+            <Toggle
+              label="图例"
+              checked={showLegend}
+              onChange={setShowLegend}
+            />
+            <Toggle
+              label="网格线"
+              checked={showGrid}
+              onChange={setShowGrid}
+            />
+            <Toggle
+              label="平滑曲线"
+              checked={smooth}
+              onChange={setSmooth}
+            />
+            <label className="field font-field">
               <span>字号</span>
               <select
                 value={fontSize}
@@ -1212,18 +1173,20 @@ export default function Home() {
           </section>
 
           <div className="panel-footer">
-            <button
-              type="button"
-              className="reset-button"
-              onClick={resetAll}
-              title="恢复示例"
-            >
+            <button type="button" className="reset-button" onClick={resetAll}>
               <RefreshCcw size={15} />
               恢复示例
             </button>
           </div>
         </aside>
       </div>
+
+      <TemplateGallery
+        open={templateOpen}
+        selected={chartType}
+        onClose={() => setTemplateOpen(false)}
+        onSelect={selectTemplate}
+      />
 
       {status && (
         <div className="toast" role="status">
