@@ -26,4 +26,30 @@
 - No new console errors or ECharts warnings appeared after the final reload and interaction pass.
 - Production build, lint, and three automated tests passed.
 
+## Settings Panel V3
+
+- Official references: Flourish editor overview and official documentation for colors, labels, axes, legends, and chart settings.
+- Before state: `design-qa/editor-v2-normalized.png`
+- Implementation: `design-qa/settings-panel-v3.jpg`
+- Combined comparison: `design-qa/settings-comparison-v3.png`
+- Comparison viewport: 1126 x 969 px
+- Visual Verdict: 94
+
+### Visual Review
+
+- The global toolbar is fixed at the top with the workspace beginning exactly 58 px below it.
+- The template control is now a compact 44 px selector rather than a large card.
+- The right panel follows Flourish's searchable accordion pattern with dense controls and thin separators.
+- Palette editing uses real color inputs, exact hex values, ordering controls, saved schemes, and series overrides.
+- The main chart remains the dominant workspace despite the expanded configuration surface.
+
+### Interaction Review
+
+- A custom color was applied to the live SVG and persisted as a named palette after reload.
+- Settings search isolated the Number formatting section and restored all groups when cleared.
+- Y-axis title, maximum value, and dotted grid styling appeared in the rendered SVG.
+- PNG preparation produced a native `blob:` file link; 2x and 4x generated distinct files and filenames.
+- The PNG link passed direct media download validation in the in-app browser.
+- Lint, production build, and all three automated tests passed.
+
 Final result: passed

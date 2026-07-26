@@ -1,10 +1,13 @@
 "use client";
 
-import type { ECharts } from "echarts";
+import { init as initECharts, type ECharts } from "echarts";
 import {
   AreaChart,
+  ArrowLeft,
+  ArrowRight,
   BarChart3,
   Check,
+  ChevronDown,
   Clipboard,
   Columns3,
   Download,
@@ -19,8 +22,10 @@ import {
   PieChart,
   Plus,
   RefreshCcw,
+  Save,
   Search,
   Settings2,
+  SlidersHorizontal,
   Table2,
   Trash2,
   X,
@@ -28,6 +33,7 @@ import {
 import {
   ChangeEvent,
   CSSProperties,
+  ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -53,56 +59,164 @@ const DEFAULT_MARGINS: Margins = {
   left: 38,
 };
 
+type SavedPalette = {
+  id: string;
+  name: string;
+  colors: string[];
+};
+
+type SettingsSectionId =
+  | "colors"
+  | "marks"
+  | "labels"
+  | "xAxis"
+  | "yAxis"
+  | "legend"
+  | "numbers"
+  | "canvas";
+
+const DEFAULT_SETTINGS_OPEN: Record<SettingsSectionId, boolean> = {
+  colors: true,
+  marks: false,
+  labels: false,
+  xAxis: false,
+  yAxis: false,
+  legend: false,
+  numbers: false,
+  canvas: true,
+};
+
 function downloadDataUrl(dataUrl: string, filename: string) {
   const link = document.createElement("a");
   link.href = dataUrl;
   link.download = filename;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.appendChild(link);
   link.click();
-}
-
-async function svgToPngBlob(
-  svgDataUrl: string,
-  width: number,
-  height: number,
-  pixelRatio: number,
-  background: string | null,
-) {
-  const image = new Image();
-  image.decoding = "sync";
-
-  await new Promise<void>((resolve, reject) => {
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error("图片转换失败"));
-    image.src = svgDataUrl;
-  });
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const context = canvas.getContext("2d");
-
-  if (!context) throw new Error("无法创建图片画布");
-  context.scale(pixelRatio, pixelRatio);
-
-  if (background) {
-    context.fillStyle = background;
-    context.fillRect(0, 0, width, height);
-  }
-
-  context.drawImage(image, 0, 0, width, height);
-
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("PNG 生成失败"));
-    }, "image/png");
-  });
+  window.requestAnimationFrame(() => link.remove());
 }
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   downloadDataUrl(url, filename);
-  window.setTimeout(() => URL.revokeObjectURL(url), 1200);
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+function parseColorOverrides(input: string) {
+  return Object.fromEntries(
+    input
+      .split(/\r?\n/)
+      .map((line) => line.split("::").map((part) => part.trim()))
+      .filter(
+        (parts): parts is [string, string] =>
+          parts.length >= 2 &&
+          Boolean(parts[0]) &&
+          /^#[0-9a-f]{6}$/i.test(parts[1]),
+      )
+      .map(([name, color]) => [name, color]),
+  );
+}
+
+function safeFilename(value: string) {
+  return (
+    value
+      .trim()
+      .replace(/[\\/:*?"<>|]/g, "-")
+      .replace(/\s+/g, " ")
+      .slice(0, 80) || "图表"
+  );
+}
+
+function renderPngDataUrl({
+  option,
+  width,
+  height,
+  pixelRatio,
+  transparent,
+  backgroundColor,
+}: {
+  option: Parameters<ECharts["setOption"]>[0];
+  width: number;
+  height: number;
+  pixelRatio: number;
+  transparent: boolean;
+  backgroundColor: string;
+}) {
+  const exportHost = document.createElement("div");
+  exportHost.style.position = "fixed";
+  exportHost.style.left = "-100000px";
+  exportHost.style.top = "0";
+  exportHost.style.width = `${width}px`;
+  exportHost.style.height = `${height}px`;
+  exportHost.style.pointerEvents = "none";
+  exportHost.setAttribute("aria-hidden", "true");
+  document.body.appendChild(exportHost);
+
+  const exportChart = initECharts(exportHost, undefined, {
+    renderer: "canvas",
+    width,
+    height,
+    devicePixelRatio: 1,
+  });
+
+  try {
+    exportChart.setOption(
+      {
+        ...option,
+        animation: false,
+        backgroundColor: transparent ? "rgba(0,0,0,0)" : backgroundColor,
+      },
+      true,
+    );
+    return exportChart.getDataURL({
+      type: "png",
+      pixelRatio,
+      backgroundColor: transparent ? undefined : backgroundColor,
+    });
+  } finally {
+    exportChart.dispose();
+    exportHost.remove();
+  }
+}
+
+function SettingsSection({
+  title,
+  icon,
+  open,
+  hidden,
+  onToggle,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  open: boolean;
+  hidden?: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  if (hidden) return null;
+
+  return (
+    <section className="settings-section">
+      <button
+        type="button"
+        className="settings-section-trigger"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <span className="settings-section-title">
+          {icon}
+          {title}
+        </span>
+        <ChevronDown
+          size={15}
+          className={open ? "settings-chevron is-open" : "settings-chevron"}
+        />
+      </button>
+      {open && <div className="settings-section-body">{children}</div>}
+    </section>
+  );
 }
 
 function ChartFamilyIcon({
@@ -283,8 +397,13 @@ export default function Home() {
     "目标",
   ]);
   const [themeId, setThemeId] = useState("editorial");
-  const [primaryColor, setPrimaryColor] = useState(THEMES[0].colors[0]);
-  const [secondaryColor, setSecondaryColor] = useState("#4aa7f3");
+  const [paletteColors, setPaletteColors] = useState<string[]>([
+    ...THEMES[0].colors,
+  ]);
+  const [customPalettes, setCustomPalettes] = useState<SavedPalette[]>([]);
+  const [palettesLoaded, setPalettesLoaded] = useState(false);
+  const [paletteName, setPaletteName] = useState("我的配色");
+  const [colorOverridesText, setColorOverridesText] = useState("");
   const [transparent, setTransparent] = useState(true);
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
   const [margins, setMargins] = useState<Margins>(DEFAULT_MARGINS);
@@ -294,6 +413,39 @@ export default function Home() {
   const [showGrid, setShowGrid] = useState(true);
   const [smooth, setSmooth] = useState(true);
   const [fontSize, setFontSize] = useState(14);
+  const [lineWidth, setLineWidth] = useState(3);
+  const [pointSize, setPointSize] = useState(7);
+  const [barWidth, setBarWidth] = useState(48);
+  const [barRadius, setBarRadius] = useState(3);
+  const [markOpacity, setMarkOpacity] = useState(100);
+  const [areaOpacity, setAreaOpacity] = useState(22);
+  const [labelPosition, setLabelPosition] = useState<
+    "auto" | "inside" | "outside"
+  >("auto");
+  const [showXAxis, setShowXAxis] = useState(true);
+  const [showYAxis, setShowYAxis] = useState(true);
+  const [xAxisTitle, setXAxisTitle] = useState("");
+  const [yAxisTitle, setYAxisTitle] = useState("");
+  const [axisLabelRotation, setAxisLabelRotation] = useState(0);
+  const [yAxisMin, setYAxisMin] = useState("");
+  const [yAxisMax, setYAxisMax] = useState("");
+  const [legendPosition, setLegendPosition] = useState<
+    "top" | "bottom" | "left" | "right"
+  >("top");
+  const [showTooltip, setShowTooltip] = useState(true);
+  const [gridLineType, setGridLineType] = useState<
+    "solid" | "dashed" | "dotted"
+  >("dashed");
+  const [numberDecimals, setNumberDecimals] = useState(0);
+  const [numberPrefix, setNumberPrefix] = useState("");
+  const [numberSuffix, setNumberSuffix] = useState("");
+  const [useThousandsSeparator, setUseThousandsSeparator] = useState(true);
+  const [titleAlign, setTitleAlign] = useState<"left" | "center" | "right">(
+    "left",
+  );
+  const [settingsQuery, setSettingsQuery] = useState("");
+  const [settingsOpen, setSettingsOpen] =
+    useState<Record<SettingsSectionId, boolean>>(DEFAULT_SETTINGS_OPEN);
   const [pixelRatio, setPixelRatio] = useState(2);
   const [previewScale, setPreviewScale] = useState(1);
   const [status, setStatus] = useState("");
@@ -305,6 +457,12 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const parsed = useMemo(() => tableToParsed(tableData), [tableData]);
+  const colorOverrides = useMemo(
+    () => parseColorOverrides(colorOverridesText),
+    [colorOverridesText],
+  );
+  const primaryColor = paletteColors[0] ?? THEMES[0].colors[0];
+  const secondaryColor = paletteColors[1] ?? primaryColor;
   const theme =
     THEMES.find((candidate) => candidate.id === themeId) ?? THEMES[0];
   const selectedTemplate =
@@ -315,12 +473,12 @@ export default function Home() {
     : parsed.headers.find(
         (header) => !parsed.numericHeaders.includes(header),
       ) ?? parsed.headers[0] ?? "";
-  const selectedSeries = seriesColumns.filter((header) =>
-    parsed.numericHeaders.includes(header),
-  );
-  const effectiveSeries = selectedSeries.length
-    ? selectedSeries
-    : parsed.numericHeaders.slice(0, 1);
+  const effectiveSeries = useMemo(() => {
+    const selected = seriesColumns.filter((header) =>
+      parsed.numericHeaders.includes(header),
+    );
+    return selected.length ? selected : parsed.numericHeaders.slice(0, 1);
+  }, [parsed.numericHeaders, seriesColumns]);
 
   const option = useMemo(
     () =>
@@ -337,6 +495,8 @@ export default function Home() {
         theme,
         primaryColor,
         secondaryColor,
+        paletteColors,
+        colorOverrides,
         backgroundColor,
         transparent,
         showLabels,
@@ -344,29 +504,83 @@ export default function Home() {
         showGrid,
         smooth,
         fontSize,
+        lineWidth,
+        pointSize,
+        barWidth,
+        barRadius,
+        markOpacity,
+        areaOpacity,
+        labelPosition,
+        showXAxis,
+        showYAxis,
+        xAxisTitle,
+        yAxisTitle,
+        axisLabelRotation,
+        yAxisMin,
+        yAxisMax,
+        legendPosition,
+        showTooltip,
+        gridLineType,
+        numberDecimals,
+        numberPrefix,
+        numberSuffix,
+        useThousandsSeparator,
+        titleAlign,
       }),
     [
+      areaOpacity,
+      axisLabelRotation,
       backgroundColor,
+      barRadius,
+      barWidth,
       chartType,
+      colorOverrides,
       effectiveSeries,
       fontSize,
+      gridLineType,
       height,
+      labelPosition,
+      legendPosition,
+      lineWidth,
       margins,
+      markOpacity,
+      numberDecimals,
+      numberPrefix,
+      numberSuffix,
+      paletteColors,
       parsed,
+      pointSize,
       primaryColor,
       secondaryColor,
       selectedCategory,
       showGrid,
       showLabels,
       showLegend,
+      showTooltip,
+      showXAxis,
+      showYAxis,
       smooth,
       subtitle,
       theme,
       title,
+      titleAlign,
       transparent,
+      useThousandsSeparator,
       width,
+      xAxisTitle,
+      yAxisMax,
+      yAxisMin,
+      yAxisTitle,
     ],
   );
+  const [pngDownload, setPngDownload] = useState<{
+    option: typeof option;
+    pixelRatio: number;
+    objectUrl: string;
+    blob: Blob;
+  } | null>(null);
+  const pngDownloadReady =
+    pngDownload?.option === option && pngDownload.pixelRatio === pixelRatio;
   const initialChartStateRef = useRef({ height, option, width });
 
   useEffect(() => {
@@ -374,10 +588,9 @@ export default function Home() {
 
     async function mountChart() {
       if (!chartElementRef.current || chartRef.current) return;
-      const echarts = await import("echarts");
       if (cancelled || !chartElementRef.current) return;
       const initial = initialChartStateRef.current;
-      chartRef.current = echarts.init(chartElementRef.current, undefined, {
+      chartRef.current = initECharts(chartElementRef.current, undefined, {
         renderer: "svg",
         width: initial.width,
         height: initial.height,
@@ -402,6 +615,50 @@ export default function Home() {
   }, [height, option, width, workspaceMode]);
 
   useEffect(() => {
+    let objectUrl = "";
+    let cancelled = false;
+    const timeout = window.setTimeout(async () => {
+      try {
+        const dataUrl = renderPngDataUrl({
+          option,
+          width,
+          height,
+          pixelRatio,
+          transparent,
+          backgroundColor,
+        });
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        if (!blob.size) throw new Error("PNG 生成失败");
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPngDownload({
+          option,
+          pixelRatio,
+          objectUrl,
+          blob,
+        });
+      } catch (error) {
+        if (cancelled) return;
+        console.error("PNG preparation failed", error);
+        setPngDownload(null);
+      }
+    }, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [
+    backgroundColor,
+    height,
+    option,
+    pixelRatio,
+    transparent,
+    width,
+  ]);
+
+  useEffect(() => {
     const host = previewHostRef.current;
     if (!host) return;
 
@@ -424,10 +681,111 @@ export default function Home() {
     return () => window.clearTimeout(timeout);
   }, [status]);
 
+  useEffect(() => {
+    let nextPalettes: SavedPalette[] = [];
+    try {
+      const saved = window.localStorage.getItem("tuzuo-custom-palettes");
+      if (saved) nextPalettes = JSON.parse(saved) as SavedPalette[];
+    } catch {
+      nextPalettes = [];
+    }
+    const frame = window.requestAnimationFrame(() => {
+      setCustomPalettes(nextPalettes);
+      setPalettesLoaded(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!palettesLoaded) return;
+    window.localStorage.setItem(
+      "tuzuo-custom-palettes",
+      JSON.stringify(customPalettes),
+    );
+  }, [customPalettes, palettesLoaded]);
+
   function selectTheme(nextTheme: (typeof THEMES)[number]) {
     setThemeId(nextTheme.id);
-    setPrimaryColor(nextTheme.colors[0]);
-    setSecondaryColor(nextTheme.colors[1]);
+    setPaletteColors([...nextTheme.colors]);
+  }
+
+  function selectSavedPalette(palette: SavedPalette) {
+    setThemeId(palette.id);
+    setPaletteColors([...palette.colors]);
+    setPaletteName(palette.name);
+  }
+
+  function updatePaletteColor(index: number, color: string) {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+    setThemeId("custom");
+    setPaletteColors((current) =>
+      current.map((candidate, colorIndex) =>
+        colorIndex === index ? color : candidate,
+      ),
+    );
+  }
+
+  function movePaletteColor(index: number, direction: -1 | 1) {
+    setThemeId("custom");
+    setPaletteColors((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function addPaletteColor() {
+    setThemeId("custom");
+    setPaletteColors((current) => [
+      ...current,
+      THEMES[0].colors[current.length % THEMES[0].colors.length],
+    ]);
+  }
+
+  function removePaletteColor(index: number) {
+    if (paletteColors.length <= 2) return;
+    setThemeId("custom");
+    setPaletteColors((current) =>
+      current.filter((_, colorIndex) => colorIndex !== index),
+    );
+  }
+
+  function saveCurrentPalette() {
+    const name = paletteName.trim() || `自定义配色 ${customPalettes.length + 1}`;
+    const existing = customPalettes.find(
+      (palette) => palette.name.toLowerCase() === name.toLowerCase(),
+    );
+    const saved: SavedPalette = {
+      id: existing?.id ?? `custom-${Date.now()}`,
+      name,
+      colors: [...paletteColors],
+    };
+    setCustomPalettes((current) =>
+      existing
+        ? current.map((palette) => (palette.id === existing.id ? saved : palette))
+        : [...current, saved],
+    );
+    setThemeId(saved.id);
+    setPaletteName(name);
+    setStatus(existing ? "自定义配色已更新" : "自定义配色已保存");
+  }
+
+  function deleteSavedPalette(id: string) {
+    setCustomPalettes((current) =>
+      current.filter((palette) => palette.id !== id),
+    );
+    if (themeId === id) setThemeId("custom");
+  }
+
+  function toggleSettingsSection(id: SettingsSectionId) {
+    setSettingsOpen((current) => ({ ...current, [id]: !current[id] }));
+  }
+
+  function settingsSectionVisible(title: string, keywords: string) {
+    const query = settingsQuery.trim().toLowerCase();
+    return !query || `${title} ${keywords}`.toLowerCase().includes(query);
   }
 
   function selectTemplate(type: ChartType) {
@@ -559,37 +917,13 @@ export default function Home() {
     }
   }
 
-  async function createPngBlob() {
-    if (!chartRef.current) throw new Error("图表尚未准备好");
-    return svgToPngBlob(
-      chartRef.current.getSvgDataURL(),
-      width,
-      height,
-      pixelRatio,
-      transparent ? null : backgroundColor,
-    );
-  }
-
-  async function exportPng() {
-    setExporting(true);
-    try {
-      downloadBlob(
-        await createPngBlob(),
-        `${title || "图表"}@${pixelRatio}x.png`,
-      );
-      setStatus("PNG 已导出");
-    } catch {
-      setStatus("PNG 导出失败");
-    } finally {
-      setExporting(false);
-    }
-  }
-
   function exportSvg() {
     if (!chartRef.current) return;
-    downloadDataUrl(
-      chartRef.current.getSvgDataURL(),
-      `${title || "图表"}.svg`,
+    downloadBlob(
+      new Blob([chartRef.current.renderToSVGString({ useViewBox: true })], {
+        type: "image/svg+xml;charset=utf-8",
+      }),
+      `${safeFilename(title)}.svg`,
     );
     setStatus("SVG 已导出");
   }
@@ -597,7 +931,20 @@ export default function Home() {
   async function copyPng() {
     setExporting(true);
     try {
-      const blob = await createPngBlob();
+      const blob =
+        pngDownloadReady && pngDownload
+          ? pngDownload.blob
+          : await fetch(
+              renderPngDataUrl({
+                option,
+                width,
+                height,
+                pixelRatio,
+                transparent,
+                backgroundColor,
+              }),
+            ).then((response) => response.blob());
+      if (!blob.size) throw new Error("PNG 生成失败");
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
       setStatus("PNG 已复制");
     } catch {
@@ -618,8 +965,9 @@ export default function Home() {
     setCategoryColumn("月份");
     setSeriesColumns(["实际收入", "目标"]);
     setThemeId("editorial");
-    setPrimaryColor(THEMES[0].colors[0]);
-    setSecondaryColor("#4aa7f3");
+    setPaletteColors([...THEMES[0].colors]);
+    setPaletteName("我的配色");
+    setColorOverridesText("");
     setTransparent(true);
     setBackgroundColor("#ffffff");
     setMargins(DEFAULT_MARGINS);
@@ -629,6 +977,30 @@ export default function Home() {
     setShowGrid(true);
     setSmooth(true);
     setFontSize(14);
+    setLineWidth(3);
+    setPointSize(7);
+    setBarWidth(48);
+    setBarRadius(3);
+    setMarkOpacity(100);
+    setAreaOpacity(22);
+    setLabelPosition("auto");
+    setShowXAxis(true);
+    setShowYAxis(true);
+    setXAxisTitle("");
+    setYAxisTitle("");
+    setAxisLabelRotation(0);
+    setYAxisMin("");
+    setYAxisMax("");
+    setLegendPosition("top");
+    setShowTooltip(true);
+    setGridLineType("dashed");
+    setNumberDecimals(0);
+    setNumberPrefix("");
+    setNumberSuffix("");
+    setUseThousandsSeparator(true);
+    setTitleAlign("left");
+    setSettingsQuery("");
+    setSettingsOpen(DEFAULT_SETTINGS_OPEN);
     setPixelRatio(2);
     setStatus("已恢复示例");
   }
@@ -707,19 +1079,27 @@ export default function Home() {
             <Download size={17} />
             SVG
           </button>
-          <button
-            type="button"
+          <a
             className="button button-primary"
-            onClick={exportPng}
-            disabled={exporting}
+            href={pngDownloadReady ? pngDownload?.objectUrl : undefined}
+            download={`${safeFilename(title)}@${pixelRatio}x.png`}
+            aria-disabled={!pngDownloadReady}
+            onClick={(event) => {
+              if (!pngDownloadReady) {
+                event.preventDefault();
+                setStatus("PNG 正在准备，请稍候");
+                return;
+              }
+              setStatus("PNG 已开始下载");
+            }}
           >
-            {exporting ? (
+            {!pngDownloadReady ? (
               <LoaderCircle className="spin" size={17} />
             ) : (
               <ImageDown size={17} />
             )}
             PNG
-          </button>
+          </a>
         </div>
       </header>
 
@@ -738,14 +1118,14 @@ export default function Home() {
               <span className="current-template-icon">
                 <ChartFamilyIcon
                   family={selectedTemplate.family}
-                  size={22}
+                  size={17}
                 />
               </span>
               <span>
                 <strong>{selectedTemplate.name}</strong>
-                <small>从 20 种模板中选择</small>
+                <small>20 种图表</small>
               </span>
-              <Columns3 size={17} />
+              <ChevronDown size={15} />
             </button>
           </section>
 
@@ -983,12 +1363,46 @@ export default function Home() {
         </section>
 
         <aside className="panel panel-right">
-          <section className="panel-section">
-            <div className="section-heading">
-              <span>配色</span>
-              <Palette size={15} />
-            </div>
-            <div className="theme-list">
+          <div className="settings-toolbar">
+            <label className="settings-search">
+              <Search size={14} />
+              <input
+                value={settingsQuery}
+                onChange={(event) => setSettingsQuery(event.target.value)}
+                placeholder="搜索设置"
+                aria-label="搜索设置"
+              />
+              {settingsQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSettingsQuery("")}
+                  aria-label="清除设置搜索"
+                  title="清除"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </label>
+            <button
+              type="button"
+              className="settings-reset-icon"
+              onClick={resetAll}
+              aria-label="恢复示例"
+              title="恢复示例"
+            >
+              <RefreshCcw size={15} />
+            </button>
+          </div>
+
+          <SettingsSection
+            title="配色"
+            icon={<Palette size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.colors}
+            hidden={!settingsSectionVisible("配色", "颜色 调色板 自定义 品牌 系列")}
+            onToggle={() => toggleSettingsSection("colors")}
+          >
+            <span className="settings-caption">预设方案</span>
+            <div className="theme-list compact">
               {THEMES.map((candidate) => (
                 <button
                   key={candidate.id}
@@ -1003,43 +1417,489 @@ export default function Home() {
                     ))}
                   </span>
                   <span>{candidate.name}</span>
-                  {themeId === candidate.id && <Check size={14} />}
+                  {themeId === candidate.id && <Check size={13} />}
                 </button>
               ))}
             </div>
-            <div className="color-row">
-              <label>
-                <span>主色</span>
-                <span className="color-input-wrap">
-                  <input
-                    type="color"
-                    value={primaryColor}
-                    onChange={(event) => setPrimaryColor(event.target.value)}
-                    aria-label="主色"
-                  />
-                  <span>{primaryColor.toUpperCase()}</span>
-                </span>
-              </label>
-              <label>
-                <span>对比色</span>
-                <span className="color-input-wrap">
-                  <input
-                    type="color"
-                    value={secondaryColor}
-                    onChange={(event) => setSecondaryColor(event.target.value)}
-                    aria-label="对比色"
-                  />
-                  <span>{secondaryColor.toUpperCase()}</span>
-                </span>
-              </label>
-            </div>
-          </section>
 
-          <section className="panel-section">
-            <div className="section-heading">
-              <span>画布</span>
-              <Settings2 size={15} />
+            {customPalettes.length > 0 && (
+              <>
+                <span className="settings-caption custom-palette-caption">
+                  已保存
+                </span>
+                <div className="saved-palette-list">
+                  {customPalettes.map((palette) => (
+                    <div key={palette.id} className="saved-palette-row">
+                      <button
+                        type="button"
+                        className={
+                          themeId === palette.id
+                            ? "saved-palette-select selected"
+                            : "saved-palette-select"
+                        }
+                        onClick={() => selectSavedPalette(palette)}
+                        aria-pressed={themeId === palette.id}
+                      >
+                        <span className="palette-strip" aria-hidden="true">
+                          {palette.colors.slice(0, 6).map((color, index) => (
+                            <span
+                              key={`${color}-${index}`}
+                              style={{ background: color }}
+                            />
+                          ))}
+                        </span>
+                        <span>{palette.name}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="palette-row-action"
+                        onClick={() => deleteSavedPalette(palette.id)}
+                        aria-label={`删除配色 ${palette.name}`}
+                        title="删除配色"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="palette-editor-heading">
+              <span className="settings-caption">当前调色板</span>
+              <button
+                type="button"
+                onClick={addPaletteColor}
+                aria-label="添加颜色"
+                title="添加颜色"
+              >
+                <Plus size={14} />
+              </button>
             </div>
+            <div className="palette-editor">
+              {paletteColors.map((color, index) => (
+                <div className="palette-color-row" key={`${index}-${color}`}>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(event) =>
+                      updatePaletteColor(index, event.target.value)
+                    }
+                    aria-label={`调色板颜色 ${index + 1}`}
+                  />
+                  <input
+                    className="palette-hex"
+                    value={color.toUpperCase()}
+                    onChange={(event) =>
+                      updatePaletteColor(index, event.target.value)
+                    }
+                    maxLength={7}
+                    aria-label={`颜色 ${index + 1} 色值`}
+                  />
+                  <div className="palette-reorder">
+                    <button
+                      type="button"
+                      onClick={() => movePaletteColor(index, -1)}
+                      disabled={index === 0}
+                      aria-label={`颜色 ${index + 1} 左移`}
+                      title="左移"
+                    >
+                      <ArrowLeft size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => movePaletteColor(index, 1)}
+                      disabled={index === paletteColors.length - 1}
+                      aria-label={`颜色 ${index + 1} 右移`}
+                      title="右移"
+                    >
+                      <ArrowRight size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removePaletteColor(index)}
+                      disabled={paletteColors.length <= 2}
+                      aria-label={`删除颜色 ${index + 1}`}
+                      title="删除颜色"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="save-palette-row">
+              <input
+                value={paletteName}
+                onChange={(event) => setPaletteName(event.target.value)}
+                placeholder="配色名称"
+                aria-label="配色名称"
+              />
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={saveCurrentPalette}
+              >
+                <Save size={14} />
+                保存
+              </button>
+            </div>
+
+            <label className="field settings-field">
+              <span>系列颜色覆盖</span>
+              <textarea
+                value={colorOverridesText}
+                onChange={(event) => setColorOverridesText(event.target.value)}
+                placeholder={"实际收入 :: #2563eb\n目标 :: #f15a3a"}
+                aria-label="系列颜色覆盖"
+              />
+              <small>每行使用“系列名 :: #色值”</small>
+            </label>
+          </SettingsSection>
+
+          <SettingsSection
+            title="线条、数据点与面积"
+            icon={<SlidersHorizontal size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.marks}
+            hidden={
+              !settingsSectionVisible(
+                "线条、数据点与面积",
+                "柱宽 圆角 透明度 平滑 点大小 样式",
+              )
+            }
+            onToggle={() => toggleSettingsSection("marks")}
+          >
+            {(selectedTemplate.family === "line" ||
+              selectedTemplate.family === "area" ||
+              chartType === "combo") && (
+              <>
+                <label className="range-field">
+                  <span>
+                    线条宽度 <strong>{lineWidth}px</strong>
+                  </span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={12}
+                    value={lineWidth}
+                    onChange={(event) => setLineWidth(Number(event.target.value))}
+                  />
+                </label>
+                <label className="range-field">
+                  <span>
+                    数据点大小 <strong>{pointSize}px</strong>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={24}
+                    value={pointSize}
+                    onChange={(event) => setPointSize(Number(event.target.value))}
+                  />
+                </label>
+                <Toggle
+                  label="平滑曲线"
+                  checked={smooth}
+                  onChange={setSmooth}
+                />
+              </>
+            )}
+            {(selectedTemplate.family === "bar" ||
+              chartType === "combo" ||
+              chartType === "divergingBar" ||
+              chartType === "populationPyramid") && (
+              <>
+                <label className="range-field">
+                  <span>
+                    柱条宽度 <strong>{barWidth}px</strong>
+                  </span>
+                  <input
+                    type="range"
+                    min={8}
+                    max={96}
+                    value={barWidth}
+                    onChange={(event) => setBarWidth(Number(event.target.value))}
+                  />
+                </label>
+                <label className="range-field">
+                  <span>
+                    圆角 <strong>{barRadius}px</strong>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={24}
+                    value={barRadius}
+                    onChange={(event) => setBarRadius(Number(event.target.value))}
+                  />
+                </label>
+              </>
+            )}
+            {selectedTemplate.family === "area" && (
+              <label className="range-field">
+                <span>
+                  面积透明度 <strong>{areaOpacity}%</strong>
+                </span>
+                <input
+                  type="range"
+                  min={5}
+                  max={100}
+                  value={areaOpacity}
+                  onChange={(event) => setAreaOpacity(Number(event.target.value))}
+                />
+              </label>
+            )}
+            <label className="range-field">
+              <span>
+                图形不透明度 <strong>{markOpacity}%</strong>
+              </span>
+              <input
+                type="range"
+                min={10}
+                max={100}
+                value={markOpacity}
+                onChange={(event) => setMarkOpacity(Number(event.target.value))}
+              />
+            </label>
+          </SettingsSection>
+
+          <SettingsSection
+            title="数据标签"
+            icon={<Table2 size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.labels}
+            hidden={!settingsSectionVisible("数据标签", "数值 位置 字号 显示")}
+            onToggle={() => toggleSettingsSection("labels")}
+          >
+            <Toggle
+              label="显示数据标签"
+              checked={showLabels}
+              onChange={setShowLabels}
+            />
+            <span className="settings-caption">标签位置</span>
+            <div className="segmented-control three">
+              {(
+                [
+                  ["auto", "自动"],
+                  ["outside", "外侧"],
+                  ["inside", "内部"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={labelPosition === value ? "active" : ""}
+                  onClick={() => setLabelPosition(value)}
+                  aria-pressed={labelPosition === value}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="field settings-field">
+              <span>标签字号</span>
+              <select
+                value={fontSize}
+                onChange={(event) => setFontSize(Number(event.target.value))}
+              >
+                <option value={10}>10 px</option>
+                <option value={12}>12 px</option>
+                <option value={14}>14 px</option>
+                <option value={16}>16 px</option>
+                <option value={18}>18 px</option>
+                <option value={20}>20 px</option>
+              </select>
+            </label>
+          </SettingsSection>
+
+          <SettingsSection
+            title="X 轴"
+            icon={<Columns3 size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.xAxis}
+            hidden={!settingsSectionVisible("X 轴", "横轴 标题 标签 旋转")}
+            onToggle={() => toggleSettingsSection("xAxis")}
+          >
+            <Toggle
+              label="显示 X 轴"
+              checked={showXAxis}
+              onChange={setShowXAxis}
+            />
+            <label className="field settings-field">
+              <span>轴标题</span>
+              <input
+                value={xAxisTitle}
+                onChange={(event) => setXAxisTitle(event.target.value)}
+                placeholder="留空则不显示"
+              />
+            </label>
+            <label className="range-field">
+              <span>
+                标签旋转 <strong>{axisLabelRotation}°</strong>
+              </span>
+              <input
+                type="range"
+                min={-90}
+                max={90}
+                step={15}
+                value={axisLabelRotation}
+                onChange={(event) =>
+                  setAxisLabelRotation(Number(event.target.value))
+                }
+              />
+            </label>
+          </SettingsSection>
+
+          <SettingsSection
+            title="Y 轴"
+            icon={<BarChart3 size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.yAxis}
+            hidden={!settingsSectionVisible("Y 轴", "纵轴 范围 最小 最大 网格线")}
+            onToggle={() => toggleSettingsSection("yAxis")}
+          >
+            <Toggle
+              label="显示 Y 轴"
+              checked={showYAxis}
+              onChange={setShowYAxis}
+            />
+            <label className="field settings-field">
+              <span>轴标题</span>
+              <input
+                value={yAxisTitle}
+                onChange={(event) => setYAxisTitle(event.target.value)}
+                placeholder="留空则不显示"
+              />
+            </label>
+            <div className="field-row">
+              <label className="field settings-field">
+                <span>最小值</span>
+                <input
+                  inputMode="decimal"
+                  value={yAxisMin}
+                  onChange={(event) => setYAxisMin(event.target.value)}
+                  placeholder="自动"
+                />
+              </label>
+              <label className="field settings-field">
+                <span>最大值</span>
+                <input
+                  inputMode="decimal"
+                  value={yAxisMax}
+                  onChange={(event) => setYAxisMax(event.target.value)}
+                  placeholder="自动"
+                />
+              </label>
+            </div>
+            <Toggle
+              label="显示网格线"
+              checked={showGrid}
+              onChange={setShowGrid}
+            />
+            <label className="field settings-field">
+              <span>网格线样式</span>
+              <select
+                value={gridLineType}
+                onChange={(event) =>
+                  setGridLineType(
+                    event.target.value as "solid" | "dashed" | "dotted",
+                  )
+                }
+              >
+                <option value="solid">实线</option>
+                <option value="dashed">虚线</option>
+                <option value="dotted">点线</option>
+              </select>
+            </label>
+          </SettingsSection>
+
+          <SettingsSection
+            title="图例与交互"
+            icon={<LayoutGrid size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.legend}
+            hidden={!settingsSectionVisible("图例与交互", "位置 提示 悬停 筛选")}
+            onToggle={() => toggleSettingsSection("legend")}
+          >
+            <Toggle
+              label="显示图例"
+              checked={showLegend}
+              onChange={setShowLegend}
+            />
+            <label className="field settings-field">
+              <span>图例位置</span>
+              <select
+                value={legendPosition}
+                onChange={(event) =>
+                  setLegendPosition(
+                    event.target.value as "top" | "bottom" | "left" | "right",
+                  )
+                }
+              >
+                <option value="top">顶部</option>
+                <option value="bottom">底部</option>
+                <option value="left">左侧</option>
+                <option value="right">右侧</option>
+              </select>
+            </label>
+            <Toggle
+              label="悬停提示"
+              checked={showTooltip}
+              onChange={setShowTooltip}
+            />
+          </SettingsSection>
+
+          <SettingsSection
+            title="数字格式"
+            icon={<Settings2 size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.numbers}
+            hidden={!settingsSectionVisible("数字格式", "小数 千分位 前缀 后缀 单位")}
+            onToggle={() => toggleSettingsSection("numbers")}
+          >
+            <label className="field settings-field">
+              <span>小数位数</span>
+              <select
+                value={numberDecimals}
+                onChange={(event) =>
+                  setNumberDecimals(Number(event.target.value))
+                }
+              >
+                {[0, 1, 2, 3, 4].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="field-row">
+              <label className="field settings-field">
+                <span>前缀</span>
+                <input
+                  value={numberPrefix}
+                  onChange={(event) => setNumberPrefix(event.target.value)}
+                  placeholder="如 ¥"
+                />
+              </label>
+              <label className="field settings-field">
+                <span>后缀</span>
+                <input
+                  value={numberSuffix}
+                  onChange={(event) => setNumberSuffix(event.target.value)}
+                  placeholder="如 万元"
+                />
+              </label>
+            </div>
+            <Toggle
+              label="使用千分位"
+              checked={useThousandsSeparator}
+              onChange={setUseThousandsSeparator}
+            />
+          </SettingsSection>
+
+          <SettingsSection
+            title="画布与布局"
+            icon={<Settings2 size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.canvas}
+            hidden={!settingsSectionVisible("画布与布局", "背景 尺寸 边距 标题 对齐 透明")}
+            onToggle={() => toggleSettingsSection("canvas")}
+          >
             <Toggle
               label="透明背景"
               checked={transparent}
@@ -1059,6 +1919,26 @@ export default function Home() {
                 </span>
               </label>
             )}
+            <span className="settings-caption">标题对齐</span>
+            <div className="segmented-control three">
+              {(
+                [
+                  ["left", "左"],
+                  ["center", "中"],
+                  ["right", "右"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={titleAlign === value ? "active" : ""}
+                  onClick={() => setTitleAlign(value)}
+                  aria-pressed={titleAlign === value}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="field-row canvas-size-row">
               <label className="field">
                 <span>宽度</span>
@@ -1131,53 +2011,24 @@ export default function Home() {
                 </label>
               ))}
             </div>
-          </section>
+          </SettingsSection>
 
-          <section className="panel-section">
-            <div className="section-heading">
-              <span>显示</span>
-              <span className="step-index">04</span>
-            </div>
-            <Toggle
-              label="数据标签"
-              checked={showLabels}
-              onChange={setShowLabels}
-            />
-            <Toggle
-              label="图例"
-              checked={showLegend}
-              onChange={setShowLegend}
-            />
-            <Toggle
-              label="网格线"
-              checked={showGrid}
-              onChange={setShowGrid}
-            />
-            <Toggle
-              label="平滑曲线"
-              checked={smooth}
-              onChange={setSmooth}
-            />
-            <label className="field font-field">
-              <span>字号</span>
-              <select
-                value={fontSize}
-                onChange={(event) => setFontSize(Number(event.target.value))}
-              >
-                <option value={12}>小 · 12 px</option>
-                <option value={14}>标准 · 14 px</option>
-                <option value={16}>大 · 16 px</option>
-                <option value={18}>特大 · 18 px</option>
-              </select>
-            </label>
-          </section>
-
-          <div className="panel-footer">
-            <button type="button" className="reset-button" onClick={resetAll}>
-              <RefreshCcw size={15} />
-              恢复示例
-            </button>
-          </div>
+          {settingsQuery &&
+            ![
+              settingsSectionVisible("配色", "颜色 调色板 自定义 品牌 系列"),
+              settingsSectionVisible(
+                "线条、数据点与面积",
+                "柱宽 圆角 透明度 平滑 点大小 样式",
+              ),
+              settingsSectionVisible("数据标签", "数值 位置 字号 显示"),
+              settingsSectionVisible("X 轴", "横轴 标题 标签 旋转"),
+              settingsSectionVisible("Y 轴", "纵轴 范围 最小 最大 网格线"),
+              settingsSectionVisible("图例与交互", "位置 提示 悬停 筛选"),
+              settingsSectionVisible("数字格式", "小数 千分位 前缀 后缀 单位"),
+              settingsSectionVisible("画布与布局", "背景 尺寸 边距 标题 对齐 透明"),
+            ].some(Boolean) && (
+              <div className="settings-empty">没有匹配的设置</div>
+            )}
         </aside>
       </div>
 

@@ -65,6 +65,8 @@ export type ChartConfig = {
   theme: ThemePreset;
   primaryColor: string;
   secondaryColor: string;
+  paletteColors?: string[];
+  colorOverrides?: Record<string, string>;
   backgroundColor: string;
   transparent: boolean;
   showLabels: boolean;
@@ -72,6 +74,28 @@ export type ChartConfig = {
   showGrid: boolean;
   smooth: boolean;
   fontSize: number;
+  lineWidth?: number;
+  pointSize?: number;
+  barWidth?: number;
+  barRadius?: number;
+  markOpacity?: number;
+  areaOpacity?: number;
+  labelPosition?: "auto" | "inside" | "outside";
+  showXAxis?: boolean;
+  showYAxis?: boolean;
+  xAxisTitle?: string;
+  yAxisTitle?: string;
+  axisLabelRotation?: number;
+  yAxisMin?: string;
+  yAxisMax?: string;
+  legendPosition?: "top" | "bottom" | "left" | "right";
+  showTooltip?: boolean;
+  gridLineType?: "solid" | "dashed" | "dotted";
+  numberDecimals?: number;
+  numberPrefix?: string;
+  numberSuffix?: string;
+  useThousandsSeparator?: boolean;
+  titleAlign?: "left" | "center" | "right";
   compact?: boolean;
 };
 
@@ -281,13 +305,45 @@ function normalizeSeries(series: { name: string; data: number[] }[]) {
   }));
 }
 
-function colorFor(index: number, config: ChartConfig) {
-  const palette = [
-    config.primaryColor,
-    config.secondaryColor,
-    ...config.theme.colors.slice(2),
-  ];
+function paletteFor(config: ChartConfig) {
+  const custom = config.paletteColors?.filter(Boolean);
+  return custom?.length
+    ? custom
+    : [
+        config.primaryColor,
+        config.secondaryColor,
+        ...config.theme.colors.slice(2),
+      ];
+}
+
+function colorFor(index: number, config: ChartConfig, name?: string) {
+  if (name && config.colorOverrides?.[name]) {
+    return config.colorOverrides[name];
+  }
+  const palette = paletteFor(config);
   return palette[index % palette.length];
+}
+
+function numberFormatter(config: ChartConfig, proportional: boolean) {
+  return (rawValue: string | number) => {
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) return String(rawValue);
+    const decimals = Math.min(6, Math.max(0, config.numberDecimals ?? 0));
+    const formatted = value.toLocaleString("zh-CN", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+      useGrouping: config.useThousandsSeparator ?? true,
+    });
+    return `${config.numberPrefix ?? ""}${formatted}${
+      proportional ? "%" : config.numberSuffix ?? ""
+    }`;
+  };
+}
+
+function numericBound(value: string | undefined) {
+  if (!value?.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 export function buildChartOption(config: ChartConfig): EChartsOption {
@@ -330,6 +386,18 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
     type === "proportionalBar" ||
     type === "proportionalColumn";
   if (proportional) dataSeries = normalizeSeries(dataSeries);
+  const formatNumber = numberFormatter(config, proportional);
+  const lineWidth = config.lineWidth ?? 3;
+  const pointSize = config.pointSize ?? 7;
+  const barWidth = config.barWidth ?? 48;
+  const barRadius = config.barRadius ?? 3;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const areaOpacity = (config.areaOpacity ?? 22) / 100;
+  const showXAxis = config.showXAxis ?? true;
+  const showYAxis = config.showYAxis ?? true;
+  const showTooltip = config.showTooltip ?? true;
+  const legendPosition = config.legendPosition ?? "top";
+  const gridLineType = config.gridLineType ?? "dashed";
 
   const titleBlock = compact ? 0 : title || subtitle ? 74 : 12;
   const gridTop = compact ? 6 : margins.top + titleBlock;
@@ -339,32 +407,46 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
   const textColor = theme.text;
   const splitLine = {
     show: compact ? false : showGrid,
-    lineStyle: { color: theme.grid, type: "dashed" as const },
+    lineStyle: { color: theme.grid, type: gridLineType },
   };
   const axisLabel = {
     show: !compact,
     color: textColor,
     fontSize,
     hideOverlap: true,
-    formatter: proportional ? "{value}%" : undefined,
+    formatter: compact ? undefined : formatNumber,
   };
   const valueAxis = {
     type: "value" as const,
+    show: !compact,
     axisLine: { show: false },
     axisTick: { show: false },
     axisLabel,
     splitLine,
-    max: proportional ? 100 : undefined,
+    max: proportional ? 100 : numericBound(config.yAxisMax),
+    min: proportional ? 0 : numericBound(config.yAxisMin),
+    name: compact ? "" : config.yAxisTitle ?? "",
+    nameLocation: "middle" as const,
+    nameGap: 45,
+    nameTextStyle: { color: textColor, fontSize },
   };
   const categoryAxis = {
     type: "category" as const,
+    show: !compact,
     data: categories,
     axisLine: {
       show: !compact,
       lineStyle: { color: "#aeb6bf" },
     },
     axisTick: { show: false },
-    axisLabel,
+    axisLabel: {
+      ...axisLabel,
+      rotate: compact ? 0 : config.axisLabelRotation ?? 0,
+    },
+    name: compact ? "" : config.xAxisTitle ?? "",
+    nameLocation: "middle" as const,
+    nameGap: 30,
+    nameTextStyle: { color: textColor, fontSize },
   };
   const isHorizontal =
     type === "bar" ||
@@ -428,8 +510,11 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
       {
         name: yName,
         type: "scatter",
-        symbolSize: compact ? 7 : 13,
-        itemStyle: { color: colorFor(0, config), opacity: 0.82 },
+        symbolSize: compact ? 7 : pointSize,
+        itemStyle: {
+          color: colorFor(0, config, yName),
+          opacity: markOpacity,
+        },
         label: {
           show: compact ? false : showLabels,
           position: "top",
@@ -505,9 +590,12 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
         name: first.name,
         type: "bar",
         stack: "diverging",
-        barMaxWidth: compact ? 12 : 26,
+        barMaxWidth: compact ? 12 : barWidth,
         data: first.data.map((value) => -Math.abs(value)),
-        itemStyle: { color: colorFor(1, config) },
+        itemStyle: {
+          color: colorFor(1, config, first.name),
+          opacity: markOpacity,
+        },
         label: {
           show: compact ? false : showLabels,
           position: "inside",
@@ -522,9 +610,12 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
         name: second.name,
         type: "bar",
         stack: "diverging",
-        barMaxWidth: compact ? 12 : 26,
+        barMaxWidth: compact ? 12 : barWidth,
         data: second.data.map((value) => Math.abs(value)),
-        itemStyle: { color: colorFor(0, config) },
+        itemStyle: {
+          color: colorFor(0, config, second.name),
+          opacity: markOpacity,
+        },
         label: {
           show: compact ? false : showLabels,
           position: "inside",
@@ -544,7 +635,7 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
       type === "column" || type === "area" ? dataSeries.slice(0, 1) : dataSeries;
 
     series = visibleDataSeries.map((item, index) => {
-      const color = colorFor(index, config);
+      const color = colorFor(index, config, item.name);
       const comboLine = type === "combo" && index > 0;
       const seriesType = isLine || comboLine ? "line" : "bar";
       return {
@@ -559,35 +650,70 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
             type === "proportionalArea" ||
             smooth),
         step: type === "stepLine" ? "middle" : undefined,
-        symbol: compact ? "none" : "circle",
-        symbolSize: compact ? 0 : 7,
-        barMaxWidth: compact ? 20 : 48,
+        symbol: compact || pointSize === 0 ? "none" : "circle",
+        symbolSize: compact ? 0 : pointSize,
+        barMaxWidth: compact ? 20 : barWidth,
         itemStyle: {
           color,
+          opacity: markOpacity,
           borderRadius:
             seriesType === "bar"
               ? isHorizontal
-                ? [0, 3, 3, 0]
-                : [3, 3, 0, 0]
+                ? [0, barRadius, barRadius, 0]
+                : [barRadius, barRadius, 0, 0]
               : 0,
         },
-        lineStyle: { color, width: compact ? 1.5 : 3 },
+        lineStyle: { color, width: compact ? 1.5 : lineWidth },
         areaStyle:
           type === "area" ||
           type === "stackedArea" ||
           type === "proportionalArea"
-            ? { color, opacity: stacked ? 0.64 : 0.22 }
+            ? {
+                color,
+                opacity: stacked
+                  ? Math.max(areaOpacity, 0.5)
+                  : areaOpacity,
+              }
             : undefined,
         label: {
           show: compact ? false : showLabels,
-          position: isHorizontal ? "right" : "top",
+          position:
+            config.labelPosition === "inside"
+              ? "inside"
+              : isHorizontal
+                ? "right"
+                : "top",
           color: textColor,
           fontSize,
-          formatter: proportional ? "{c}%" : undefined,
+          formatter: (params: unknown) => {
+            const item = params as { value: string | number };
+            return formatNumber(item.value);
+          },
         },
         emphasis: { focus: "series" },
       } as SeriesOption;
     });
+  }
+
+  if (xAxis && !Array.isArray(xAxis)) {
+    xAxis = {
+      ...xAxis,
+      show: compact ? false : showXAxis,
+      name: compact ? "" : config.xAxisTitle ?? "",
+      nameLocation: "middle",
+      nameGap: 32,
+      nameTextStyle: { color: textColor, fontSize },
+    };
+  }
+  if (yAxis && !Array.isArray(yAxis)) {
+    yAxis = {
+      ...yAxis,
+      show: compact ? false : showYAxis,
+      name: compact ? "" : config.yAxisTitle ?? "",
+      nameLocation: "middle",
+      nameGap: 48,
+      nameTextStyle: { color: textColor, fontSize },
+    };
   }
 
   return {
@@ -595,11 +721,7 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
     animationDuration: 480,
     animationEasing: "cubicOut",
     backgroundColor: transparent ? "transparent" : backgroundColor,
-    color: [
-      config.primaryColor,
-      config.secondaryColor,
-      ...theme.colors.slice(2),
-    ],
+    color: paletteFor(config),
     textStyle: {
       fontFamily:
         '"Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
@@ -607,7 +729,13 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
     },
     title: {
       show: compact ? false : Boolean(title || subtitle),
-      left: margins.left,
+      left:
+        config.titleAlign === "center"
+          ? "center"
+          : config.titleAlign === "right"
+            ? undefined
+            : margins.left,
+      right: config.titleAlign === "right" ? margins.right : undefined,
       top: margins.top,
       text: title,
       subtext: subtitle,
@@ -627,14 +755,33 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
         !compact &&
         showLegend &&
         (dataSeries.length > 1 || type === "pie" || type === "donut"),
-      top: margins.top + 3,
-      right: margins.right,
+      top:
+        legendPosition === "top"
+          ? margins.top + 3
+          : legendPosition === "left" || legendPosition === "right"
+            ? "middle"
+            : undefined,
+      bottom: legendPosition === "bottom" ? margins.bottom : undefined,
+      left:
+        legendPosition === "left"
+          ? margins.left
+          : legendPosition === "bottom"
+            ? "center"
+            : undefined,
+      right:
+        legendPosition === "right" || legendPosition === "top"
+          ? margins.right
+          : undefined,
+      orient:
+        legendPosition === "left" || legendPosition === "right"
+          ? "vertical"
+          : "horizontal",
       icon: "roundRect",
       itemWidth: 12,
       itemHeight: 8,
       textStyle: { color: textColor, fontSize },
     },
-    tooltip: compact
+    tooltip: compact || !showTooltip
       ? { show: false }
       : {
           trigger: type === "pie" || type === "donut" ? "item" : "axis",
