@@ -299,3 +299,112 @@ test("negative and extreme values render without throwing", () => {
     assert.ok(seriesList(option).length > 0, `${type}: failed to render negatives/extremes`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Group: P1-1 bar/column deepening — sort, stack totals, stack order, gaps.
+// Locks in the new capabilities and the default-is-unchanged contract.
+// ---------------------------------------------------------------------------
+
+const BAR_TYPES: ChartType[] = [
+  "bar",
+  "stackedBar",
+  "proportionalBar",
+  "column",
+  "groupedColumn",
+  "stackedColumn",
+  "proportionalColumn",
+];
+
+const quarterlyConfig = (overrides: Partial<ChartConfig> = {}): ChartConfig =>
+  baseConfig({
+    parsed: tableToParsed([
+      ["季度", "产品 A", "产品 B", "产品 C"],
+      ["Q1", "320", "240", "180"],
+      ["Q2", "380", "290", "210"],
+      ["Q3", "420", "310", "245"],
+      ["Q4", "510", "365", "290"],
+    ]),
+    categoryColumn: "季度",
+    seriesColumns: ["产品 A", "产品 B", "产品 C"],
+    ...overrides,
+  });
+
+test("P1-1: bar defaults are unchanged when the new fields are absent", () => {
+  for (const type of BAR_TYPES) {
+    const implicit = sig(buildChartOption(quarterlyConfig({ type })));
+    const explicitUndef = sig(
+      buildChartOption(
+        quarterlyConfig({
+          type,
+          sortCategories: undefined,
+          showStackTotals: undefined,
+          stackOrder: undefined,
+          barGap: undefined,
+          barCategoryGap: undefined,
+        }),
+      ),
+    );
+    assert.equal(implicit, explicitUndef, `${type}: defaults differ`);
+  }
+});
+
+test("P1-1: sortCategories reorders the category axis", () => {
+  const sorted = buildChartOption(
+    quarterlyConfig({
+      type: "stackedColumn",
+      sortCategories: { bySeries: "产品 A", order: "desc" },
+    }),
+  );
+  const cats = (sorted.xAxis as { data: string[] }).data;
+  // 产品 A values: Q1=320, Q2=380, Q3=420, Q4=510 → desc => Q4,Q3,Q2,Q1
+  assert.deepEqual(cats, ["Q4", "Q3", "Q2", "Q1"]);
+});
+
+test("P1-1: stackOrder reorders stacked series by total value", () => {
+  // Totals: 产品 A=1630, 产品 B=1205, 产品 C=925.
+  const asc = buildChartOption(quarterlyConfig({ type: "stackedColumn", stackOrder: "asc" }));
+  const desc = buildChartOption(quarterlyConfig({ type: "stackedColumn", stackOrder: "desc" }));
+  const namesAsc = seriesList(asc).map((s) => (s as { name: string }).name);
+  const namesDesc = seriesList(desc).map((s) => (s as { name: string }).name);
+  assert.deepEqual(namesAsc, ["产品 C", "产品 B", "产品 A"]);
+  assert.deepEqual(namesDesc, ["产品 A", "产品 B", "产品 C"]);
+});
+
+test("P1-1: stackOrder preserves per-series color (original palette index)", () => {
+  const desc = buildChartOption(quarterlyConfig({ type: "stackedColumn", stackOrder: "desc" }));
+  const asc = buildChartOption(quarterlyConfig({ type: "stackedColumn", stackOrder: "asc" }));
+  const colorOf = (option: { series?: unknown }, name: string) =>
+    seriesList(option)
+      .find((s) => (s as { name: string }).name === name)
+      ?.itemStyle.color;
+  // 产品 A keeps palette[0] regardless of stack position.
+  assert.equal(colorOf(desc, "产品 A"), colorOf(asc, "产品 A"));
+});
+
+test("P1-1: showStackTotals surfaces column totals via the top-series formatter", () => {
+  // QuarterlyConfig uses the ChartConfig default (thousands separator on), so
+  // totals are formatted in zh-CN grouping form.
+  const on = buildChartOption(quarterlyConfig({ type: "stackedColumn", showStackTotals: true }));
+  const top = seriesList(on).at(-1) as { label?: { formatter?: (p: { dataIndex: number }) => string } };
+  assert.equal(top.label?.formatter?.({ dataIndex: 0 }), "740"); // 320+240+180
+  assert.equal(top.label?.formatter?.({ dataIndex: 3 }), "1,165"); // 510+365+290
+});
+
+test("P1-1: showStackTotals is a no-op for non-stacked bar types", () => {
+  // For non-stacked types the renderer never enters the totals branch, so the
+  // top-series formatter must keep returning the segment value (not a total).
+  for (const type of ["bar", "groupedColumn", "column"] as ChartType[]) {
+    const on = buildChartOption(quarterlyConfig({ type, showStackTotals: true }));
+    const last = seriesList(on).at(-1) as { label?: { formatter?: (p: { dataIndex: number; value: number }) => string } };
+    // Last series in Q1 (original order) is 产品 C = 180.
+    assert.equal(last.label?.formatter?.({ dataIndex: 0, value: 180 }), "180", `${type}: totals leaked into non-stacked`);
+  }
+});
+
+test("P1-1: barGap and barCategoryGap change the option", () => {
+  const off = sig(quarterlyConfig({ type: "groupedColumn" }));
+  const on = sig(
+    quarterlyConfig({ type: "groupedColumn", barGap: 50, barCategoryGap: 40 }),
+  );
+  assert.notEqual(off, on);
+});

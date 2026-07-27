@@ -100,6 +100,15 @@ export type ChartConfig = {
   // Combo chart only: per-series "bar" or "line" role. When unset for a series
   // the renderer falls back to the legacy rule (first series = bar, rest = line).
   seriesKind?: Record<string, "bar" | "line">;
+  // Sort categories by a series' values. Undefined = original row order.
+  sortCategories?: { bySeries?: string; order?: "asc" | "desc" };
+  // Stacked bar/column only: show the column total on top of each stack.
+  showStackTotals?: boolean;
+  // Stacked bar/column only: reorder series within a stack by their total value.
+  stackOrder?: "asc" | "desc";
+  // Grouped/stacked bar spacing. Numbers are interpreted by ECharts (percent of bar width).
+  barGap?: number;
+  barCategoryGap?: number;
   compact?: boolean;
 };
 

@@ -432,6 +432,15 @@ export default function Home() {
   const [pointSize, setPointSize] = useState(7);
   const [barWidth, setBarWidth] = useState(48);
   const [barRadius, setBarRadius] = useState(3);
+  // P1-1 bar deepening: category sort, stack totals, stack order, group gaps.
+  // Empty = renderer default (no sort / no totals / ECharts default spacing).
+  const [sortCategories, setSortCategories] = useState<
+    { bySeries: string; order: "asc" | "desc" } | null
+  >(null);
+  const [showStackTotals, setShowStackTotals] = useState(false);
+  const [stackOrder, setStackOrder] = useState<"asc" | "desc" | null>(null);
+  const [barGap, setBarGap] = useState<number | null>(null);
+  const [barCategoryGap, setBarCategoryGap] = useState<number | null>(null);
   const [markOpacity, setMarkOpacity] = useState(100);
   const [areaOpacity, setAreaOpacity] = useState(22);
   const [labelPosition, setLabelPosition] = useState<
@@ -583,6 +592,11 @@ export default function Home() {
         pointSize,
         barWidth,
         barRadius,
+        sortCategories: sortCategories ?? undefined,
+        showStackTotals: showStackTotals || undefined,
+        stackOrder: stackOrder ?? undefined,
+        barGap: barGap ?? undefined,
+        barCategoryGap: barCategoryGap ?? undefined,
         markOpacity,
         areaOpacity,
         labelPosition,
@@ -607,6 +621,8 @@ export default function Home() {
       areaOpacity,
       axisLabelRotation,
       backgroundColor,
+      barCategoryGap,
+      barGap,
       barRadius,
       barWidth,
       categoryColumn,
@@ -633,10 +649,13 @@ export default function Home() {
       showGrid,
       showLabels,
       showLegend,
+      showStackTotals,
       showTooltip,
       showXAxis,
       showYAxis,
       smooth,
+      sortCategories,
+      stackOrder,
       subtitle,
       theme,
       title,
@@ -1141,6 +1160,11 @@ export default function Home() {
     setPointSize(7);
     setBarWidth(48);
     setBarRadius(3);
+    setSortCategories(null);
+    setShowStackTotals(false);
+    setStackOrder(null);
+    setBarGap(null);
+    setBarCategoryGap(null);
     setMarkOpacity(100);
     setAreaOpacity(22);
     setLabelPosition("auto");
@@ -1896,6 +1920,89 @@ export default function Home() {
                     onChange={(event) => setBarRadius(Number(event.target.value))}
                   />
                 </label>
+                {selectedTemplate.family === "bar" && (
+                  <>
+                    <label className="field">
+                      <span>分类排序</span>
+                      <select
+                        value={sortCategories ? `${sortCategories.bySeries}:${sortCategories.order}` : ""}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (!value) {
+                            setSortCategories(null);
+                            return;
+                          }
+                          const [bySeries, order] = value.split(":");
+                          setSortCategories({
+                            bySeries,
+                            order: order === "desc" ? "desc" : "asc",
+                          });
+                        }}
+                      >
+                        <option value="">默认（原序）</option>
+                        {seriesColumns.map((header) => (
+                          <optgroup key={header} label={header}>
+                            <option value={`${header}:asc`}>升序</option>
+                            <option value={`${header}:desc`}>降序</option>
+                          </optgroup>
+                        ))}
+                      </select>
+                    </label>
+                    {(chartType === "stackedBar" ||
+                      chartType === "stackedColumn" ||
+                      chartType === "proportionalBar" ||
+                      chartType === "proportionalColumn") && (
+                      <>
+                        <Toggle
+                          label="堆叠总计"
+                          checked={showStackTotals}
+                          onChange={setShowStackTotals}
+                        />
+                        <label className="field">
+                          <span>堆叠顺序</span>
+                          <select
+                            value={stackOrder ?? ""}
+                            onChange={(event) =>
+                              setStackOrder(
+                                event.target.value === "asc" || event.target.value === "desc"
+                                  ? event.target.value
+                                  : null,
+                              )
+                            }
+                          >
+                            <option value="">默认（原序）</option>
+                            <option value="asc">按总量升序</option>
+                            <option value="desc">按总量降序</option>
+                          </select>
+                        </label>
+                      </>
+                    )}
+                    <label className="range-field">
+                      <span>
+                        组内间距 <strong>{barGap ?? 30}%</strong>
+                      </span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={barGap ?? 30}
+                        onChange={(event) => setBarGap(Number(event.target.value))}
+                      />
+                    </label>
+                    <label className="range-field">
+                      <span>
+                        组间间距 <strong>{barCategoryGap ?? 20}%</strong>
+                      </span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={80}
+                        value={barCategoryGap ?? 20}
+                        onChange={(event) => setBarCategoryGap(Number(event.target.value))}
+                      />
+                    </label>
+                  </>
+                )}
               </>
             )}
             {selectedTemplate.family === "area" && (

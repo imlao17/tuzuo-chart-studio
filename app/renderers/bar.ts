@@ -57,10 +57,42 @@ export function buildBarOption(ctx: RenderContext): RendererResult {
   const visibleDataSeries =
     type === "column" ? dataSeries.slice(0, 1) : dataSeries;
 
-  const textColor = theme.text;
+  // Optional stack-order reorder. Each entry carries its original index so
+  // colorFor still maps to the same palette slot regardless of stack position.
+  type OrderedItem = { item: (typeof visibleDataSeries)[number]; originalIndex: number };
+  let ordered: OrderedItem[] = visibleDataSeries.map((item, originalIndex) => ({
+    item,
+    originalIndex,
+  }));
+  if (stacked && config.stackOrder) {
+    const dir = config.stackOrder === "desc" ? -1 : 1;
+    const totalOf = (item: (typeof visibleDataSeries)[number]) =>
+      item.data.reduce(
+        (sum, v) => sum + (Number.isFinite(v) ? Math.abs(v) : 0),
+        0,
+      );
+    ordered = [...ordered].sort((a, b) => (totalOf(a.item) - totalOf(b.item)) * dir);
+  }
 
-  const series: SeriesOption[] = visibleDataSeries.map((item, index) => {
-    const color = colorFor(index, config, item.name);
+  // Per-column totals for the stack-total label (stacked only). The label is
+  // attached to the topmost stack member so it renders once per column.
+  const showTotals = !compact && stacked && config.showStackTotals;
+  const columnTotals = showTotals
+    ? ordered[0].item.data.map((_, colIdx) =>
+        ordered.reduce(
+          (sum, entry) =>
+            sum + (Number.isFinite(entry.item.data[colIdx]) ? entry.item.data[colIdx] : 0),
+          0,
+        ),
+      )
+    : [];
+
+  const textColor = theme.text;
+  const showLabels = compact ? false : config.showLabels;
+
+  const series: SeriesOption[] = ordered.map(({ item, originalIndex }, topIndex) => {
+    const color = colorFor(originalIndex, config, item.name);
+    const isTopOfStack = stacked && topIndex === ordered.length - 1;
     // In the legacy map `seriesType` was "line" when isLine/comboLine, else
     // "bar". This renderer only handles bar types, so it is always "bar". The
     // remaining field assignments mirror legacy lines 645-694 exactly; the
@@ -76,6 +108,8 @@ export function buildBarOption(ctx: RenderContext): RendererResult {
       symbol: compact || pointSize === 0 ? "none" : "circle",
       symbolSize: compact ? 0 : pointSize,
       barMaxWidth: compact ? 20 : barWidth,
+      barGap: config.barGap,
+      barCategoryGap: config.barCategoryGap,
       itemStyle: {
         color,
         opacity: markOpacity,
@@ -86,12 +120,18 @@ export function buildBarOption(ctx: RenderContext): RendererResult {
       lineStyle: { color, width: compact ? 1.5 : 3 },
       areaStyle: undefined,
       label: {
-        show: compact ? false : config.showLabels,
+        show: showLabels,
         position:
           config.labelPosition === "inside" ? "inside" : isHorizontal ? "right" : "top",
         color: textColor,
         fontSize,
         formatter: (params: unknown) => {
+          // Stack totals replace the segment value on the topmost series so
+          // each column shows one sum instead of per-segment labels.
+          if (isTopOfStack && showTotals) {
+            const entry = params as { dataIndex: number };
+            return formatNumber(columnTotals[entry.dataIndex] ?? 0);
+          }
           const entry = params as { value: string | number };
           return formatNumber(entry.value);
         },

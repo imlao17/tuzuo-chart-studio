@@ -70,9 +70,40 @@ export function buildRenderContext(config: ChartConfig): RenderContext {
     type === "proportionalColumn";
   if (proportional) dataSeries = normalizeSeries(dataSeries);
 
+  // Optional category sort: reorder categories and every series' data array by
+  // the values of a chosen series. The permutation is computed once and
+  // applied consistently so categories and data stay aligned. No-op when the
+  // sort config is absent or the referenced series is not present.
+  const sortSpec = config.sortCategories;
+  let sortedCategories = categories;
+  let sortedDataSeries = dataSeries;
+  if (sortSpec?.bySeries) {
+    const bySeries = dataSeries.find((s) => s.name === sortSpec.bySeries);
+    if (bySeries) {
+      const indices = bySeries.data.map((_, i) => i);
+      const dir = sortSpec.order === "desc" ? -1 : 1;
+      indices.sort((a, b) => {
+        const va = Number.isFinite(bySeries.data[a]) ? bySeries.data[a] : 0;
+        const vb = Number.isFinite(bySeries.data[b]) ? bySeries.data[b] : 0;
+        return (va - vb) * dir;
+      });
+      sortedCategories = indices.map((i) => categories[i]);
+      sortedDataSeries = dataSeries.map((s) => ({
+        name: s.name,
+        data: indices.map((i) => s.data[i]),
+      }));
+    }
+  }
+
   const formatNumber = numberFormatter(config, proportional);
 
-  return { config, categories, dataSeries, proportional, formatNumber };
+  return {
+    config,
+    categories: sortedCategories,
+    dataSeries: sortedDataSeries,
+    proportional,
+    formatNumber,
+  };
 }
 
 /**
