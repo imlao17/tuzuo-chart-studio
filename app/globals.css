@@ -421,6 +421,34 @@ button:disabled {
   border-radius: 2px;
 }
 
+/* Combo chart: per-series 柱/线 toggle in the data-field series list. Widen the
+   last grid column so the two-button group fits alongside the series name. */
+.series-option-combo {
+  grid-template-columns: 14px 10px minmax(0, 1fr) auto;
+}
+
+.series-kind {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.series-kind-btn {
+  border: 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 16px;
+  color: #4e575f;
+  background: transparent;
+  cursor: pointer;
+}
+
+.series-kind-btn.is-active {
+  background: var(--blue);
+  color: #ffffff;
+}
+
 .text-button {
   display: inline-flex;
   height: 30px;
@@ -485,6 +513,7 @@ button:disabled {
 }
 
 .preview-document {
+  position: relative;
   width: var(--chart-width);
   height: var(--chart-height);
   transform: scale(var(--preview-scale));
@@ -516,6 +545,30 @@ button:disabled {
 .chart-root {
   width: var(--chart-width);
   height: var(--chart-height);
+}
+
+/* Empty-state overlay shown when the current data does not satisfy the
+   template's validators (e.g. scatter needs 2 numeric columns). The chart-root
+   is hidden and this centered message replaces it so the user never sees a
+   blank or misleading chart from insufficient data. */
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  color: #68727d;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.chart-empty svg {
+  color: #b58c04;
 }
 
 .data-workspace {

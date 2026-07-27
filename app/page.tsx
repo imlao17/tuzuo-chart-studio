@@ -2,6 +2,7 @@
 
 import { init as initECharts, type ECharts } from "echarts";
 import {
+  AlertTriangle,
   AreaChart,
   ArrowLeft,
   ArrowRight,
@@ -51,6 +52,10 @@ import {
   tableToParsed,
   THEMES,
 } from "./chart-model";
+import {
+  type DataBindingRole,
+  getTemplateDefinition,
+} from "./template-definition";
 
 const DEFAULT_MARGINS: Margins = {
   top: 28,
@@ -64,6 +69,11 @@ type SavedPalette = {
   name: string;
   colors: string[];
 };
+
+// Field role bindings: single-column roles map to a string, the multi-column
+// `value` role maps to a string[] (selection order = render order). Missing
+// roles are resolved with sensible fallbacks by `resolveFieldBindings`.
+type FieldRoles = Partial<Record<DataBindingRole, string | string[]>>;
 
 type SettingsSectionId =
   | "colors"
@@ -391,11 +401,15 @@ export default function Home() {
   const [subtitle, setSubtitle] = useState("单位：万元");
   const [width, setWidth] = useState(960);
   const [height, setHeight] = useState(540);
-  const [categoryColumn, setCategoryColumn] = useState("月份");
-  const [seriesColumns, setSeriesColumns] = useState([
-    "实际收入",
-    "目标",
-  ]);
+  const [fieldRoles, setFieldRoles] = useState<FieldRoles>({
+    category: "月份",
+    value: ["实际收入", "目标"],
+  });
+  // Combo chart only: per-series bar/line role. Empty = renderer falls back to
+  // the legacy rule (first series bar, rest line), so default output is stable.
+  const [seriesKind, setSeriesKind] = useState<
+    Record<string, "bar" | "line">
+  >({});
   const [themeId, setThemeId] = useState("editorial");
   const [paletteColors, setPaletteColors] = useState<string[]>([
     ...THEMES[0].colors,
@@ -468,25 +482,85 @@ export default function Home() {
   const selectedTemplate =
     CHART_TEMPLATES.find((template) => template.id === chartType) ??
     CHART_TEMPLATES[0];
-  const selectedCategory = parsed.headers.includes(categoryColumn)
-    ? categoryColumn
-    : parsed.headers.find(
-        (header) => !parsed.numericHeaders.includes(header),
-      ) ?? parsed.headers[0] ?? "";
-  const effectiveSeries = useMemo(() => {
-    const selected = seriesColumns.filter((header) =>
-      parsed.numericHeaders.includes(header),
-    );
-    return selected.length ? selected : parsed.numericHeaders.slice(0, 1);
-  }, [parsed.numericHeaders, seriesColumns]);
+  const templateDefinition = getTemplateDefinition(chartType);
+
+  // Resolve the user's field-role bindings into the categoryColumn +
+  // seriesColumns shape the renderers still consume. This is the single
+  // adapter that lets the UI be role-driven while the renderers stay
+  // unchanged. Behavior matches the legacy selectedCategory/effectiveSeries
+  // fallbacks for the generic templates, and the per-template selectedColumns
+  // fallbacks for scatter (X/Y) and diverging (left/right).
+  const { categoryColumn, seriesColumns, resolvedRoles } = useMemo(() => {
+    const headers = parsed.headers;
+    const numeric = parsed.numericHeaders;
+    const firstNumeric = numeric[0] ?? "";
+
+    const resolveCategory = () => {
+      const bound = fieldRoles.category;
+      if (typeof bound === "string" && headers.includes(bound)) return bound;
+      return (
+        headers.find((h) => !numeric.includes(h)) ?? headers[0] ?? ""
+      );
+    };
+
+    const resolveSingle = (
+      role: DataBindingRole,
+      fallbackIndex: number,
+    ): string => {
+      const bound = fieldRoles[role];
+      if (typeof bound === "string" && numeric.includes(bound)) return bound;
+      return numeric[fallbackIndex] ?? firstNumeric;
+    };
+
+    const categoryColumn = resolveCategory();
+    // Per-role resolved values, so the single-column <select>s can display
+    // exactly what the renderer will receive (including fallbacks), instead of
+    // a raw (possibly undefined) binding that drifts from the rendered chart.
+    const resolvedRoles: Partial<Record<DataBindingRole, string>> = {
+      category: categoryColumn,
+    };
+
+    // Inspect the template's declared roles to decide how to assemble the
+    // series columns. Each template family maps cleanly to one case.
+    const roles = new Set(templateDefinition.dataBindings.map((b) => b.role));
+    let seriesColumns: string[];
+    if (roles.has("x") || roles.has("y")) {
+      // scatter: X then Y, mirroring the renderer's selectedColumns[0]/[1].
+      const x = resolveSingle("x", 0);
+      const y = resolveSingle("y", 1) || x;
+      seriesColumns = [x, y];
+      resolvedRoles.x = x;
+      resolvedRoles.y = y;
+    } else if (roles.has("leftValue") || roles.has("rightValue")) {
+      // diverging / pyramid: left then right, mirroring dataSeries[0]/[1].
+      const left = resolveSingle("leftValue", 0);
+      const right = resolveSingle("rightValue", 1) || left;
+      seriesColumns = [left, right];
+      resolvedRoles.leftValue = left;
+      resolvedRoles.rightValue = right;
+    } else {
+      // generic multi-series templates: value role, selection order preserved.
+      const selected = (fieldRoles.value as string[] | undefined)?.filter(
+        (header) => numeric.includes(header),
+      ) ?? [];
+      seriesColumns = selected.length ? selected : numeric.slice(0, 1);
+    }
+
+    return { categoryColumn, seriesColumns, resolvedRoles };
+  }, [
+    fieldRoles,
+    parsed.headers,
+    parsed.numericHeaders,
+    templateDefinition.dataBindings,
+  ]);
 
   const option = useMemo(
     () =>
       buildChartOption({
         type: chartType,
         parsed,
-        categoryColumn: selectedCategory,
-        seriesColumns: effectiveSeries,
+        categoryColumn,
+        seriesColumns,
         title,
         subtitle,
         width,
@@ -526,6 +600,7 @@ export default function Home() {
         numberSuffix,
         useThousandsSeparator,
         titleAlign,
+        seriesKind,
       }),
     [
       areaOpacity,
@@ -533,9 +608,9 @@ export default function Home() {
       backgroundColor,
       barRadius,
       barWidth,
+      categoryColumn,
       chartType,
       colorOverrides,
-      effectiveSeries,
       fontSize,
       gridLineType,
       height,
@@ -552,7 +627,8 @@ export default function Home() {
       pointSize,
       primaryColor,
       secondaryColor,
-      selectedCategory,
+      seriesColumns,
+      seriesKind,
       showGrid,
       showLabels,
       showLegend,
@@ -579,8 +655,24 @@ export default function Home() {
     objectUrl: string;
     blob: Blob;
   } | null>(null);
+
+  // Run the current template's validators against the resolved field bindings.
+  // The first non-null message wins and is shown as a preview overlay; while a
+  // data error is present the chart is cleared and PNG export is skipped, so
+  // the user never sees a blank or misleading chart from insufficient data.
+  const dataError = useMemo(() => {
+    const ctx = { parsed, categoryColumn, seriesColumns };
+    for (const validator of templateDefinition.validators) {
+      const message = validator.validate(ctx);
+      if (message) return message;
+    }
+    return null;
+  }, [templateDefinition.validators, parsed, categoryColumn, seriesColumns]);
+
   const pngDownloadReady =
-    pngDownload?.option === option && pngDownload.pixelRatio === pixelRatio;
+    !dataError &&
+    pngDownload?.option === option &&
+    pngDownload.pixelRatio === pixelRatio;
   const initialChartStateRef = useRef({ height, option, width });
 
   useEffect(() => {
@@ -608,13 +700,24 @@ export default function Home() {
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
+      // When data validation fails, clear any previously rendered chart so the
+      // preview overlay is the only thing visible (no stale/misleading chart).
+      if (dataError) {
+        chartRef.current?.clear();
+        return;
+      }
       chartRef.current?.resize({ width, height });
       chartRef.current?.setOption(option, true);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [height, option, width, workspaceMode]);
+  }, [dataError, height, option, width, workspaceMode]);
 
   useEffect(() => {
+    // While data validation fails there is no valid chart to export: skip PNG
+    // generation entirely. pngDownloadReady already factors in dataError, so
+    // the export buttons show their not-ready state without needing to clear
+    // the (now-stale) pngDownload state here.
+    if (dataError) return;
     let objectUrl = "";
     let cancelled = false;
     const timeout = window.setTimeout(async () => {
@@ -651,6 +754,7 @@ export default function Home() {
     };
   }, [
     backgroundColor,
+    dataError,
     height,
     option,
     pixelRatio,
@@ -788,6 +892,19 @@ export default function Home() {
     return !query || `${title} ${keywords}`.toLowerCase().includes(query);
   }
 
+  // Whether a settings section is declared for the current template. Driven by
+  // the registry's settingsGroups so the panel only shows sections that mean
+  // something for the current chart (e.g. pie/donut hide X/Y axis sections).
+  function sectionInTemplate(id: SettingsSectionId) {
+    return templateDefinition.settingsGroups.some((group) => group.id === id);
+  }
+
+  // Combined visibility for a section: hidden unless it both belongs to the
+  // current template AND matches the settings search query.
+  function sectionShown(id: SettingsSectionId, title: string, keywords: string) {
+    return sectionInTemplate(id) && settingsSectionVisible(title, keywords);
+  }
+
   function selectTemplate(type: ChartType) {
     setChartType(type);
     setTemplateOpen(false);
@@ -795,13 +912,18 @@ export default function Home() {
   }
 
   function toggleSeries(header: string) {
-    setSeriesColumns((current) => {
-      if (current.includes(header)) {
-        return current.length > 1
-          ? current.filter((candidate) => candidate !== header)
-          : current;
+    setFieldRoles((current) => {
+      const list = (current.value as string[] | undefined) ?? [];
+      if (list.includes(header)) {
+        return {
+          ...current,
+          value:
+            list.length > 1
+              ? list.filter((candidate) => candidate !== header)
+              : list,
+        };
       }
-      return [...current, header];
+      return { ...current, value: [...list, header] };
     });
   }
 
@@ -822,10 +944,22 @@ export default function Home() {
       next[rowIndex][columnIndex] = value;
 
       if (rowIndex === 0 && previousHeader !== value) {
-        if (categoryColumn === previousHeader) setCategoryColumn(value);
-        setSeriesColumns((columns) =>
-          columns.map((column) => (column === previousHeader ? value : column)),
-        );
+        // Keep field-role bindings in sync when a column is renamed: rename
+        // the header in every role that currently references it.
+        setFieldRoles((roles) => {
+          const next: FieldRoles = {};
+          for (const [role, bound] of Object.entries(roles)) {
+            if (typeof bound === "string") {
+              next[role as DataBindingRole] =
+                bound === previousHeader ? value : bound;
+            } else {
+              next[role as DataBindingRole] = bound?.map((column) =>
+                column === previousHeader ? value : column,
+              );
+            }
+          }
+          return next;
+        });
       }
 
       return next;
@@ -893,12 +1027,21 @@ export default function Home() {
     setTableData((current) =>
       current.map((row) => row.filter((_, columnIndex) => columnIndex !== index)),
     );
-    setSeriesColumns((current) =>
-      current.filter((header) => header !== removedHeader),
-    );
-    if (categoryColumn === removedHeader) {
-      setCategoryColumn(tableData[0]?.[index === 0 ? 1 : 0] ?? "");
-    }
+    // Drop the deleted header from every role binding. resolveFieldBindings
+    // will fall back to the first available numeric/header column for any
+    // role left empty, so no explicit reassignment is needed here.
+    setFieldRoles((roles) => {
+      const next: FieldRoles = {};
+      for (const [role, bound] of Object.entries(roles)) {
+        if (typeof bound === "string") {
+          if (bound !== removedHeader) next[role as DataBindingRole] = bound;
+        } else {
+          const filtered = bound?.filter((header) => header !== removedHeader);
+          if (filtered?.length) next[role as DataBindingRole] = filtered;
+        }
+      }
+      return next;
+    });
   }
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -962,8 +1105,8 @@ export default function Home() {
     setSubtitle("单位：万元");
     setWidth(960);
     setHeight(540);
-    setCategoryColumn("月份");
-    setSeriesColumns(["实际收入", "目标"]);
+    setFieldRoles({ category: "月份", value: ["实际收入", "目标"] });
+    setSeriesKind({});
     setThemeId("editorial");
     setPaletteColors([...THEMES[0].colors]);
     setPaletteName("我的配色");
@@ -1067,7 +1210,8 @@ export default function Home() {
             onClick={copyPng}
             title="复制 PNG"
             aria-label="复制 PNG"
-            disabled={exporting}
+            disabled={exporting || Boolean(dataError)}
+            aria-hidden={Boolean(dataError)}
           >
             <Clipboard size={17} />
           </button>
@@ -1075,6 +1219,8 @@ export default function Home() {
             type="button"
             className="button button-secondary"
             onClick={exportSvg}
+            disabled={Boolean(dataError)}
+            aria-hidden={Boolean(dataError)}
           >
             <Download size={17} />
             SVG
@@ -1085,6 +1231,10 @@ export default function Home() {
             download={`${safeFilename(title)}@${pixelRatio}x.png`}
             aria-disabled={!pngDownloadReady}
             onClick={(event) => {
+              if (dataError) {
+                event.preventDefault();
+                return;
+              }
               if (!pngDownloadReady) {
                 event.preventDefault();
                 setStatus("PNG 正在准备，请稍候");
@@ -1155,44 +1305,114 @@ export default function Home() {
               <span>数据字段</span>
               <Table2 size={15} />
             </div>
-            <label className="field">
-              <span>分类</span>
-              <select
-                value={selectedCategory}
-                onChange={(event) => setCategoryColumn(event.target.value)}
-              >
-                {parsed.headers.map((header) => (
-                  <option key={header} value={header}>
-                    {header}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="series-list">
-              <span className="field-caption">数值系列</span>
-              {parsed.numericHeaders.map((header, index) => (
-                <label key={header} className="series-option">
-                  <input
-                    type="checkbox"
-                    checked={effectiveSeries.includes(header)}
-                    onChange={() => toggleSeries(header)}
-                  />
-                  <span
-                    className="series-color"
-                    style={{
-                      background:
-                        index === 0
-                          ? primaryColor
-                          : index === 1
-                            ? secondaryColor
-                            : theme.colors[index % theme.colors.length],
-                    }}
-                  />
-                  <span>{header}</span>
-                  {effectiveSeries.includes(header) && <Check size={13} />}
+            {templateDefinition.dataBindings.map((binding) => {
+              const isCategory = binding.role === "category";
+              const options = isCategory
+                ? parsed.headers
+                : parsed.numericHeaders;
+              if (binding.multiple) {
+                // Multi-column value role: checkbox list, selection order
+                // preserved (toggleSeries appends to the end).
+                const selected = (fieldRoles.value as string[] | undefined) ??
+                  [];
+                return (
+                  <div key={binding.role} className="series-list">
+                    <span className="field-caption">
+                      {binding.label}
+                      {binding.hint ? ` · ${binding.hint}` : ""}
+                    </span>
+                    {parsed.numericHeaders.map((header, index) => {
+                      const isSelected = selected.includes(header);
+                      // Combo only: a per-series 柱/线 toggle lets the user
+                      // assign which selected columns render as bars vs lines,
+                      // instead of relying on selection order. Default (no
+                      // explicit kind) keeps the renderer's legacy rule.
+                      const kind =
+                        seriesKind[header] ??
+                        (index === 0 ? "bar" : "line");
+                      return (
+                        <label
+                          key={header}
+                          className={`series-option${
+                            isSelected && chartType === "combo"
+                              ? " series-option-combo"
+                              : ""
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSeries(header)}
+                          />
+                          <span
+                            className="series-color"
+                            style={{
+                              background:
+                                index === 0
+                                  ? primaryColor
+                                  : index === 1
+                                    ? secondaryColor
+                                    : theme.colors[index % theme.colors.length],
+                            }}
+                          />
+                          <span>{header}</span>
+                          {isSelected && chartType === "combo" && (
+                            <span className="series-kind" role="group" aria-label={`${header} 图形`}>
+                              {(["bar", "line"] as const).map((option) => (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  className={`series-kind-btn${
+                                    kind === option ? " is-active" : ""
+                                  }`}
+                                  aria-pressed={kind === option}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    setSeriesKind((current) => ({
+                                      ...current,
+                                      [header]: option,
+                                    }));
+                                  }}
+                                >
+                                  {option === "bar" ? "柱" : "线"}
+                                </button>
+                              ))}
+                            </span>
+                          )}
+                          {isSelected && chartType !== "combo" && (
+                            <Check size={13} />
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              }
+              // Single-column role (category / x / y / leftValue / rightValue).
+              // Display the resolved value (includes fallbacks) so the select
+              // always matches what the renderer receives.
+              const current = resolvedRoles[binding.role] ?? options[0] ?? "";
+              return (
+                <label key={binding.role} className="field">
+                  <span>{binding.label}</span>
+                  <select
+                    value={options.includes(current) ? current : (options[0] ?? "")}
+                    onChange={(event) =>
+                      setFieldRoles((roles) => ({
+                        ...roles,
+                        [binding.role]: event.target.value,
+                      }))
+                    }
+                  >
+                    {options.map((header) => (
+                      <option key={header} value={header}>
+                        {header}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-              ))}
-            </div>
+              );
+            })}
             <button
               type="button"
               className="text-button"
@@ -1223,7 +1443,17 @@ export default function Home() {
                   transparent ? "is-transparent" : "is-solid"
                 }`}
               >
-                <div ref={chartElementRef} className="chart-root" />
+                <div
+                  ref={chartElementRef}
+                  className="chart-root"
+                  style={{ display: dataError ? "none" : undefined }}
+                />
+                {dataError && (
+                  <div className="chart-empty" role="alert">
+                    <AlertTriangle size={22} />
+                    <span>{dataError}</span>
+                  </div>
+                )}
               </div>
             </div>
         </section>
@@ -1398,7 +1628,7 @@ export default function Home() {
             title="配色"
             icon={<Palette size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.colors}
-            hidden={!settingsSectionVisible("配色", "颜色 调色板 自定义 品牌 系列")}
+            hidden={!sectionShown("colors", "配色", "颜色 调色板 自定义 品牌 系列")}
             onToggle={() => toggleSettingsSection("colors")}
           >
             <span className="settings-caption">预设方案</span>
@@ -1563,7 +1793,8 @@ export default function Home() {
             icon={<SlidersHorizontal size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.marks}
             hidden={
-              !settingsSectionVisible(
+              !sectionShown(
+                "marks",
                 "线条、数据点与面积",
                 "柱宽 圆角 透明度 平滑 点大小 样式",
               )
@@ -1586,24 +1817,29 @@ export default function Home() {
                     onChange={(event) => setLineWidth(Number(event.target.value))}
                   />
                 </label>
-                <label className="range-field">
-                  <span>
-                    数据点大小 <strong>{pointSize}px</strong>
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={24}
-                    value={pointSize}
-                    onChange={(event) => setPointSize(Number(event.target.value))}
-                  />
-                </label>
                 <Toggle
                   label="平滑曲线"
                   checked={smooth}
                   onChange={setSmooth}
                 />
               </>
+            )}
+            {(selectedTemplate.family === "line" ||
+              selectedTemplate.family === "area" ||
+              chartType === "combo" ||
+              chartType === "scatter") && (
+              <label className="range-field">
+                <span>
+                  数据点大小 <strong>{pointSize}px</strong>
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={24}
+                  value={pointSize}
+                  onChange={(event) => setPointSize(Number(event.target.value))}
+                />
+              </label>
             )}
             {(selectedTemplate.family === "bar" ||
               chartType === "combo" ||
@@ -1668,7 +1904,7 @@ export default function Home() {
             title="数据标签"
             icon={<Table2 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.labels}
-            hidden={!settingsSectionVisible("数据标签", "数值 位置 字号 显示")}
+            hidden={!sectionShown("labels", "数据标签", "数值 位置 字号 显示")}
             onToggle={() => toggleSettingsSection("labels")}
           >
             <Toggle
@@ -1716,7 +1952,7 @@ export default function Home() {
             title="X 轴"
             icon={<Columns3 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.xAxis}
-            hidden={!settingsSectionVisible("X 轴", "横轴 标题 标签 旋转")}
+            hidden={!sectionShown("xAxis", "X 轴", "横轴 标题 标签 旋转")}
             onToggle={() => toggleSettingsSection("xAxis")}
           >
             <Toggle
@@ -1753,7 +1989,7 @@ export default function Home() {
             title="Y 轴"
             icon={<BarChart3 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.yAxis}
-            hidden={!settingsSectionVisible("Y 轴", "纵轴 范围 最小 最大 网格线")}
+            hidden={!sectionShown("yAxis", "Y 轴", "纵轴 范围 最小 最大 网格线")}
             onToggle={() => toggleSettingsSection("yAxis")}
           >
             <Toggle
@@ -1815,7 +2051,7 @@ export default function Home() {
             title="图例与交互"
             icon={<LayoutGrid size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.legend}
-            hidden={!settingsSectionVisible("图例与交互", "位置 提示 悬停 筛选")}
+            hidden={!sectionShown("legend", "图例与交互", "位置 提示 悬停 筛选")}
             onToggle={() => toggleSettingsSection("legend")}
           >
             <Toggle
@@ -1850,7 +2086,7 @@ export default function Home() {
             title="数字格式"
             icon={<Settings2 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.numbers}
-            hidden={!settingsSectionVisible("数字格式", "小数 千分位 前缀 后缀 单位")}
+            hidden={!sectionShown("numbers", "数字格式", "小数 千分位 前缀 后缀 单位")}
             onToggle={() => toggleSettingsSection("numbers")}
           >
             <label className="field settings-field">
@@ -1897,7 +2133,7 @@ export default function Home() {
             title="画布与布局"
             icon={<Settings2 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.canvas}
-            hidden={!settingsSectionVisible("画布与布局", "背景 尺寸 边距 标题 对齐 透明")}
+            hidden={!sectionShown("canvas", "画布与布局", "背景 尺寸 边距 标题 对齐 透明")}
             onToggle={() => toggleSettingsSection("canvas")}
           >
             <Toggle
@@ -2015,17 +2251,18 @@ export default function Home() {
 
           {settingsQuery &&
             ![
-              settingsSectionVisible("配色", "颜色 调色板 自定义 品牌 系列"),
-              settingsSectionVisible(
+              sectionShown("colors", "配色", "颜色 调色板 自定义 品牌 系列"),
+              sectionShown(
+                "marks",
                 "线条、数据点与面积",
                 "柱宽 圆角 透明度 平滑 点大小 样式",
               ),
-              settingsSectionVisible("数据标签", "数值 位置 字号 显示"),
-              settingsSectionVisible("X 轴", "横轴 标题 标签 旋转"),
-              settingsSectionVisible("Y 轴", "纵轴 范围 最小 最大 网格线"),
-              settingsSectionVisible("图例与交互", "位置 提示 悬停 筛选"),
-              settingsSectionVisible("数字格式", "小数 千分位 前缀 后缀 单位"),
-              settingsSectionVisible("画布与布局", "背景 尺寸 边距 标题 对齐 透明"),
+              sectionShown("labels", "数据标签", "数值 位置 字号 显示"),
+              sectionShown("xAxis", "X 轴", "横轴 标题 标签 旋转"),
+              sectionShown("yAxis", "Y 轴", "纵轴 范围 最小 最大 网格线"),
+              sectionShown("legend", "图例与交互", "位置 提示 悬停 筛选"),
+              sectionShown("numbers", "数字格式", "小数 千分位 前缀 后缀 单位"),
+              sectionShown("canvas", "画布与布局", "背景 尺寸 边距 标题 对齐 透明"),
             ].some(Boolean) && (
               <div className="settings-empty">没有匹配的设置</div>
             )}

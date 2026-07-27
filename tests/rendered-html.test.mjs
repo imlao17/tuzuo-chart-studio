@@ -53,7 +53,7 @@ test("keeps the chart canvas mounted while editing data", async () => {
 
   assert.match(page, /workspaceMode !== "preview" \? "workspace-hidden"/);
   assert.match(page, /workspaceMode !== "data" \? "workspace-hidden"/);
-  assert.match(page, /\[height, option, width, workspaceMode\]/);
+  assert.match(page, /\[dataError, height, option, width, workspaceMode\]/);
   assert.match(styles, /\.workspace-hidden\s*\{[^}]*display:\s*none\s*!important/s);
 });
 

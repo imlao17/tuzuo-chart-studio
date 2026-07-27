@@ -1,4 +1,5 @@
-import type { EChartsOption, SeriesOption } from "echarts";
+import type { EChartsOption } from "echarts";
+import { buildWithRenderer, getTemplateDefinition } from "./template-definition";
 
 export type ChartType =
   | "line"
@@ -96,6 +97,9 @@ export type ChartConfig = {
   numberSuffix?: string;
   useThousandsSeparator?: boolean;
   titleAlign?: "left" | "center" | "right";
+  // Combo chart only: per-series "bar" or "line" role. When unset for a series
+  // the renderer falls back to the legacy rule (first series = bar, rest = line).
+  seriesKind?: Record<string, "bar" | "line">;
   compact?: boolean;
 };
 
@@ -287,11 +291,11 @@ export function tableToParsed(table: string[][]): ParsedTable {
   };
 }
 
-function columnIndex(headers: string[], name: string) {
+export function columnIndex(headers: string[], name: string) {
   return Math.max(0, headers.indexOf(name));
 }
 
-function normalizeSeries(series: { name: string; data: number[] }[]) {
+export function normalizeSeries(series: { name: string; data: number[] }[]) {
   if (!series.length) return series;
   return series.map((item) => ({
     ...item,
@@ -305,7 +309,7 @@ function normalizeSeries(series: { name: string; data: number[] }[]) {
   }));
 }
 
-function paletteFor(config: ChartConfig) {
+export function paletteFor(config: ChartConfig) {
   const custom = config.paletteColors?.filter(Boolean);
   return custom?.length
     ? custom
@@ -316,7 +320,7 @@ function paletteFor(config: ChartConfig) {
       ];
 }
 
-function colorFor(index: number, config: ChartConfig, name?: string) {
+export function colorFor(index: number, config: ChartConfig, name?: string) {
   if (name && config.colorOverrides?.[name]) {
     return config.colorOverrides[name];
   }
@@ -324,7 +328,7 @@ function colorFor(index: number, config: ChartConfig, name?: string) {
   return palette[index % palette.length];
 }
 
-function numberFormatter(config: ChartConfig, proportional: boolean) {
+export function numberFormatter(config: ChartConfig, proportional: boolean) {
   return (rawValue: string | number) => {
     const value = Number(rawValue);
     if (!Number.isFinite(value)) return String(rawValue);
@@ -340,473 +344,17 @@ function numberFormatter(config: ChartConfig, proportional: boolean) {
   };
 }
 
-function numericBound(value: string | undefined) {
+export function numericBound(value: string | undefined) {
   if (!value?.trim()) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 export function buildChartOption(config: ChartConfig): EChartsOption {
-  const {
-    type,
-    parsed,
-    categoryColumn,
-    title,
-    subtitle,
-    width,
-    height,
-    margins,
-    theme,
-    backgroundColor,
-    transparent,
-    showLabels,
-    showLegend,
-    showGrid,
-    smooth,
-    fontSize,
-    compact = false,
-  } = config;
-  const categoryIndex = columnIndex(parsed.headers, categoryColumn);
-  const categories = parsed.rows.map((row) => row[categoryIndex]);
-  const validSeriesColumns = config.seriesColumns.filter((header) =>
-    parsed.numericHeaders.includes(header),
-  );
-  const selectedColumns = validSeriesColumns.length
-    ? validSeriesColumns
-    : parsed.numericHeaders.slice(0, 1);
-  let dataSeries = selectedColumns.map((name) => {
-    const index = columnIndex(parsed.headers, name);
-    return {
-      name,
-      data: parsed.rows.map((row) => toNumber(row[index])),
-    };
-  });
-  const proportional =
-    type === "proportionalArea" ||
-    type === "proportionalBar" ||
-    type === "proportionalColumn";
-  if (proportional) dataSeries = normalizeSeries(dataSeries);
-  const formatNumber = numberFormatter(config, proportional);
-  const lineWidth = config.lineWidth ?? 3;
-  const pointSize = config.pointSize ?? 7;
-  const barWidth = config.barWidth ?? 48;
-  const barRadius = config.barRadius ?? 3;
-  const markOpacity = (config.markOpacity ?? 100) / 100;
-  const areaOpacity = (config.areaOpacity ?? 22) / 100;
-  const showXAxis = config.showXAxis ?? true;
-  const showYAxis = config.showYAxis ?? true;
-  const showTooltip = config.showTooltip ?? true;
-  const legendPosition = config.legendPosition ?? "top";
-  const gridLineType = config.gridLineType ?? "dashed";
-
-  const titleBlock = compact ? 0 : title || subtitle ? 74 : 12;
-  const gridTop = compact ? 6 : margins.top + titleBlock;
-  const gridBottom = compact ? 6 : margins.bottom;
-  const gridLeft = compact ? 6 : margins.left;
-  const gridRight = compact ? 6 : margins.right;
-  const textColor = theme.text;
-  const splitLine = {
-    show: compact ? false : showGrid,
-    lineStyle: { color: theme.grid, type: gridLineType },
-  };
-  const axisLabel = {
-    show: !compact,
-    color: textColor,
-    fontSize,
-    hideOverlap: true,
-    formatter: compact ? undefined : formatNumber,
-  };
-  const valueAxis = {
-    type: "value" as const,
-    show: !compact,
-    axisLine: { show: false },
-    axisTick: { show: false },
-    axisLabel,
-    splitLine,
-    max: proportional ? 100 : numericBound(config.yAxisMax),
-    min: proportional ? 0 : numericBound(config.yAxisMin),
-    name: compact ? "" : config.yAxisTitle ?? "",
-    nameLocation: "middle" as const,
-    nameGap: 45,
-    nameTextStyle: { color: textColor, fontSize },
-  };
-  const categoryAxis = {
-    type: "category" as const,
-    show: !compact,
-    data: categories,
-    axisLine: {
-      show: !compact,
-      lineStyle: { color: "#aeb6bf" },
-    },
-    axisTick: { show: false },
-    axisLabel: {
-      ...axisLabel,
-      rotate: compact ? 0 : config.axisLabelRotation ?? 0,
-    },
-    name: compact ? "" : config.xAxisTitle ?? "",
-    nameLocation: "middle" as const,
-    nameGap: 30,
-    nameTextStyle: { color: textColor, fontSize },
-  };
-  const isHorizontal =
-    type === "bar" ||
-    type === "stackedBar" ||
-    type === "proportionalBar" ||
-    type === "divergingBar" ||
-    type === "populationPyramid";
-  const stacked =
-    type === "stackedArea" ||
-    type === "proportionalArea" ||
-    type === "stackedBar" ||
-    type === "proportionalBar" ||
-    type === "stackedColumn" ||
-    type === "proportionalColumn";
-  let series: SeriesOption[] = [];
-  let xAxis: EChartsOption["xAxis"] = isHorizontal ? valueAxis : categoryAxis;
-  let yAxis: EChartsOption["yAxis"] = isHorizontal ? categoryAxis : valueAxis;
-  let singleAxis: EChartsOption["singleAxis"];
-
-  if (type === "pie" || type === "donut") {
-    const innerTop = margins.top + titleBlock;
-    const innerHeight = Math.max(80, height - innerTop - margins.bottom);
-    const innerWidth = Math.max(80, width - margins.left - margins.right);
-    const centerX = ((margins.left + innerWidth / 2) / width) * 100;
-    const centerY = ((innerTop + innerHeight / 2) / height) * 100;
-    const radius = Math.max(42, Math.min(innerWidth, innerHeight) * 0.38);
-    const primary = dataSeries[0] ?? { name: "数值", data: [] };
-    series = [
-      {
-        name: primary.name,
-        type: "pie",
-        radius: type === "donut" ? [radius * 0.56, radius] : [0, radius],
-        center: [`${centerX}%`, `${centerY}%`],
-        avoidLabelOverlap: true,
-        itemStyle: {
-          borderColor: transparent ? "rgba(255,255,255,0.82)" : backgroundColor,
-          borderWidth: compact ? 1 : 2,
-          borderRadius: compact ? 1 : 3,
-        },
-        label: {
-          show: compact ? false : showLabels,
-          color: textColor,
-          fontSize,
-          formatter: "{b}\n{d}%",
-          lineHeight: fontSize + 5,
-        },
-        data: categories.map((name, index) => ({
-          name,
-          value: primary.data[index],
-        })),
-      },
-    ];
-    xAxis = undefined;
-    yAxis = undefined;
-  } else if (type === "scatter") {
-    const xName = selectedColumns[0] ?? parsed.numericHeaders[0];
-    const yName = selectedColumns[1] ?? parsed.numericHeaders[1] ?? xName;
-    const xIndex = columnIndex(parsed.headers, xName);
-    const yIndex = columnIndex(parsed.headers, yName);
-    series = [
-      {
-        name: yName,
-        type: "scatter",
-        symbolSize: compact ? 7 : pointSize,
-        itemStyle: {
-          color: colorFor(0, config, yName),
-          opacity: markOpacity,
-        },
-        label: {
-          show: compact ? false : showLabels,
-          position: "top",
-          color: textColor,
-          fontSize,
-          formatter: (params: unknown) => {
-            const item = params as { dataIndex: number };
-            return categories[item.dataIndex] ?? "";
-          },
-        },
-        data: parsed.rows.map((row) => [
-          toNumber(row[xIndex]),
-          toNumber(row[yIndex]),
-        ]),
-      },
-    ];
-    xAxis = valueAxis;
-    yAxis = valueAxis;
-  } else if (type === "streamgraph") {
-    const riverData = dataSeries.flatMap((item) =>
-      item.data.map((value, index) => [index, value, item.name]),
-    );
-    singleAxis = {
-      type: "value",
-      top: gridTop,
-      bottom: gridBottom,
-      left: gridLeft,
-      right: gridRight,
-      axisLabel: {
-        show: !compact,
-        color: textColor,
-        fontSize,
-        formatter: (value: number) => categories[Math.round(value)] ?? "",
-      },
-      axisTick: { show: false },
-      splitLine,
-      max: Math.max(0, categories.length - 1),
-    };
-    series = [
-      {
-        type: "themeRiver",
-        data: riverData,
-        label: { show: false },
-        emphasis: { focus: "series" },
-      } as SeriesOption,
-    ];
-    xAxis = undefined;
-    yAxis = undefined;
-  } else if (type === "divergingBar" || type === "populationPyramid") {
-    const first = dataSeries[0] ?? { name: "系列 A", data: [] };
-    const second = dataSeries[1] ?? first;
-    const maxValue = Math.max(
-      1,
-      ...first.data.map((value) => Math.abs(value)),
-      ...second.data.map((value) => Math.abs(value)),
-    );
-    const divergingValueAxis = {
-      ...valueAxis,
-      min: -maxValue,
-      max: maxValue,
-      axisLabel: {
-        ...axisLabel,
-        formatter: (value: number) => Math.abs(value).toString(),
-      },
-    };
-    xAxis = divergingValueAxis;
-    yAxis = {
-      ...categoryAxis,
-      inverse: type === "populationPyramid",
-    };
-    series = [
-      {
-        name: first.name,
-        type: "bar",
-        stack: "diverging",
-        barMaxWidth: compact ? 12 : barWidth,
-        data: first.data.map((value) => -Math.abs(value)),
-        itemStyle: {
-          color: colorFor(1, config, first.name),
-          opacity: markOpacity,
-        },
-        label: {
-          show: compact ? false : showLabels,
-          position: "inside",
-          color: "#ffffff",
-          formatter: (params: unknown) => {
-            const item = params as { value: number };
-            return Math.abs(item.value).toString();
-          },
-        },
-      },
-      {
-        name: second.name,
-        type: "bar",
-        stack: "diverging",
-        barMaxWidth: compact ? 12 : barWidth,
-        data: second.data.map((value) => Math.abs(value)),
-        itemStyle: {
-          color: colorFor(0, config, second.name),
-          opacity: markOpacity,
-        },
-        label: {
-          show: compact ? false : showLabels,
-          position: "inside",
-          color: "#ffffff",
-        },
-      },
-    ];
-  } else {
-    const isLine =
-      type === "line" ||
-      type === "smoothLine" ||
-      type === "stepLine" ||
-      type === "area" ||
-      type === "stackedArea" ||
-      type === "proportionalArea";
-    const visibleDataSeries =
-      type === "column" || type === "area" ? dataSeries.slice(0, 1) : dataSeries;
-
-    series = visibleDataSeries.map((item, index) => {
-      const color = colorFor(index, config, item.name);
-      const comboLine = type === "combo" && index > 0;
-      const seriesType = isLine || comboLine ? "line" : "bar";
-      return {
-        name: item.name,
-        type: seriesType,
-        data: item.data,
-        stack: stacked ? "total" : undefined,
-        smooth:
-          seriesType === "line" &&
-          (type === "smoothLine" ||
-            type === "stackedArea" ||
-            type === "proportionalArea" ||
-            smooth),
-        step: type === "stepLine" ? "middle" : undefined,
-        symbol: compact || pointSize === 0 ? "none" : "circle",
-        symbolSize: compact ? 0 : pointSize,
-        barMaxWidth: compact ? 20 : barWidth,
-        itemStyle: {
-          color,
-          opacity: markOpacity,
-          borderRadius:
-            seriesType === "bar"
-              ? isHorizontal
-                ? [0, barRadius, barRadius, 0]
-                : [barRadius, barRadius, 0, 0]
-              : 0,
-        },
-        lineStyle: { color, width: compact ? 1.5 : lineWidth },
-        areaStyle:
-          type === "area" ||
-          type === "stackedArea" ||
-          type === "proportionalArea"
-            ? {
-                color,
-                opacity: stacked
-                  ? Math.max(areaOpacity, 0.5)
-                  : areaOpacity,
-              }
-            : undefined,
-        label: {
-          show: compact ? false : showLabels,
-          position:
-            config.labelPosition === "inside"
-              ? "inside"
-              : isHorizontal
-                ? "right"
-                : "top",
-          color: textColor,
-          fontSize,
-          formatter: (params: unknown) => {
-            const item = params as { value: string | number };
-            return formatNumber(item.value);
-          },
-        },
-        emphasis: { focus: "series" },
-      } as SeriesOption;
-    });
-  }
-
-  if (xAxis && !Array.isArray(xAxis)) {
-    xAxis = {
-      ...xAxis,
-      show: compact ? false : showXAxis,
-      name: compact ? "" : config.xAxisTitle ?? "",
-      nameLocation: "middle",
-      nameGap: 32,
-      nameTextStyle: { color: textColor, fontSize },
-    };
-  }
-  if (yAxis && !Array.isArray(yAxis)) {
-    yAxis = {
-      ...yAxis,
-      show: compact ? false : showYAxis,
-      name: compact ? "" : config.yAxisTitle ?? "",
-      nameLocation: "middle",
-      nameGap: 48,
-      nameTextStyle: { color: textColor, fontSize },
-    };
-  }
-
-  return {
-    animation: !compact,
-    animationDuration: 480,
-    animationEasing: "cubicOut",
-    backgroundColor: transparent ? "transparent" : backgroundColor,
-    color: paletteFor(config),
-    textStyle: {
-      fontFamily:
-        '"Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
-      color: textColor,
-    },
-    title: {
-      show: compact ? false : Boolean(title || subtitle),
-      left:
-        config.titleAlign === "center"
-          ? "center"
-          : config.titleAlign === "right"
-            ? undefined
-            : margins.left,
-      right: config.titleAlign === "right" ? margins.right : undefined,
-      top: margins.top,
-      text: title,
-      subtext: subtitle,
-      itemGap: 7,
-      textStyle: {
-        color: textColor,
-        fontSize: Math.max(22, fontSize + 10),
-        fontWeight: 700,
-      },
-      subtextStyle: {
-        color: "#68727d",
-        fontSize: Math.max(12, fontSize - 1),
-      },
-    },
-    legend: {
-      show:
-        !compact &&
-        showLegend &&
-        (dataSeries.length > 1 || type === "pie" || type === "donut"),
-      top:
-        legendPosition === "top"
-          ? margins.top + 3
-          : legendPosition === "left" || legendPosition === "right"
-            ? "middle"
-            : undefined,
-      bottom: legendPosition === "bottom" ? margins.bottom : undefined,
-      left:
-        legendPosition === "left"
-          ? margins.left
-          : legendPosition === "bottom"
-            ? "center"
-            : undefined,
-      right:
-        legendPosition === "right" || legendPosition === "top"
-          ? margins.right
-          : undefined,
-      orient:
-        legendPosition === "left" || legendPosition === "right"
-          ? "vertical"
-          : "horizontal",
-      icon: "roundRect",
-      itemWidth: 12,
-      itemHeight: 8,
-      textStyle: { color: textColor, fontSize },
-    },
-    tooltip: compact || !showTooltip
-      ? { show: false }
-      : {
-          trigger: type === "pie" || type === "donut" ? "item" : "axis",
-          backgroundColor: "rgba(24, 28, 33, 0.94)",
-          borderWidth: 0,
-          textStyle: { color: "#ffffff", fontSize },
-          padding: [10, 12],
-        },
-    grid:
-      type === "pie" ||
-      type === "donut" ||
-      type === "streamgraph"
-        ? undefined
-        : {
-            top: gridTop,
-            right: gridRight,
-            bottom: gridBottom,
-            left: gridLeft,
-            containLabel: !compact,
-          },
-    singleAxis,
-    xAxis,
-    yAxis,
-    series,
-  };
+  // All 20 templates are registered with a per-family renderer; the legacy
+  // monolithic builder has been removed. buildWithRenderer assembles the
+  // shared title/legend/tooltip/grid/textStyle around the renderer's output.
+  return buildWithRenderer(config, getTemplateDefinition(config.type));
 }
 
 export function buildThumbnailOption(type: ChartType): EChartsOption {
