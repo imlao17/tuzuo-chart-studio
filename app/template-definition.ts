@@ -92,6 +92,15 @@ export type RenderContext = {
   formatNumber: (value: number | string) => string;
 };
 
+export type SampleData = {
+  /** 含表头的二维数组（同 tableData 形状） */
+  table: string[][];
+  /** 该示例数据的分类列名 */
+  categoryColumn: string;
+  /** 该示例数据的数值系列列名（按渲染顺序） */
+  seriesColumns: string[];
+};
+
 export type TemplateDefinition = {
   id: ChartType;
   family: ChartFamily;
@@ -99,7 +108,8 @@ export type TemplateDefinition = {
   validators: DataValidator[];
   settingsGroups: SettingsGroup[];
   capabilities: Capabilities;
-  /** undefined=走 legacy buildChartOption（任务 2 迁移后逐步消除） */
+  /** 模板专属示例数据，用于模板库缩略图与「加载示例」入口 */
+  sampleData: SampleData;
   buildOption?: (ctx: RenderContext) => RendererResult;
 };
 
@@ -246,6 +256,98 @@ const BIND_RIGHT_VALUE: DataBinding = {
   multiple: false,
 };
 
+// --- Per-template sample data ----------------------------------------------
+// Semantically appropriate demo data for each template family. Used by the
+// template-gallery thumbnails (so each preview shows a meaningful shape) and
+// by the "加载示例" action in the data-field panel. Tables include the header
+// row, matching the tableData shape.
+
+const SAMPLE_MONTHLY: SampleData = {
+  table: [
+    ["月份", "实际收入", "目标", "成本"],
+    ["一月", "128", "110", "80"],
+    ["二月", "146", "125", "90"],
+    ["三月", "138", "140", "85"],
+    ["四月", "172", "150", "100"],
+    ["五月", "189", "165", "110"],
+    ["六月", "218", "190", "125"],
+  ],
+  categoryColumn: "月份",
+  seriesColumns: ["实际收入", "目标", "成本"],
+};
+
+const SAMPLE_QUARTERLY: SampleData = {
+  table: [
+    ["季度", "产品 A", "产品 B", "产品 C"],
+    ["Q1", "320", "240", "180"],
+    ["Q2", "380", "290", "210"],
+    ["Q3", "420", "310", "245"],
+    ["Q4", "510", "365", "290"],
+  ],
+  categoryColumn: "季度",
+  seriesColumns: ["产品 A", "产品 B", "产品 C"],
+};
+
+const SAMPLE_SHARE: SampleData = {
+  table: [
+    ["渠道", "占比"],
+    ["线上", "42"],
+    ["门店", "31"],
+    ["分销", "18"],
+    ["其他", "9"],
+  ],
+  categoryColumn: "渠道",
+  seriesColumns: ["占比"],
+};
+
+// Scatter needs two numeric columns (X / Y). The category column labels points.
+const SAMPLE_SCATTER: SampleData = {
+  table: [
+    ["姓名", "身高 cm", "体重 kg"],
+    ["A", "160", "55"],
+    ["B", "168", "61"],
+    ["C", "172", "66"],
+    ["D", "175", "70"],
+    ["E", "180", "74"],
+    ["F", "158", "52"],
+    ["G", "185", "82"],
+    ["H", "165", "58"],
+  ],
+  categoryColumn: "姓名",
+  seriesColumns: ["身高 cm", "体重 kg"],
+};
+
+// Diverging needs two numeric columns (left / right) on opposite sides.
+const SAMPLE_DIVERGING: SampleData = {
+  table: [
+    ["议题", "支持", "反对"],
+    ["政策一", "62", "28"],
+    ["政策二", "48", "44"],
+    ["政策三", "35", "55"],
+    ["政策四", "71", "19"],
+    ["政策五", "44", "46"],
+  ],
+  categoryColumn: "议题",
+  seriesColumns: ["支持", "反对"],
+};
+
+// Population pyramid: left = male, right = female, by age band.
+const SAMPLE_PYRAMID: SampleData = {
+  table: [
+    ["年龄段", "男性 万", "女性 万"],
+    ["0-9", "380", "350"],
+    ["10-19", "420", "395"],
+    ["20-29", "510", "485"],
+    ["30-39", "480", "470"],
+    ["40-49", "445", "440"],
+    ["50-59", "390", "400"],
+    ["60-69", "310", "335"],
+    ["70+", "205", "245"],
+  ],
+  categoryColumn: "年龄段",
+  seriesColumns: ["男性 万", "女性 万"],
+};
+
 // --- Shared validators -----------------------------------------------------
 // Each returns null (pass) or a human-readable error string. Validators read
 // only the ValidationContext (parsed table + resolved categoryColumn /
@@ -287,6 +389,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildBarOption,
+    sampleData: SAMPLE_QUARTERLY,
   },
   stackedBar: {
     id: "stackedBar",
@@ -296,6 +399,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildBarOption,
+    sampleData: SAMPLE_QUARTERLY,
   },
   proportionalBar: {
     id: "proportionalBar",
@@ -305,6 +409,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildBarOption,
+    sampleData: SAMPLE_QUARTERLY,
   },
   column: {
     id: "column",
@@ -314,6 +419,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildBarOption,
+    sampleData: SAMPLE_QUARTERLY,
   },
   groupedColumn: {
     id: "groupedColumn",
@@ -323,6 +429,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildBarOption,
+    sampleData: SAMPLE_QUARTERLY,
   },
   stackedColumn: {
     id: "stackedColumn",
@@ -332,6 +439,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildBarOption,
+    sampleData: SAMPLE_QUARTERLY,
   },
   proportionalColumn: {
     id: "proportionalColumn",
@@ -341,6 +449,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildBarOption,
+    sampleData: SAMPLE_QUARTERLY,
   },
 
   // --- Pie / donut family (migrated) --------------------------------------
@@ -352,6 +461,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: PIE_GROUPS,
     capabilities: CAP_PIE,
     buildOption: buildPieOption,
+    sampleData: SAMPLE_SHARE,
   },
   pie: {
     id: "pie",
@@ -361,6 +471,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: PIE_GROUPS,
     capabilities: CAP_PIE,
     buildOption: buildPieOption,
+    sampleData: SAMPLE_SHARE,
   },
 
   // --- Line / area family (migrated) --------------------------------------
@@ -372,6 +483,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildLineAreaOption,
+    sampleData: SAMPLE_MONTHLY,
   },
   smoothLine: {
     id: "smoothLine",
@@ -381,6 +493,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildLineAreaOption,
+    sampleData: SAMPLE_MONTHLY,
   },
   stepLine: {
     id: "stepLine",
@@ -390,6 +503,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildLineAreaOption,
+    sampleData: SAMPLE_MONTHLY,
   },
   area: {
     id: "area",
@@ -399,6 +513,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildLineAreaOption,
+    sampleData: SAMPLE_MONTHLY,
   },
   stackedArea: {
     id: "stackedArea",
@@ -408,6 +523,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildLineAreaOption,
+    sampleData: SAMPLE_MONTHLY,
   },
   proportionalArea: {
     id: "proportionalArea",
@@ -417,6 +533,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildLineAreaOption,
+    sampleData: SAMPLE_MONTHLY,
   },
 
   // --- Streamgraph family (migrated) --------------------------------------
@@ -428,6 +545,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildStreamgraphOption,
+    sampleData: SAMPLE_MONTHLY,
   },
 
   // --- Combo family (migrated) --------------------------------------------
@@ -439,6 +557,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildComboOption,
+    sampleData: SAMPLE_QUARTERLY,
   },
 
   // --- Scatter family (migrated) ------------------------------------------
@@ -453,6 +572,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildScatterOption,
+    sampleData: SAMPLE_SCATTER,
   },
 
   // --- Diverging / population pyramid family (migrated) -------------------
@@ -467,6 +587,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildDivergingOption,
+    sampleData: SAMPLE_DIVERGING,
   },
   populationPyramid: {
     id: "populationPyramid",
@@ -479,6 +600,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     settingsGroups: CARTESIAN_GROUPS,
     capabilities: CAP_CARTESIAN,
     buildOption: buildDivergingOption,
+    sampleData: SAMPLE_PYRAMID,
   },
 };
 

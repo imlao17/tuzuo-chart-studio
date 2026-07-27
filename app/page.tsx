@@ -27,6 +27,7 @@ import {
   Search,
   Settings2,
   SlidersHorizontal,
+  Sparkles,
   Table2,
   Trash2,
   X,
@@ -911,6 +912,22 @@ export default function Home() {
     setWorkspaceMode("preview");
   }
 
+  function loadSample() {
+    // Load the current template's semantically appropriate sample data into the
+    // editor. Replaces the table and the generic category/value field roles,
+    // but leaves styling (palette, canvas, margins) untouched. Scatter /
+    // diverging / pyramid sample data is designed so the first two numeric
+    // columns are X/Y or left/right, so the role-specific bindings can stay
+    // unset and the resolver falls back correctly.
+    const { sampleData } = templateDefinition;
+    setTableData(sampleData.table.map((row) => [...row]));
+    setFieldRoles({
+      category: sampleData.categoryColumn,
+      value: [...sampleData.seriesColumns],
+    });
+    setStatus("已加载示例数据");
+  }
+
   function toggleSeries(header: string) {
     setFieldRoles((current) => {
       const list = (current.value as string[] | undefined) ?? [];
@@ -1413,6 +1430,15 @@ export default function Home() {
                 </label>
               );
             })}
+            <button
+              type="button"
+              className="text-button"
+              onClick={loadSample}
+              title="为当前图表加载示例数据"
+            >
+              <Sparkles size={14} />
+              加载示例
+            </button>
             <button
               type="button"
               className="text-button"

@@ -358,12 +358,16 @@ export function buildChartOption(config: ChartConfig): EChartsOption {
 }
 
 export function buildThumbnailOption(type: ChartType): EChartsOption {
-  const parsed = tableToParsed(INITIAL_TABLE);
+  // Each template's thumbnail uses its own semantically appropriate sample
+  // data, so the gallery previews show a meaningful shape (e.g. scatter shows
+  // a real point cloud, pyramid shows age bands) instead of one generic table.
+  const { sampleData } = getTemplateDefinition(type);
+  const parsed = tableToParsed(sampleData.table);
   return buildChartOption({
     type,
     parsed,
-    categoryColumn: "月份",
-    seriesColumns: ["实际收入", "目标"],
+    categoryColumn: sampleData.categoryColumn,
+    seriesColumns: sampleData.seriesColumns,
     title: "",
     subtitle: "",
     width: 240,
