@@ -91,8 +91,12 @@ export function buildPieOption(ctx: RenderContext): RendererResult {
           : [0, radius],
       center: [`${centerX}%`, `${centerY}%`],
       avoidLabelOverlap: true,
-      // startAngle only set when configured; otherwise ECharts default (90).
-      startAngle: config.startAngle,
+      // startAngle is emitted ONLY when configured. Setting it to undefined on
+      // the series object makes ECharts 6's pie renderer produce empty slice
+      // paths, so the field must be absent (not undefined) by default.
+      ...(config.startAngle !== undefined
+        ? { startAngle: config.startAngle }
+        : {}),
       itemStyle: {
         borderColor: transparent ? "rgba(255,255,255,0.82)" : backgroundColor,
         borderWidth: compact ? 1 : 2,

@@ -557,6 +557,18 @@ test("P1-3: startAngle appears on the series when configured", () => {
   assert.equal(series.startAngle, 45);
 });
 
+test("P1-3: startAngle is ABSENT (not undefined) on the pie series by default", () => {
+  // Regression: emitting startAngle: undefined on the pie series object makes
+  // ECharts 6's pie renderer produce empty slice paths (d=""). The field must
+  // be entirely absent, which JSON.stringify masks — so assert with `in`.
+  const option = buildChartOption(baseConfig({ type: "pie" }));
+  const series = seriesList(option)[0] as object;
+  assert.equal("startAngle" in series, false, "startAngle key should be absent by default");
+  // Same for donut.
+  const donut = buildChartOption(baseConfig({ type: "donut" }));
+  assert.equal("startAngle" in seriesList(donut)[0], false);
+});
+
 test("P1-3: pieOtherThreshold merges small slices into 其他", () => {
   // baseConfig row values for the primary series are 128/146/138 (total 412).
   // With a 34% threshold, both the 31% and 33% slices merge → 1 其他 + 1 large.
