@@ -1,98 +1,62 @@
-# vinext-starter
+# 图作 · 透明图表工具
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+导入数据，制作图表，导出**透明背景**的 PNG 或 SVG。一个本地、轻量、可复用的静态图表图片生成器。
 
-## Prerequisites
+## 定位
 
-- Node.js `>=22.13.0`
+图作不是 Flourish 那样的发布/协作平台，而是专注一件事：**快速生成一张干净的、透明背景的、可直接复用的图表图片**。所有控件都真实影响预览与导出，每个模板都有独立的数据字段、校验、菜单和行为。
 
-## Quick Start
+## 模板与家族
+
+20 个起始样式，按 7 个渲染家族组织，每个家族有独立的 renderer、数据角色、设置菜单和能力声明：
+
+| 家族 | 模板 |
+|---|---|
+| 柱/条 | 条形图、堆叠条形图、百分比条形图、柱状图、分组柱状图、堆叠柱状图、百分比柱状图 |
+| 折线/面积 | 折线图、平滑折线图、阶梯折线图、面积图、堆叠面积图、百分比面积图、河流图 |
+| 饼/环 | 饼图、环形图 |
+| 组合 | 柱线组合图 |
+| 散点 | 散点图 |
+| 发散 | 发散条形图、人口金字塔 |
+
+每个模板在 `app/template-definition.ts` 的 `TEMPLATE_REGISTRY` 里声明自己的数据绑定（角色）、校验器、设置组、能力，以及专属示例数据。
+
+## 架构
+
+```
+buildChartOption(config)          ← 薄分派器
+  → getTemplateDefinition(type)   ← 查 registry
+  → buildWithRenderer(config, def)
+      → buildRenderContext(config)        ← 预算 categories / dataSeries / formatNumber
+      → def.buildOption(ctx)              ← 对应家族的 renderer
+      → assembleOption(result, ...)       ← 共享 title / legend / tooltip / grid
+```
+
+- `app/template-definition.ts` — `TemplateDefinition` 注册表（角色 / 校验 / 菜单 / 能力 / 示例数据）
+- `app/renderers/*.ts` — 每个家族一个 renderer（bar / line-area / pie / combo / scatter / diverging / streamgraph）
+- `app/renderers/shared.ts` — 共享的轴原语、上下文组装、最终 option 拼装
+- `app/chart-model.ts` — `ChartConfig` 类型、数据解析、`buildChartOption` 分派器
+- `app/page.tsx` — 编辑器 UI（模板库、数据字段角色绑定、设置面板、预览、PNG/SVG 导出）
+
+## 快速开始
+
+需要 Node.js `>=22.13.0`。
 
 ```bash
 npm install
-npm run dev
-npm run build
+npm run dev      # 本地开发
+npm run build    # 生产构建
+npm test         # 构建 + HTML 回归测试 + 行为测试
+npm run lint
 ```
 
-This starter does not use `wrangler.jsonc`.
+## 测试
 
-## Included Shape
+两类测试，`npm test` 会依次运行：
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+- `tests/rendered-html.test.mjs` — SSR 渲染的 HTML 回归 + 源码 token 断言（`node --test`）
+- `tests/behavior.test.mts` — 行为回归（`tsx --test`），覆盖每个模板：配置变更是否真的改变 option、数据变更是否重绘、校验边界（空/负/文本/单列）、option 可导出性、示例数据渲染
 
-## Workspace Auth Headers
+## 技术栈
 
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
-```
-
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+vinext + Next.js 16 + React 19 + ECharts 6 + Tailwind 4。可选 Cloudflare D1 / Drizzle（当前未使用）。
