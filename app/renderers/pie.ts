@@ -12,7 +12,7 @@ import type { RenderContext } from "../template-definition";
 import type { RendererResult } from "./shared";
 
 export function buildPieOption(ctx: RenderContext): RendererResult {
-  const { config, categories, dataSeries } = ctx;
+  const { config, categories, dataSeries, formatNumber } = ctx;
   const {
     type,
     title,
@@ -39,13 +39,60 @@ export function buildPieOption(ctx: RenderContext): RendererResult {
 
   const primary = dataSeries[0] ?? { name: "数值", data: [] };
 
+  // Build slice entries from categories + the primary series. Apply optional
+  // sort (by value) and optional "其他" merging for slices below a percent
+  // threshold. Both are no-ops when their config field is absent.
+  let entries = categories.map((name, index) => ({
+    name,
+    value: primary.data[index],
+  }));
+  if (config.pieSort) {
+    const dir = config.pieSort === "desc" ? -1 : 1;
+    entries = [...entries].sort((a, b) => (a.value - b.value) * dir);
+  }
+  if (config.pieOtherThreshold !== undefined) {
+    const total = entries.reduce((sum, e) => sum + e.value, 0);
+    if (total > 0) {
+      const [small, large] = entries.reduce(
+        (acc, e) => {
+          const pct = (e.value / total) * 100;
+          acc[pct < config.pieOtherThreshold! ? 0 : 1].push(e);
+          return acc;
+        },
+        [[] as typeof entries, [] as typeof entries],
+      );
+      if (small.length) {
+        const otherValue = small.reduce((sum, e) => sum + e.value, 0);
+        entries = [...large, { name: "其他", value: otherValue }];
+      }
+    }
+  }
+
+  // Label formatter: undefined keeps the legacy "{b}\n{d}%" string so default
+  // output is byte-identical; otherwise compose name + value/percent.
+  const labelFormatter =
+    config.pieLabelContent === undefined
+      ? "{b}\n{d}%"
+      : (params: unknown) => {
+          const item = params as { name: string; percent: number; value: number };
+          const valueText = formatNumber(item.value);
+          if (config.pieLabelContent === "value") return `${item.name}\n${valueText}`;
+          if (config.pieLabelContent === "percent") return `${item.name}\n${item.percent}%`;
+          return `${item.name}\n${valueText} (${item.percent}%)`;
+        };
+
   const series: SeriesOption[] = [
     {
       name: primary.name,
       type: "pie",
-      radius: type === "donut" ? [radius * 0.56, radius] : [0, radius],
+      radius:
+        type === "donut"
+          ? [radius * (config.donutInnerRadius ?? 0.56), radius]
+          : [0, radius],
       center: [`${centerX}%`, `${centerY}%`],
       avoidLabelOverlap: true,
+      // startAngle only set when configured; otherwise ECharts default (90).
+      startAngle: config.startAngle,
       itemStyle: {
         borderColor: transparent ? "rgba(255,255,255,0.82)" : backgroundColor,
         borderWidth: compact ? 1 : 2,
@@ -55,13 +102,10 @@ export function buildPieOption(ctx: RenderContext): RendererResult {
         show: compact ? false : config.showLabels,
         color: textColor,
         fontSize,
-        formatter: "{b}\n{d}%",
+        formatter: labelFormatter,
         lineHeight: fontSize + 5,
       },
-      data: categories.map((name, index) => ({
-        name,
-        value: primary.data[index],
-      })),
+      data: entries,
     },
   ];
 

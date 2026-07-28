@@ -449,6 +449,14 @@ export default function Home() {
   const [endLabel, setEndLabel] = useState(false);
   const [referenceBandsText, setReferenceBandsText] = useState("");
   const [referenceLinesText, setReferenceLinesText] = useState("");
+  // P1-3 pie/donut deepening. All default to off/undefined = renderer unchanged.
+  const [pieLabelContent, setPieLabelContent] = useState<
+    "value" | "percent" | "both" | null
+  >(null);
+  const [donutInnerRadius, setDonutInnerRadius] = useState<number | null>(null);
+  const [pieSort, setPieSort] = useState<"asc" | "desc" | null>(null);
+  const [startAngle, setStartAngle] = useState<number | null>(null);
+  const [pieOtherThreshold, setPieOtherThreshold] = useState<number | null>(null);
   const [labelPosition, setLabelPosition] = useState<
     "auto" | "inside" | "outside"
   >("auto");
@@ -634,6 +642,11 @@ export default function Home() {
         endLabel: endLabel || undefined,
         referenceBands: referenceBands.length ? referenceBands : undefined,
         referenceLines: referenceLines.length ? referenceLines : undefined,
+        pieLabelContent: pieLabelContent ?? undefined,
+        donutInnerRadius: donutInnerRadius ?? undefined,
+        pieSort: pieSort ?? undefined,
+        startAngle: startAngle ?? undefined,
+        pieOtherThreshold: pieOtherThreshold ?? undefined,
         markOpacity,
         areaOpacity,
         labelPosition,
@@ -666,6 +679,7 @@ export default function Home() {
       chartType,
       colorOverrides,
       connectNulls,
+      donutInnerRadius,
       endLabel,
       fontSize,
       gridLineType,
@@ -680,11 +694,15 @@ export default function Home() {
       numberSuffix,
       paletteColors,
       parsed,
+      pieLabelContent,
+      pieOtherThreshold,
+      pieSort,
       pointSize,
       primaryColor,
       referenceBands,
       referenceLines,
       secondaryColor,
+      startAngle,
       seriesColumns,
       seriesKind,
       showGrid,
@@ -1210,6 +1228,11 @@ export default function Home() {
     setEndLabel(false);
     setReferenceBandsText("");
     setReferenceLinesText("");
+    setPieLabelContent(null);
+    setDonutInnerRadius(null);
+    setPieSort(null);
+    setStartAngle(null);
+    setPieOtherThreshold(null);
     setMarkOpacity(100);
     setAreaOpacity(22);
     setLabelPosition("auto");
@@ -2161,6 +2184,89 @@ export default function Home() {
                 <option value={20}>20 px</option>
               </select>
             </label>
+            {(chartType === "pie" || chartType === "donut") && (
+              <>
+                <label className="field settings-field">
+                  <span>标签内容</span>
+                  <select
+                    value={pieLabelContent ?? ""}
+                    onChange={(event) =>
+                      setPieLabelContent(
+                        event.target.value === "value" ||
+                          event.target.value === "percent" ||
+                          event.target.value === "both"
+                          ? event.target.value
+                          : null,
+                      )
+                    }
+                  >
+                    <option value="">默认（名称 + 百分比）</option>
+                    <option value="value">数值</option>
+                    <option value="percent">百分比</option>
+                    <option value="both">数值 + 百分比</option>
+                  </select>
+                </label>
+                <label className="field settings-field">
+                  <span>扇区排序</span>
+                  <select
+                    value={pieSort ?? ""}
+                    onChange={(event) =>
+                      setPieSort(
+                        event.target.value === "asc" || event.target.value === "desc"
+                          ? event.target.value
+                          : null,
+                      )
+                    }
+                  >
+                    <option value="">默认（原序）</option>
+                    <option value="asc">按数值升序</option>
+                    <option value="desc">按数值降序</option>
+                  </select>
+                </label>
+                <label className="range-field">
+                  <span>
+                    起始角 <strong>{startAngle ?? 90}°</strong>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={360}
+                    value={startAngle ?? 90}
+                    onChange={(event) => setStartAngle(Number(event.target.value))}
+                  />
+                </label>
+                <label className="range-field">
+                  <span>
+                    其他项阈值 <strong>{pieOtherThreshold ?? 0}%</strong>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={20}
+                    value={pieOtherThreshold ?? 0}
+                    onChange={(event) =>
+                      setPieOtherThreshold(Number(event.target.value) || null)
+                    }
+                  />
+                </label>
+              </>
+            )}
+            {chartType === "donut" && (
+              <label className="range-field">
+                <span>
+                  内径比例 <strong>{Math.round((donutInnerRadius ?? 0.56) * 100)}%</strong>
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={90}
+                  value={Math.round((donutInnerRadius ?? 0.56) * 100)}
+                  onChange={(event) =>
+                    setDonutInnerRadius(Number(event.target.value) / 100)
+                  }
+                />
+              </label>
+            )}
           </SettingsSection>
 
           <SettingsSection

@@ -489,3 +489,83 @@ test("P1-2: referenceLines attaches markLine to the first series only", () => {
   assert.ok(first.markLine && first.markLine.data.length === 1, "first series missing markLine");
   assert.equal(second.markLine, undefined, "markLine leaked to non-first series");
 });
+
+// ---------------------------------------------------------------------------
+// Group: P1-3 pie/donut deepening — label content, inner radius, sort, angle,
+// "other" merging.
+// ---------------------------------------------------------------------------
+
+const PIE_TYPES: ChartType[] = ["pie", "donut"];
+
+test("P1-3: pie/donut defaults are unchanged when the new fields are absent", () => {
+  for (const type of PIE_TYPES) {
+    const implicit = sig(buildChartOption(baseConfig({ type })));
+    const explicitUndef = sig(
+      buildChartOption(
+        baseConfig({
+          type,
+          pieLabelContent: undefined,
+          donutInnerRadius: undefined,
+          pieSort: undefined,
+          startAngle: undefined,
+          pieOtherThreshold: undefined,
+        }),
+      ),
+    );
+    assert.equal(implicit, explicitUndef, `${type}: defaults differ`);
+  }
+});
+
+test("P1-3: pieLabelContent switches the label formatter and value/percent modes", () => {
+  // Default keeps the legacy string formatter.
+  const def = buildChartOption(baseConfig({ type: "pie" }));
+  const defLabel = seriesList(def)[0] as { label?: { formatter?: unknown } };
+  assert.equal(defLabel.label?.formatter, "{b}\n{d}%");
+  // "value" mode yields a function formatter whose output includes the value.
+  const valueMode = buildChartOption(baseConfig({ type: "pie", pieLabelContent: "value" }));
+  const valueLabel = seriesList(valueMode)[0] as { label?: { formatter?: (p: { name: string; percent: number; value: number }) => string } };
+  const fn = valueLabel.label?.formatter;
+  assert.equal(typeof fn, "function");
+  // baseConfig row 1 numeric series[0] value is 128 → value mode prints "128".
+  assert.equal(fn?.({ name: "一月", percent: 50, value: 128 }), "一月\n128");
+  // "both" mode includes percent too.
+  const bothMode = buildChartOption(baseConfig({ type: "pie", pieLabelContent: "both" }));
+  const bothFn = (seriesList(bothMode)[0] as { label?: { formatter?: (p: { name: string; percent: number; value: number }) => string } }).label?.formatter;
+  assert.equal(bothFn?.({ name: "一月", percent: 42, value: 128 }), "一月\n128 (42%)");
+});
+
+test("P1-3: donutInnerRadius changes the donut inner radius", () => {
+  const def = buildChartOption(baseConfig({ type: "donut" }));
+  const tuned = buildChartOption(baseConfig({ type: "donut", donutInnerRadius: 0.8 }));
+  const defRadius = (seriesList(def)[0] as { radius: [number, number] }).radius;
+  const tunedRadius = (seriesList(tuned)[0] as { radius: [number, number] }).radius;
+  assert.notEqual(defRadius[0], tunedRadius[0]);
+  assert.ok(tunedRadius[0] > defRadius[0], "larger inner radius should yield larger hole");
+});
+
+test("P1-3: pieSort reorders the slice data by value", () => {
+  const desc = buildChartOption(baseConfig({ type: "pie", pieSort: "desc" }));
+  const data = (seriesList(desc)[0] as { data: { value: number }[] }).data;
+  const values = data.map((d) => d.value);
+  const sorted = [...values].sort((a, b) => b - a);
+  assert.deepEqual(values, sorted);
+});
+
+test("P1-3: startAngle appears on the series when configured", () => {
+  const option = buildChartOption(baseConfig({ type: "pie", startAngle: 45 }));
+  const series = seriesList(option)[0] as { startAngle?: number };
+  assert.equal(series.startAngle, 45);
+});
+
+test("P1-3: pieOtherThreshold merges small slices into 其他", () => {
+  // baseConfig row values for the primary series are 128/146/138 (total 412).
+  // With a 34% threshold, both the 31% and 33% slices merge → 1 其他 + 1 large.
+  const option = buildChartOption(baseConfig({ type: "pie", pieOtherThreshold: 34 }));
+  const data = (seriesList(option)[0] as { data: { name: string; value: number }[] }).data;
+  const names = data.map((d) => d.name);
+  assert.ok(names.includes("其他"), "expected an 其他 merged slice");
+  assert.ok(data.length === 2, `expected 2 slices after merge, got ${data.length}`);
+  // The 其他 slice must carry the sum of the merged small slices (128+138=266).
+  const otherSlice = data.find((d) => d.name === "其他");
+  assert.equal(otherSlice?.value, 266);
+});

@@ -117,6 +117,16 @@ export type ChartConfig = {
   referenceBands?: Array<{ start: string; end: string; label?: string }>;
   // Line/area family: horizontal reference lines at fixed Y values.
   referenceLines?: Array<{ value: number; label?: string }>;
+  // Pie/donut family: what the slice labels show.
+  pieLabelContent?: "value" | "percent" | "both";
+  // Donut only: inner radius as a fraction of the outer radius (0–1).
+  donutInnerRadius?: number;
+  // Pie/donut: sort slices by value.
+  pieSort?: "asc" | "desc";
+  // Pie/donut: starting angle in degrees.
+  startAngle?: number;
+  // Pie/donut: merge slices below this percent of the total into an "其他" slice.
+  pieOtherThreshold?: number;
   compact?: boolean;
 };
 
