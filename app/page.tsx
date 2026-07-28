@@ -466,6 +466,8 @@ export default function Home() {
   const [comboDualAxis, setComboDualAxis] = useState(false);
   const [y2AxisTitle, setY2AxisTitle] = useState("");
   const [comboAxisSync, setComboAxisSync] = useState(false);
+  // P1-6 streamgraph time axis. Default off = row-index axis (unchanged).
+  const [streamTimeAxis, setStreamTimeAxis] = useState(false);
   const [labelPosition, setLabelPosition] = useState<
     "auto" | "inside" | "outside"
   >("auto");
@@ -663,6 +665,7 @@ export default function Home() {
         comboDualAxis: comboDualAxis || undefined,
         y2AxisTitle: y2AxisTitle || undefined,
         comboAxisSync: comboAxisSync || undefined,
+        streamTimeAxis: streamTimeAxis || undefined,
         markOpacity,
         areaOpacity,
         labelPosition,
@@ -725,6 +728,7 @@ export default function Home() {
       sizeColumn,
       colorColumn,
       startAngle,
+      streamTimeAxis,
       seriesColumns,
       seriesKind,
       showGrid,
@@ -1263,6 +1267,7 @@ export default function Home() {
     setComboDualAxis(false);
     setY2AxisTitle("");
     setComboAxisSync(false);
+    setStreamTimeAxis(false);
     setMarkOpacity(100);
     setAreaOpacity(22);
     setLabelPosition("auto");
@@ -2099,6 +2104,13 @@ export default function Home() {
                   </>
                 )}
               </>
+            )}
+            {chartType === "streamgraph" && (
+              <Toggle
+                label="时间轴（按日期解析）"
+                checked={streamTimeAxis}
+                onChange={setStreamTimeAxis}
+              />
             )}
             {(selectedTemplate.family === "bar" ||
               chartType === "combo" ||

@@ -140,6 +140,8 @@ export type ChartConfig = {
   y2AxisTitle?: string;
   // Combo only: link the two Y axes to a shared min/max.
   comboAxisSync?: boolean;
+  // Streamgraph only: parse the category column as dates and use a time axis.
+  streamTimeAxis?: boolean;
   compact?: boolean;
 };
 

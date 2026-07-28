@@ -720,3 +720,57 @@ test("P1-5: non-combo templates are unaffected by the patchAxes array support", 
     assert.equal(Array.isArray(option.yAxis), false, `${type}: yAxis unexpectedly an array`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Group: P1-6 streamgraph time axis — opt-in date parsing on the category axis.
+// ---------------------------------------------------------------------------
+
+const streamConfig = (overrides: Partial<ChartConfig> = {}): ChartConfig =>
+  baseConfig({
+    type: "streamgraph",
+    parsed: tableToParsed([
+      ["月份", "产品 A", "产品 B"],
+      ["2024-01", "320", "240"],
+      ["2024-02", "380", "290"],
+      ["2024-03", "420", "310"],
+    ]),
+    categoryColumn: "月份",
+    seriesColumns: ["产品 A", "产品 B"],
+    ...overrides,
+  });
+
+test("P1-6: streamgraph defaults are unchanged when streamTimeAxis is absent", () => {
+  const implicit = sig(buildChartOption(streamConfig()));
+  const explicitUndef = sig(buildChartOption(streamConfig({ streamTimeAxis: undefined })));
+  assert.equal(implicit, explicitUndef);
+  // Default axis is a value axis (row-index based), not a time axis.
+  assert.equal((buildChartOption(streamConfig()).singleAxis as { type?: string }).type, "value");
+});
+
+test("P1-6: streamTimeAxis switches to a time axis with timestamps when categories parse", () => {
+  const option = buildChartOption(streamConfig({ streamTimeAxis: true }));
+  const axis = option.singleAxis as { type?: string };
+  assert.equal(axis.type, "time");
+  // Data tuples carry timestamps (numbers in the billions for ms epochs),
+  // not small row indices.
+  const series = seriesList(option)[0] as { data: [number, number, string][] };
+  const xs = series.data.map((d) => d[0]);
+  assert.ok(xs.every((x) => x > 1_000_000_000_000), `expected epoch ms, got ${xs}`);
+});
+
+test("P1-6: streamTimeAxis falls back to value axis when categories are not dates", () => {
+  // Non-date categories (Chinese month names) should not break; renderer falls
+  // back to the row-index value axis.
+  const option = buildChartOption(
+    baseConfig({
+      type: "streamgraph",
+      streamTimeAxis: true,
+    }),
+  );
+  const axis = option.singleAxis as { type?: string };
+  assert.equal(axis.type, "value");
+  // Data tuples carry row indices (small integers).
+  const series = seriesList(option)[0] as { data: [number, number, string][] };
+  const xs = series.data.map((d) => d[0]);
+  assert.ok(xs.every((x) => x < 1000), `expected small indices, got ${xs}`);
+});

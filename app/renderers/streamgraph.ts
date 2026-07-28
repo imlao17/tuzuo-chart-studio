@@ -32,12 +32,41 @@ export function buildStreamgraphOption(ctx: RenderContext): RendererResult {
     lineStyle: { color: theme.grid, type: config.gridLineType ?? "dashed" },
   };
 
+  // P1-6 time axis: when the user opts in, try to parse each category as a
+  // date. If every category parses, switch the axis to type:"time" and carry
+  // timestamps in the data tuples; if any fail (e.g. Chinese month names,
+  // plain labels), fall back to row indices so the chart still renders.
+  const useTimeAxis = !compact && config.streamTimeAxis === true;
+  const parsedTimes = useTimeAxis
+    ? categories.map((c) => Date.parse(String(c)))
+    : null;
+  const allDates = parsedTimes !== null && parsedTimes.every((t) => Number.isFinite(t));
+
+  // The x-coordinate for each category: a timestamp when the time axis is
+  // active and parseable, otherwise the original row index.
+  const xOf = (index: number) =>
+    allDates ? parsedTimes[index] : index;
+
   const riverData = dataSeries.flatMap((item) =>
-    item.data.map((value, index) => [index, value, item.name]),
+    item.data.map((value, index) => [xOf(index), value, item.name]),
   );
 
+  // Date label formatter: pick a granularity based on the span. If the data
+  // spans multiple years, show YYYY-MM; within a year, show MM-DD; otherwise
+  // fall back to the raw category string.
+  const formatTimeLabel = (value: number) => {
+    const idx = parsedTimes ? parsedTimes.indexOf(value) : -1;
+    if (idx >= 0) return categories[idx] ?? "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return allDates && parsedTimes ? `${y}-${m}-${day}` : `${y}-${m}`;
+  };
+
   const singleAxis: EChartsOption["singleAxis"] = {
-    type: "value",
+    type: allDates ? "time" : "value",
     top: gridTop,
     bottom: gridBottom,
     left: gridLeft,
@@ -46,11 +75,13 @@ export function buildStreamgraphOption(ctx: RenderContext): RendererResult {
       show: !compact,
       color: textColor,
       fontSize,
-      formatter: (value: number) => categories[Math.round(value)] ?? "",
+      formatter: allDates
+        ? (value: number) => formatTimeLabel(value)
+        : (value: number) => categories[Math.round(value)] ?? "",
     },
     axisTick: { show: false },
     splitLine,
-    max: Math.max(0, categories.length - 1),
+    max: allDates ? undefined : Math.max(0, categories.length - 1),
   };
 
   const series: SeriesOption[] = [
