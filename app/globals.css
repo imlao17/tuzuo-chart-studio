@@ -43,6 +43,24 @@ textarea {
   letter-spacing: 0;
 }
 
+/* Compact multi-line input for P1-2 reference bands / lines (one entry per row). */
+.marks-textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #ffffff;
+  color: #17202a;
+  font-size: 11px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.marks-textarea::placeholder {
+  color: #98a1a9;
+}
+
 button {
   cursor: pointer;
 }

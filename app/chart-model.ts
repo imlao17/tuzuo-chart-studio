@@ -109,6 +109,14 @@ export type ChartConfig = {
   // Grouped/stacked bar spacing. Numbers are interpreted by ECharts (percent of bar width).
   barGap?: number;
   barCategoryGap?: number;
+  // Line/area family: connect across missing (NaN) values instead of leaving a gap.
+  connectNulls?: boolean;
+  // Line family only: show a label at the last point of each series.
+  endLabel?: boolean;
+  // Line/area family: shaded vertical bands across a category range.
+  referenceBands?: Array<{ start: string; end: string; label?: string }>;
+  // Line/area family: horizontal reference lines at fixed Y values.
+  referenceLines?: Array<{ value: number; label?: string }>;
   compact?: boolean;
 };
 

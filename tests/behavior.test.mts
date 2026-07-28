@@ -408,3 +408,84 @@ test("P1-1: barGap and barCategoryGap change the option", () => {
   );
   assert.notEqual(off, on);
 });
+
+// ---------------------------------------------------------------------------
+// Group: P1-2 line/area deepening — connectNulls, endLabel, reference marks.
+// ---------------------------------------------------------------------------
+
+const LINE_TYPES: ChartType[] = [
+  "line",
+  "smoothLine",
+  "stepLine",
+  "area",
+  "stackedArea",
+  "proportionalArea",
+];
+
+test("P1-2: line/area defaults are unchanged when the new fields are absent", () => {
+  for (const type of LINE_TYPES) {
+    const implicit = sig(buildChartOption(baseConfig({ type })));
+    const explicitUndef = sig(
+      buildChartOption(
+        baseConfig({
+          type,
+          connectNulls: undefined,
+          endLabel: undefined,
+          referenceBands: undefined,
+          referenceLines: undefined,
+        }),
+      ),
+    );
+    assert.equal(implicit, explicitUndef, `${type}: defaults differ`);
+  }
+});
+
+test("P1-2: connectNulls appears on every line/area series", () => {
+  for (const type of LINE_TYPES) {
+    const option = buildChartOption(baseConfig({ type, connectNulls: true }));
+    for (const s of seriesList(option)) {
+      assert.equal((s as { connectNulls?: boolean }).connectNulls, true, `${type}: missing connectNulls`);
+    }
+  }
+});
+
+test("P1-2: endLabel is added to line series but not area", () => {
+  const line = buildChartOption(baseConfig({ type: "line", endLabel: true }));
+  const lineSeries = seriesList(line)[0] as { endLabel?: unknown };
+  assert.ok(lineSeries.endLabel, "line series missing endLabel");
+  // endLabel suppresses the per-point label.
+  const lineLabel = seriesList(line)[0] as { label?: { show?: boolean } };
+  assert.equal(lineLabel.label?.show, false);
+  // area should not get endLabel (only line family).
+  const area = buildChartOption(baseConfig({ type: "area", endLabel: true }));
+  const areaSeries = seriesList(area)[0] as { endLabel?: unknown };
+  assert.equal(areaSeries.endLabel, undefined);
+});
+
+test("P1-2: referenceBands attaches markArea to the first series only", () => {
+  const option = buildChartOption(
+    baseConfig({
+      type: "line",
+      referenceBands: [{ start: "二月", end: "四月" }],
+    }),
+  );
+  const list = seriesList(option);
+  const first = list[0] as { markArea?: { data: unknown[] } };
+  const second = list[1] as { markArea?: unknown };
+  assert.ok(first.markArea && first.markArea.data.length === 1, "first series missing markArea");
+  assert.equal(second.markArea, undefined, "markArea leaked to non-first series");
+});
+
+test("P1-2: referenceLines attaches markLine to the first series only", () => {
+  const option = buildChartOption(
+    baseConfig({
+      type: "line",
+      referenceLines: [{ value: 150, label: "目标" }],
+    }),
+  );
+  const list = seriesList(option);
+  const first = list[0] as { markLine?: { data: unknown[] } };
+  const second = list[1] as { markLine?: unknown };
+  assert.ok(first.markLine && first.markLine.data.length === 1, "first series missing markLine");
+  assert.equal(second.markLine, undefined, "markLine leaked to non-first series");
+});

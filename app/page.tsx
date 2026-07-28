@@ -46,6 +46,7 @@ import {
   buildThumbnailOption,
   CHART_TEMPLATES,
   ChartFamily,
+  type ChartConfig,
   ChartType,
   INITIAL_TABLE,
   Margins,
@@ -443,6 +444,11 @@ export default function Home() {
   const [barCategoryGap, setBarCategoryGap] = useState<number | null>(null);
   const [markOpacity, setMarkOpacity] = useState(100);
   const [areaOpacity, setAreaOpacity] = useState(22);
+  // P1-2 line/area deepening. All default to off/empty = renderer unchanged.
+  const [connectNulls, setConnectNulls] = useState(false);
+  const [endLabel, setEndLabel] = useState(false);
+  const [referenceBandsText, setReferenceBandsText] = useState("");
+  const [referenceLinesText, setReferenceLinesText] = useState("");
   const [labelPosition, setLabelPosition] = useState<
     "auto" | "inside" | "outside"
   >("auto");
@@ -564,6 +570,33 @@ export default function Home() {
     templateDefinition.dataBindings,
   ]);
 
+  // P1-2 reference marks: parse the text inputs into structured arrays.
+  // Bands: one per line as "start,end" or "start,end,label".
+  // Lines: one per line as "value" or "value,label".
+  type ReferenceBand = NonNullable<ChartConfig["referenceBands"]>[number];
+  type ReferenceLine = NonNullable<ChartConfig["referenceLines"]>[number];
+  const referenceBands = useMemo<ReferenceBand[]>(() => {
+    const bands: ReferenceBand[] = [];
+    for (const raw of referenceBandsText.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line) continue;
+      const [start, end, label] = line.split(",").map((part) => part?.trim());
+      if (start && end) bands.push({ start, end, label: label || undefined });
+    }
+    return bands;
+  }, [referenceBandsText]);
+  const referenceLines = useMemo<ReferenceLine[]>(() => {
+    const lines: ReferenceLine[] = [];
+    for (const raw of referenceLinesText.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line) continue;
+      const [valueText, label] = line.split(",").map((part) => part?.trim());
+      const value = Number(valueText);
+      if (Number.isFinite(value)) lines.push({ value, label: label || undefined });
+    }
+    return lines;
+  }, [referenceLinesText]);
+
   const option = useMemo(
     () =>
       buildChartOption({
@@ -597,6 +630,10 @@ export default function Home() {
         stackOrder: stackOrder ?? undefined,
         barGap: barGap ?? undefined,
         barCategoryGap: barCategoryGap ?? undefined,
+        connectNulls: connectNulls || undefined,
+        endLabel: endLabel || undefined,
+        referenceBands: referenceBands.length ? referenceBands : undefined,
+        referenceLines: referenceLines.length ? referenceLines : undefined,
         markOpacity,
         areaOpacity,
         labelPosition,
@@ -628,6 +665,8 @@ export default function Home() {
       categoryColumn,
       chartType,
       colorOverrides,
+      connectNulls,
+      endLabel,
       fontSize,
       gridLineType,
       height,
@@ -643,6 +682,8 @@ export default function Home() {
       parsed,
       pointSize,
       primaryColor,
+      referenceBands,
+      referenceLines,
       secondaryColor,
       seriesColumns,
       seriesKind,
@@ -1165,6 +1206,10 @@ export default function Home() {
     setStackOrder(null);
     setBarGap(null);
     setBarCategoryGap(null);
+    setConnectNulls(false);
+    setEndLabel(false);
+    setReferenceBandsText("");
+    setReferenceLinesText("");
     setMarkOpacity(100);
     setAreaOpacity(22);
     setLabelPosition("auto");
@@ -1872,6 +1917,43 @@ export default function Home() {
                   checked={smooth}
                   onChange={setSmooth}
                 />
+              </>
+            )}
+            {(selectedTemplate.family === "line" ||
+              selectedTemplate.family === "area") && (
+              <>
+                <Toggle
+                  label="连接缺失值"
+                  checked={connectNulls}
+                  onChange={setConnectNulls}
+                />
+                {selectedTemplate.family === "line" && (
+                  <Toggle
+                    label="末端标签"
+                    checked={endLabel}
+                    onChange={setEndLabel}
+                  />
+                )}
+                <label className="field">
+                  <span>参考区间（每行 起,止[,标签]）</span>
+                  <textarea
+                    className="marks-textarea"
+                    rows={2}
+                    value={referenceBandsText}
+                    onChange={(event) => setReferenceBandsText(event.target.value)}
+                    placeholder={"二月,四月"}
+                  />
+                </label>
+                <label className="field">
+                  <span>参考线（每行 数值[,标签]）</span>
+                  <textarea
+                    className="marks-textarea"
+                    rows={2}
+                    value={referenceLinesText}
+                    onChange={(event) => setReferenceLinesText(event.target.value)}
+                    placeholder={"150,目标"}
+                  />
+                </label>
               </>
             )}
             {(selectedTemplate.family === "line" ||

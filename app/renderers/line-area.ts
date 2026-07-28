@@ -52,6 +52,37 @@ export function buildLineAreaOption(ctx: RenderContext): RendererResult {
   // only render the first series; the other line/area types render all.
   const visibleDataSeries = type === "area" ? dataSeries.slice(0, 1) : dataSeries;
 
+  // P1-2 marks: shaded vertical bands and horizontal reference lines. Both are
+  // series-level in ECharts, so attach them to the first rendered series once.
+  const markArea =
+    config.referenceBands && config.referenceBands.length
+      ? {
+          silent: true,
+          itemStyle: { color: "rgba(22, 99, 235, 0.08)" },
+          data: config.referenceBands.map((band) => [
+            { xAxis: band.start, label: band.label ? { show: true, formatter: band.label } : undefined },
+            { xAxis: band.end },
+          ]),
+        }
+      : undefined;
+  const markLine =
+    config.referenceLines && config.referenceLines.length
+      ? {
+          silent: true,
+          symbol: ["none", "none"],
+          lineStyle: { type: "dashed" as const },
+          data: config.referenceLines.map((line) => ({
+            yAxis: line.value,
+            label: line.label ? { show: true, formatter: line.label } : undefined,
+          })),
+        }
+      : undefined;
+
+  // endLabel only applies to line series (ECharts ignores it on area). When
+  // enabled, suppress the per-point label so only the end label shows.
+  const endLabelEnabled = !compact && !isArea && config.endLabel;
+  const showPerPointLabel = (compact ? false : config.showLabels) && !endLabelEnabled;
+
   const series: SeriesOption[] = visibleDataSeries.map((item, index) => {
     const color = colorFor(index, config, item.name);
     // In the legacy map `seriesType` was "line" when isLine/comboLine, else
@@ -69,6 +100,8 @@ export function buildLineAreaOption(ctx: RenderContext): RendererResult {
         seriesType === "line" &&
         (SMOOTH_BY_DEFAULT.has(type) || config.smooth),
       step: type === "stepLine" ? "middle" : undefined,
+      // P1-2: optionally bridge missing (NaN) values instead of leaving a gap.
+      connectNulls: config.connectNulls || undefined,
       symbol: compact || pointSize === 0 ? "none" : "circle",
       symbolSize: compact ? 0 : pointSize,
       barMaxWidth: compact ? 20 : barWidth,
@@ -86,7 +119,7 @@ export function buildLineAreaOption(ctx: RenderContext): RendererResult {
           }
         : undefined,
       label: {
-        show: compact ? false : config.showLabels,
+        show: showPerPointLabel,
         // isHorizontal is false for line/area, so position is "top" unless
         // the user forced "inside".
         position: config.labelPosition === "inside" ? "inside" : "top",
@@ -97,6 +130,18 @@ export function buildLineAreaOption(ctx: RenderContext): RendererResult {
           return formatNumber(entry.value);
         },
       },
+      // P1-2: end-of-line label (series name) for line series.
+      endLabel: endLabelEnabled
+        ? {
+            show: true,
+            formatter: "{a}",
+            color,
+            fontSize,
+          }
+        : undefined,
+      // P1-2 marks attach to the first series only.
+      markArea: index === 0 ? markArea : undefined,
+      markLine: index === 0 ? markLine : undefined,
       emphasis: { focus: "series" },
     } as SeriesOption;
   });
