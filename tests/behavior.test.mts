@@ -569,3 +569,79 @@ test("P1-3: pieOtherThreshold merges small slices into 其他", () => {
   const otherSlice = data.find((d) => d.name === "其他");
   assert.equal(otherSlice?.value, 266);
 });
+
+// ---------------------------------------------------------------------------
+// Group: P1-4 scatter deepening — size/color/shape roles + trend line.
+// ---------------------------------------------------------------------------
+
+// Scatter test data: 姓名 (category) + 身高/体重/年龄 (numeric) + 性别 (categorical).
+const scatterConfig = (overrides: Partial<ChartConfig> = {}): ChartConfig =>
+  baseConfig({
+    parsed: tableToParsed([
+      ["姓名", "身高 cm", "体重 kg", "年龄", "性别"],
+      ["A", "160", "55", "20", "女"],
+      ["B", "175", "70", "30", "男"],
+      ["C", "168", "62", "25", "女"],
+      ["D", "180", "80", "40", "男"],
+    ]),
+    categoryColumn: "姓名",
+    seriesColumns: ["身高 cm", "体重 kg"],
+    ...overrides,
+  });
+
+test("P1-4: scatter defaults are unchanged when the new fields are absent", () => {
+  const implicit = sig(buildChartOption(scatterConfig({ type: "scatter" })));
+  const explicitUndef = sig(
+    buildChartOption(
+      scatterConfig({
+        type: "scatter",
+        sizeColumn: undefined,
+        colorColumn: undefined,
+        shapeColumn: undefined,
+        scatterTrendLine: undefined,
+      }),
+    ),
+  );
+  assert.equal(implicit, explicitUndef);
+});
+
+test("P1-4: sizeColumn switches data to object form with per-point symbolSize", () => {
+  const option = buildChartOption(
+    scatterConfig({ type: "scatter", sizeColumn: "年龄" }),
+  );
+  const data = (seriesList(option)[0] as { data: unknown[] }).data;
+  // Object-form entries carry a symbolSize; ages 20/30/25/40 → distinct sizes.
+  for (const entry of data) {
+    assert.ok(typeof entry === "object" && entry !== null, "expected object-form entry");
+  }
+  const sizes = (data as { symbolSize: number }[]).map((d) => d.symbolSize);
+  assert.ok(sizes.some((s, i) => s !== sizes[0] || i === 0), "sizes should vary");
+});
+
+test("P1-4: colorColumn assigns per-point categorical colors", () => {
+  const option = buildChartOption(
+    scatterConfig({ type: "scatter", colorColumn: "性别" }),
+  );
+  const data = (seriesList(option)[0] as { data: { itemStyle?: { color?: string } }[] }).data;
+  const colors = data.map((d) => d.itemStyle?.color);
+  // 男 and 女 should map to two distinct colors.
+  assert.ok(new Set(colors).size === 2, `expected 2 distinct colors, got ${colors.join(",")}`);
+});
+
+test("P1-4: shapeColumn assigns per-point categorical symbols", () => {
+  const option = buildChartOption(
+    scatterConfig({ type: "scatter", shapeColumn: "性别" }),
+  );
+  const data = (seriesList(option)[0] as { data: { symbol?: string }[] }).data;
+  const symbols = data.map((d) => d.symbol);
+  assert.ok(new Set(symbols).size === 2, `expected 2 distinct symbols, got ${symbols.join(",")}`);
+});
+
+test("P1-4: scatterTrendLine attaches a two-point markLine", () => {
+  const option = buildChartOption(
+    scatterConfig({ type: "scatter", scatterTrendLine: true }),
+  );
+  const series = seriesList(option)[0] as { markLine?: { data: unknown[] } };
+  assert.ok(series.markLine, "missing trend markLine");
+  assert.ok(series.markLine && series.markLine.data.length === 1, "expected one 2-point line");
+});

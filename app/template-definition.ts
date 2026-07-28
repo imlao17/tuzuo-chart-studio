@@ -28,6 +28,7 @@ export type DataBindingRole =
   | "y"
   | "size"
   | "color"
+  | "shape"
   | "leftValue"
   | "rightValue"
   | "source"
@@ -254,6 +255,31 @@ const BIND_RIGHT_VALUE: DataBinding = {
   label: "右侧数值",
   required: true,
   multiple: false,
+};
+
+// Scatter optional roles. All not required; undefined = single global style.
+const BIND_SIZE: DataBinding = {
+  role: "size",
+  label: "点大小（数值，可选）",
+  required: false,
+  multiple: false,
+  hint: "留空使用统一点大小",
+};
+
+const BIND_COLOR: DataBinding = {
+  role: "color",
+  label: "点颜色（分类，可选）",
+  required: false,
+  multiple: false,
+  hint: "留空使用统一颜色",
+};
+
+const BIND_SHAPE: DataBinding = {
+  role: "shape",
+  label: "点形状（分类，可选）",
+  required: false,
+  multiple: false,
+  hint: "留空使用统一形状",
 };
 
 // --- Per-template sample data ----------------------------------------------
@@ -564,7 +590,14 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
   scatter: {
     id: "scatter",
     family: "other",
-    dataBindings: [BIND_CATEGORY_SINGLE, BIND_X, BIND_Y],
+    dataBindings: [
+      BIND_CATEGORY_SINGLE,
+      BIND_X,
+      BIND_Y,
+      BIND_SIZE,
+      BIND_COLOR,
+      BIND_SHAPE,
+    ],
     validators: [
       ...BASE_VALIDATORS,
       requireTwoNumericColumns("散点图需要 2 个数值列（X 和 Y）"),

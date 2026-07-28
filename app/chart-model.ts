@@ -127,6 +127,13 @@ export type ChartConfig = {
   startAngle?: number;
   // Pie/donut: merge slices below this percent of the total into an "其他" slice.
   pieOtherThreshold?: number;
+  // Scatter only: column driving per-point size (bubble), color (categorical),
+  // or shape (categorical). Undefined = single global size/color/shape.
+  sizeColumn?: string;
+  colorColumn?: string;
+  shapeColumn?: string;
+  // Scatter only: draw a least-squares trend line through the points.
+  scatterTrendLine?: boolean;
   compact?: boolean;
 };
 

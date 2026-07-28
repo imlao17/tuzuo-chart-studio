@@ -457,6 +457,11 @@ export default function Home() {
   const [pieSort, setPieSort] = useState<"asc" | "desc" | null>(null);
   const [startAngle, setStartAngle] = useState<number | null>(null);
   const [pieOtherThreshold, setPieOtherThreshold] = useState<number | null>(null);
+  // P1-4 scatter deepening. All default to unset = single global style.
+  const [sizeColumn, setSizeColumn] = useState<string | null>(null);
+  const [colorColumn, setColorColumn] = useState<string | null>(null);
+  const [shapeColumn, setShapeColumn] = useState<string | null>(null);
+  const [scatterTrendLine, setScatterTrendLine] = useState(false);
   const [labelPosition, setLabelPosition] = useState<
     "auto" | "inside" | "outside"
   >("auto");
@@ -647,6 +652,10 @@ export default function Home() {
         pieSort: pieSort ?? undefined,
         startAngle: startAngle ?? undefined,
         pieOtherThreshold: pieOtherThreshold ?? undefined,
+        sizeColumn: sizeColumn ?? undefined,
+        colorColumn: colorColumn ?? undefined,
+        shapeColumn: shapeColumn ?? undefined,
+        scatterTrendLine: scatterTrendLine || undefined,
         markOpacity,
         areaOpacity,
         labelPosition,
@@ -701,7 +710,11 @@ export default function Home() {
       primaryColor,
       referenceBands,
       referenceLines,
+      scatterTrendLine,
       secondaryColor,
+      shapeColumn,
+      sizeColumn,
+      colorColumn,
       startAngle,
       seriesColumns,
       seriesKind,
@@ -1233,6 +1246,10 @@ export default function Home() {
     setPieSort(null);
     setStartAngle(null);
     setPieOtherThreshold(null);
+    setSizeColumn(null);
+    setColorColumn(null);
+    setShapeColumn(null);
+    setScatterTrendLine(false);
     setMarkOpacity(100);
     setAreaOpacity(22);
     setLabelPosition("auto");
@@ -1495,6 +1512,47 @@ export default function Home() {
                       );
                     })}
                   </div>
+                );
+              }
+              // Scatter optional roles (size/color/shape) bind to dedicated
+              // ChartConfig fields with a "无" option, not the generic role map.
+              if (
+                chartType === "scatter" &&
+                (binding.role === "size" ||
+                  binding.role === "color" ||
+                  binding.role === "shape")
+              ) {
+                const isSize = binding.role === "size";
+                const roleOptions = isSize ? parsed.numericHeaders : parsed.headers;
+                const value =
+                  binding.role === "size"
+                    ? sizeColumn
+                    : binding.role === "color"
+                      ? colorColumn
+                      : shapeColumn;
+                const setValue =
+                  binding.role === "size"
+                    ? setSizeColumn
+                    : binding.role === "color"
+                      ? setColorColumn
+                      : setShapeColumn;
+                return (
+                  <label key={binding.role} className="field">
+                    <span>{binding.label}</span>
+                    <select
+                      value={value ?? ""}
+                      onChange={(event) =>
+                        setValue(event.target.value || null)
+                      }
+                    >
+                      <option value="">无</option>
+                      {roleOptions.map((header) => (
+                        <option key={header} value={header}>
+                          {header}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 );
               }
               // Single-column role (category / x / y / leftValue / rightValue).
@@ -1995,6 +2053,13 @@ export default function Home() {
                   onChange={(event) => setPointSize(Number(event.target.value))}
                 />
               </label>
+            )}
+            {chartType === "scatter" && (
+              <Toggle
+                label="趋势线"
+                checked={scatterTrendLine}
+                onChange={setScatterTrendLine}
+              />
             )}
             {(selectedTemplate.family === "bar" ||
               chartType === "combo" ||
