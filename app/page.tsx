@@ -519,6 +519,20 @@ export default function Home() {
     CHART_TEMPLATES[0];
   const templateDefinition = getTemplateDefinition(chartType);
 
+  // Whether the current table data matches this template's sample data. Used
+  // to decide whether to nudge the user toward "加载示例" after switching
+  // templates (e.g. monthly-revenue data on a pie chart looks wrong but isn't
+  // a validation error, so we hint instead of blocking).
+  const dataMatchesSample = useMemo(() => {
+    const sample = templateDefinition.sampleData.table;
+    if (tableData.length !== sample.length) return false;
+    return tableData.every(
+      (row, r) =>
+        row.length === sample[r].length &&
+        row.every((cell, c) => cell === sample[r][c]),
+    );
+  }, [tableData, templateDefinition.sampleData.table]);
+
   // Resolve the user's field-role bindings into the categoryColumn +
   // seriesColumns shape the renderers still consume. This is the single
   // adapter that lets the UI be role-driven while the renderers stay
@@ -1449,6 +1463,20 @@ export default function Home() {
               <span>数据字段</span>
               <Table2 size={15} />
             </div>
+            {!dataMatchesSample && (
+              <div className="sample-hint" role="note">
+                <span>
+                  当前数据可能不适合「{selectedTemplate.name}」，可加载专属示例数据。
+                </span>
+                <button
+                  type="button"
+                  className="sample-hint-button"
+                  onClick={loadSample}
+                >
+                  加载示例
+                </button>
+              </div>
+            )}
             {templateDefinition.dataBindings.map((binding) => {
               const isCategory = binding.role === "category";
               const options = isCategory

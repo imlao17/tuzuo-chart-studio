@@ -565,6 +565,42 @@ button:disabled {
   height: var(--chart-height);
 }
 
+/* Nudge shown in the data-field panel when the current table data doesn't
+   match the template's sample data (e.g. monthly revenue data left over after
+   switching to a pie chart). Offers a one-click 加载示例 to load the
+   template-appropriate sample. */
+.sample-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border: 1px solid #f0d8a8;
+  border-radius: 4px;
+  background: #fff8e8;
+  color: #6b530a;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.sample-hint-button {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 3px;
+  padding: 3px 10px;
+  background: #f0b400;
+  color: #2a2200;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sample-hint-button:hover {
+  background: #d9a700;
+}
+
 /* Empty-state overlay shown when the current data does not satisfy the
    template's validators (e.g. scatter needs 2 numeric columns). The chart-root
    is hidden and this centered message replaces it so the user never sees a
