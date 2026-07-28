@@ -645,3 +645,78 @@ test("P1-4: scatterTrendLine attaches a two-point markLine", () => {
   assert.ok(series.markLine, "missing trend markLine");
   assert.ok(series.markLine && series.markLine.data.length === 1, "expected one 2-point line");
 });
+
+// ---------------------------------------------------------------------------
+// Group: P1-5 combo dual Y axis — opt-in split of bar/line across two axes.
+// ---------------------------------------------------------------------------
+
+const comboConfig = (overrides: Partial<ChartConfig> = {}): ChartConfig =>
+  baseConfig({
+    type: "combo",
+    parsed: tableToParsed([
+      ["月份", "收入", "增长率"],
+      ["一月", "128", "12"],
+      ["二月", "146", "14"],
+      ["三月", "138", "9"],
+      ["四月", "172", "18"],
+    ]),
+    categoryColumn: "月份",
+    seriesColumns: ["收入", "增长率"],
+    ...overrides,
+  });
+
+test("P1-5: combo defaults are unchanged when the new fields are absent", () => {
+  const implicit = sig(buildChartOption(comboConfig()));
+  const explicitUndef = sig(
+    buildChartOption(
+      comboConfig({
+        comboDualAxis: undefined,
+        y2AxisTitle: undefined,
+        comboAxisSync: undefined,
+      }),
+    ),
+  );
+  assert.equal(implicit, explicitUndef);
+  // Default yAxis is a single object, not an array.
+  const def = buildChartOption(comboConfig());
+  assert.equal(Array.isArray(def.yAxis), false);
+});
+
+test("P1-5: comboDualAxis splits yAxis into a 2-element array and assigns yAxisIndex", () => {
+  const option = buildChartOption(comboConfig({ comboDualAxis: true }));
+  assert.ok(Array.isArray(option.yAxis) && option.yAxis.length === 2, "expected 2-element yAxis array");
+  const list = seriesList(option);
+  // 收入 (index 0, bar) → yAxisIndex 0; 增长率 (index 1, line) → yAxisIndex 1.
+  const barIdx = list.findIndex((s) => (s as { name: string }).name === "收入");
+  const lineIdx = list.findIndex((s) => (s as { name: string }).name === "增长率");
+  assert.equal((list[barIdx] as { yAxisIndex?: number }).yAxisIndex, 0);
+  assert.equal((list[lineIdx] as { yAxisIndex?: number }).yAxisIndex, 1);
+});
+
+test("P1-5: y2AxisTitle lands on the right (second) Y axis", () => {
+  const option = buildChartOption(
+    comboConfig({ comboDualAxis: true, y2AxisTitle: "增长率 (%)", yAxisTitle: "收入" }),
+  );
+  const axes = option.yAxis as { name?: string }[];
+  assert.equal(axes[0].name, "收入");
+  assert.equal(axes[1].name, "增长率 (%)");
+});
+
+test("P1-5: comboAxisSync applies a shared min/max to both axes", () => {
+  const option = buildChartOption(
+    comboConfig({ comboDualAxis: true, comboAxisSync: true }),
+  );
+  const axes = option.yAxis as { min?: number; max?: number }[];
+  assert.equal(axes[0].min, axes[1].min);
+  assert.equal(axes[0].max, axes[1].max);
+  // The shared max must equal the global max across both series (172 and 18 → 172).
+  assert.equal(axes[0].max, 172);
+});
+
+test("P1-5: non-combo templates are unaffected by the patchAxes array support", () => {
+  // Regression: every other template still returns a single (non-array) yAxis.
+  for (const type of ALL_TYPES.filter((t) => t !== "combo")) {
+    const option = buildChartOption(baseConfig({ type }));
+    assert.equal(Array.isArray(option.yAxis), false, `${type}: yAxis unexpectedly an array`);
+  }
+});

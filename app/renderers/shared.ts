@@ -136,15 +136,26 @@ function patchAxes(
       nameTextStyle: { color: textColor, fontSize },
     };
   }
-  if (yAxis && !Array.isArray(yAxis)) {
-    yAxis = {
-      ...yAxis,
-      show: compact ? false : showYAxis,
-      name: compact ? "" : config.yAxisTitle ?? "",
-      nameLocation: "middle",
-      nameGap: 48,
-      nameTextStyle: { color: textColor, fontSize },
-    };
+  // yAxis may be a single axis or an array (combo dual-axis). Patch each:
+  // the primary (index 0) uses yAxisTitle, the secondary (index 1) uses
+  // y2AxisTitle. The non-array path is unchanged.
+  const patchYAxis = (
+    axis: NonNullable<typeof yAxis>,
+    title: string | undefined,
+  ) => ({
+    ...axis,
+    show: compact ? false : showYAxis,
+    name: compact ? "" : title ?? "",
+    nameLocation: "middle" as const,
+    nameGap: 48,
+    nameTextStyle: { color: textColor, fontSize },
+  });
+  if (Array.isArray(yAxis)) {
+    yAxis = yAxis.map((axis, index) =>
+      patchYAxis(axis, index === 0 ? config.yAxisTitle : config.y2AxisTitle),
+    );
+  } else if (yAxis) {
+    yAxis = patchYAxis(yAxis, config.yAxisTitle);
   }
   return { ...result, xAxis, yAxis };
 }

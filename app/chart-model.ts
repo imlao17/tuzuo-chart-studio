@@ -134,6 +134,12 @@ export type ChartConfig = {
   shapeColumn?: string;
   // Scatter only: draw a least-squares trend line through the points.
   scatterTrendLine?: boolean;
+  // Combo only: split bar/line series across left and right Y axes.
+  comboDualAxis?: boolean;
+  // Combo only: title for the right (secondary) Y axis.
+  y2AxisTitle?: string;
+  // Combo only: link the two Y axes to a shared min/max.
+  comboAxisSync?: boolean;
   compact?: boolean;
 };
 

@@ -462,6 +462,10 @@ export default function Home() {
   const [colorColumn, setColorColumn] = useState<string | null>(null);
   const [shapeColumn, setShapeColumn] = useState<string | null>(null);
   const [scatterTrendLine, setScatterTrendLine] = useState(false);
+  // P1-5 combo dual Y axis. All default to off/empty = renderer unchanged.
+  const [comboDualAxis, setComboDualAxis] = useState(false);
+  const [y2AxisTitle, setY2AxisTitle] = useState("");
+  const [comboAxisSync, setComboAxisSync] = useState(false);
   const [labelPosition, setLabelPosition] = useState<
     "auto" | "inside" | "outside"
   >("auto");
@@ -656,6 +660,9 @@ export default function Home() {
         colorColumn: colorColumn ?? undefined,
         shapeColumn: shapeColumn ?? undefined,
         scatterTrendLine: scatterTrendLine || undefined,
+        comboDualAxis: comboDualAxis || undefined,
+        y2AxisTitle: y2AxisTitle || undefined,
+        comboAxisSync: comboAxisSync || undefined,
         markOpacity,
         areaOpacity,
         labelPosition,
@@ -686,6 +693,8 @@ export default function Home() {
       barWidth,
       categoryColumn,
       chartType,
+      comboAxisSync,
+      comboDualAxis,
       colorOverrides,
       connectNulls,
       donutInnerRadius,
@@ -736,6 +745,7 @@ export default function Home() {
       useThousandsSeparator,
       width,
       xAxisTitle,
+      y2AxisTitle,
       yAxisMax,
       yAxisMin,
       yAxisTitle,
@@ -1250,6 +1260,9 @@ export default function Home() {
     setColorColumn(null);
     setShapeColumn(null);
     setScatterTrendLine(false);
+    setComboDualAxis(false);
+    setY2AxisTitle("");
+    setComboAxisSync(false);
     setMarkOpacity(100);
     setAreaOpacity(22);
     setLabelPosition("auto");
@@ -2060,6 +2073,32 @@ export default function Home() {
                 checked={scatterTrendLine}
                 onChange={setScatterTrendLine}
               />
+            )}
+            {chartType === "combo" && (
+              <>
+                <Toggle
+                  label="双 Y 轴（柱左 / 线右）"
+                  checked={comboDualAxis}
+                  onChange={setComboDualAxis}
+                />
+                {comboDualAxis && (
+                  <>
+                    <label className="field settings-field">
+                      <span>右轴标题</span>
+                      <input
+                        value={y2AxisTitle}
+                        onChange={(event) => setY2AxisTitle(event.target.value)}
+                        placeholder="如：增长率"
+                      />
+                    </label>
+                    <Toggle
+                      label="同步两轴范围"
+                      checked={comboAxisSync}
+                      onChange={setComboAxisSync}
+                    />
+                  </>
+                )}
+              </>
             )}
             {(selectedTemplate.family === "bar" ||
               chartType === "combo" ||

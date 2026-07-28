@@ -34,9 +34,35 @@ export function buildComboOption(ctx: RenderContext): RendererResult {
   const markOpacity = (config.markOpacity ?? 100) / 100;
 
   // Combo is vertical cartesian: xAxis=categoryAxis, yAxis=valueAxis.
+  // P1-5 dual Y axis: when comboDualAxis is on, split bar/line series across
+  // left (index 0) and right (index 1) value axes. Default (undefined) keeps a
+  // single yAxis so default output is unchanged.
   const textColor = theme.text;
   const xAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
-  const yAxis = buildValueAxis(ctx, textColor, fontSize, compact);
+  const dualAxis = !compact && config.comboDualAxis;
+  const leftAxis = buildValueAxis(ctx, textColor, fontSize, compact);
+  const rightAxis = buildValueAxis(ctx, textColor, fontSize, compact);
+  // Optional axis sync: derive a shared min/max from every series' values and
+  // apply it to both axes so they share a scale.
+  if (dualAxis && config.comboAxisSync) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const s of dataSeries) {
+      for (const v of s.data) {
+        if (Number.isFinite(v)) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+      }
+    }
+    if (Number.isFinite(min) && Number.isFinite(max)) {
+      (leftAxis as { min?: number; max?: number }).min = min;
+      (leftAxis as { min?: number; max?: number }).max = max;
+      (rightAxis as { min?: number; max?: number }).min = min;
+      (rightAxis as { min?: number; max?: number }).max = max;
+    }
+  }
+  const yAxis = dualAxis ? [leftAxis, rightAxis] : leftAxis;
 
   // Legacy line 643-644: combo is not in the slice condition, so all selected
   // series render.
@@ -53,6 +79,10 @@ export function buildComboOption(ctx: RenderContext): RendererResult {
       name: item.name,
       type: seriesType,
       data: item.data,
+      // P1-5: route bar series to the left axis (0) and line series to the
+      // right axis (1) when dual-axis is on. Omit yAxisIndex otherwise so the
+      // default single-axis output is unchanged.
+      yAxisIndex: dualAxis ? (seriesType === "line" ? 1 : 0) : undefined,
       // Legacy `stacked` flag does not include combo, so always undefined.
       stack: undefined,
       // Legacy smooth logic: `seriesType === "line" && (...smoothLine... ||
