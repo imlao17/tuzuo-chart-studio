@@ -35,13 +35,15 @@ test("server-renders the chart studio", async () => {
   assert.match(html, /图作/);
   assert.match(html, /透明图表工具/);
   assert.match(html, /上传 CSV/);
-  assert.match(html, /20 种图表/);
+  assert.match(html, /30(?:<!-- -->)?\s*种图表/);
   assert.match(html, /数据表/);
   assert.match(html, /搜索设置/);
   assert.match(html, /线条、数据点与面积/);
   assert.match(html, /数字格式/);
   assert.match(html, /标题样式/);
   assert.match(html, /副标题样式/);
+  assert.match(html, /检查登录/);
+  assert.match(html, /登录后下载 PNG/);
   assert.match(html, /PNG/);
   assert.match(html, /SVG/);
   assert.doesNotMatch(html, /codex-preview|Building your site|SkeletonPreview/);
@@ -60,12 +62,39 @@ test("keeps the chart canvas mounted while editing data", async () => {
 });
 
 test("includes the complete chart studio implementation", async () => {
-  const [page, model, styles, layout, packageJson] = await Promise.all([
+  const [
+    page,
+    model,
+    styles,
+    layout,
+    packageJson,
+    authServer,
+    authSchema,
+    authRegisterRoute,
+    authLoginRoute,
+    authVerifyRoute,
+    hostingConfig,
+  ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/chart-model.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../app/auth-server.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/api/auth/register/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/api/auth/login/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/api/auth/verify/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
   ]);
 
   const templateDefinitions =
@@ -73,7 +102,7 @@ test("includes the complete chart studio implementation", async () => {
       .match(/export const CHART_TEMPLATES:[\s\S]*?\n\];/)?.[0]
       .match(/\{\s*id:/g) ?? [];
 
-  assert.equal(templateDefinitions.length, 20);
+  assert.equal(templateDefinitions.length, 30);
   assert.match(page, /renderer:\s*"svg"/);
   assert.match(page, /renderPngDataUrl/);
   assert.match(page, /URL\.createObjectURL\(blob\)/);
@@ -96,9 +125,17 @@ test("includes the complete chart studio implementation", async () => {
   assert.match(page, /rightPanelCollapsed/);
   assert.match(page, /PanelLeftClose/);
   assert.match(page, /PanelRightClose/);
+  assert.match(page, /authUser/);
+  assert.match(page, /requireDownloadAuth/);
+  assert.match(page, /\/api\/auth\/session/);
+  assert.match(page, /登录 \/ 注册/);
+  assert.match(page, /登录后可下载 SVG、PNG 和项目文件/);
+  assert.match(page, /登录后才能下载/);
   assert.match(styles, /\.brand-logo/);
   assert.match(styles, /\.studio-grid\.left-collapsed/);
   assert.match(styles, /\.toolbar-group/);
+  assert.match(styles, /\.auth-dialog/);
+  assert.match(styles, /\.auth-toolbar/);
   assert.match(styles, /\.canvas-margin-block/);
   assert.match(styles, /--topbar-height:\s*58px/);
   assert.match(styles, /--control-height:\s*34px/);
@@ -119,6 +156,16 @@ test("includes the complete chart studio implementation", async () => {
   assert.match(layout, /lang="zh-CN"/);
   assert.doesNotMatch(layout, /Starter Project|codex-preview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+  assert.match(authSchema, /sqliteTable\(\s*"users"/);
+  assert.match(authSchema, /email_verification_tokens/);
+  assert.match(authSchema, /sqliteTable\(\s*"sessions"/);
+  assert.match(authServer, /PBKDF2/);
+  assert.match(authServer, /RESEND_API_KEY/);
+  assert.match(authServer, /SESSION_COOKIE/);
+  assert.match(authRegisterRoute, /registerWithEmail/);
+  assert.match(authLoginRoute, /setSessionCookie/);
+  assert.match(authVerifyRoute, /verifyEmailToken/);
+  assert.match(hostingConfig, /"d1":\s*"DB"/);
 
   await assert.rejects(
     access(new URL("../app/_sites-preview", templateRoot)),

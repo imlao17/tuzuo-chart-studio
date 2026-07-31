@@ -2,8 +2,8 @@
  * Template definition layer.
  *
  * Each chart template declares its data bindings, validators, settings
- * groups, capabilities, and its renderer. All 20 templates are migrated to
- * per-family renderers; the legacy buildChartOption fallback has been removed.
+ * groups, capabilities, and its renderer. Every template is migrated to a
+ * per-family renderer; the legacy buildChartOption fallback has been removed.
  *
  * The type surface here is the contract the rest of the P0 roadmap builds on:
  *   - Task 3 fills in dataBindings for real field-role binding UI.
@@ -12,6 +12,18 @@
  *   - Task 6 fixes the per-template "silent ignore" issues.
  */
 import type { ChartConfig, ChartFamily, ChartType } from "./chart-model";
+import {
+  buildBoxplotOption,
+  buildCandlestickOption,
+  buildDotPlotOption,
+  buildFunnelOption,
+  buildGaugeOption,
+  buildHeatmapOption,
+  buildRadarOption,
+  buildSankeyOption,
+  buildTreemapOption,
+  buildWaterfallOption,
+} from "./renderers/advanced";
 import { buildBarOption } from "./renderers/bar";
 import { buildComboOption } from "./renderers/combo";
 import { buildDivergingOption } from "./renderers/diverging";
@@ -49,6 +61,8 @@ export type ValidationContext = {
   parsed: ChartConfig["parsed"];
   categoryColumn: string;
   seriesColumns: string[];
+  sourceColumn?: string;
+  targetColumn?: string;
 };
 
 export type DataValidator = {
@@ -99,6 +113,8 @@ export type SampleData = {
   categoryColumn: string;
   /** 该示例数据的数值系列列名（按渲染顺序） */
   seriesColumns: string[];
+  /** 特殊角色默认列名，例如桑基图的来源 / 去向。 */
+  roleDefaults?: Partial<Record<DataBindingRole, string | string[]>>;
 };
 
 export type TemplateDefinition = {
@@ -163,7 +179,49 @@ const CARTESIAN_GROUPS: SettingsGroup[] = [
   GROUP_NUMBERS,
 ];
 
+const CARTESIAN_GROUPS_NO_LEGEND: SettingsGroup[] = [
+  GROUP_COLORS,
+  GROUP_MARKS,
+  GROUP_LABELS,
+  GROUP_X_AXIS,
+  GROUP_Y_AXIS,
+  GROUP_LEGEND,
+  GROUP_NUMBERS,
+];
+
+const CARTESIAN_BASIC_GROUPS_NO_LEGEND: SettingsGroup[] = [
+  GROUP_COLORS,
+  GROUP_LABELS,
+  GROUP_X_AXIS,
+  GROUP_Y_AXIS,
+  GROUP_LEGEND,
+  GROUP_NUMBERS,
+];
+
 const PIE_GROUPS: SettingsGroup[] = [
+  GROUP_COLORS,
+  GROUP_MARKS,
+  GROUP_LABELS,
+  GROUP_LEGEND,
+  GROUP_NUMBERS,
+];
+
+const NON_CARTESIAN_GROUPS_NO_LEGEND: SettingsGroup[] = [
+  GROUP_COLORS,
+  GROUP_MARKS,
+  GROUP_LABELS,
+  GROUP_LEGEND,
+  GROUP_NUMBERS,
+];
+
+const NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND: SettingsGroup[] = [
+  GROUP_COLORS,
+  GROUP_LABELS,
+  GROUP_LEGEND,
+  GROUP_NUMBERS,
+];
+
+const RADAR_GROUPS: SettingsGroup[] = [
   GROUP_COLORS,
   GROUP_MARKS,
   GROUP_LABELS,
@@ -191,6 +249,25 @@ const CAP_PIE: Capabilities = {
   svgExport: true,
 };
 
+const CAP_CARTESIAN_NO_LEGEND: Capabilities = {
+  ...CAP_CARTESIAN,
+  legend: false,
+};
+
+const CAP_NON_CARTESIAN: Capabilities = {
+  axes: false,
+  legend: true,
+  tooltip: true,
+  labels: true,
+  animation: true,
+  svgExport: true,
+};
+
+const CAP_NON_CARTESIAN_NO_LEGEND: Capabilities = {
+  ...CAP_NON_CARTESIAN,
+  legend: false,
+};
+
 // --- Shared data-binding presets (task 3 will specialize these per template) -
 
 const BIND_CATEGORY_SINGLE: DataBinding = {
@@ -214,6 +291,22 @@ const BIND_VALUE_MULTIPLE: DataBinding = {
   required: true,
   multiple: true,
   hint: "至少 1 个数值列",
+};
+
+const BIND_DISTRIBUTION_MULTIPLE: DataBinding = {
+  role: "value",
+  label: "分布字段",
+  required: true,
+  multiple: true,
+  hint: "每个数值列生成一个箱线",
+};
+
+const BIND_OHLC_MULTIPLE: DataBinding = {
+  role: "value",
+  label: "OHLC 字段",
+  required: true,
+  multiple: true,
+  hint: "按开盘、收盘、最低、最高选择 4 列",
 };
 
 // Specialized bindings for role-driven templates (task 3 will surface these
@@ -244,6 +337,20 @@ const BIND_LEFT_VALUE: DataBinding = {
 const BIND_RIGHT_VALUE: DataBinding = {
   role: "rightValue",
   label: "右侧数值",
+  required: true,
+  multiple: false,
+};
+
+const BIND_SOURCE: DataBinding = {
+  role: "source",
+  label: "来源字段",
+  required: true,
+  multiple: false,
+};
+
+const BIND_TARGET: DataBinding = {
+  role: "target",
+  label: "去向字段",
   required: true,
   multiple: false,
 };
@@ -365,6 +472,115 @@ const SAMPLE_PYRAMID: SampleData = {
   seriesColumns: ["男性 万", "女性 万"],
 };
 
+const SAMPLE_WATERFALL: SampleData = {
+  table: [
+    ["项目", "变化"],
+    ["期初余额", "120"],
+    ["新增收入", "48"],
+    ["服务成本", "-31"],
+    ["市场投入", "-18"],
+    ["续费收入", "42"],
+    ["期末调整", "-9"],
+  ],
+  categoryColumn: "项目",
+  seriesColumns: ["变化"],
+};
+
+const SAMPLE_HEATMAP: SampleData = {
+  table: [
+    ["时段", "周一", "周二", "周三", "周四", "周五"],
+    ["早间", "32", "41", "36", "45", "52"],
+    ["午间", "58", "63", "61", "68", "72"],
+    ["下午", "44", "49", "55", "59", "64"],
+    ["晚间", "27", "34", "39", "42", "47"],
+  ],
+  categoryColumn: "时段",
+  seriesColumns: ["周一", "周二", "周三", "周四", "周五"],
+};
+
+const SAMPLE_RADAR: SampleData = {
+  table: [
+    ["维度", "品牌 A", "品牌 B", "品牌 C"],
+    ["性能", "88", "74", "68"],
+    ["价格", "62", "82", "71"],
+    ["设计", "79", "69", "91"],
+    ["服务", "85", "73", "77"],
+    ["口碑", "72", "80", "83"],
+  ],
+  categoryColumn: "维度",
+  seriesColumns: ["品牌 A", "品牌 B", "品牌 C"],
+};
+
+const SAMPLE_DISTRIBUTION: SampleData = {
+  table: [
+    ["样本", "产品 A", "产品 B", "产品 C"],
+    ["1", "42", "36", "48"],
+    ["2", "45", "39", "51"],
+    ["3", "47", "41", "57"],
+    ["4", "49", "44", "60"],
+    ["5", "53", "46", "63"],
+    ["6", "57", "52", "68"],
+    ["7", "60", "56", "74"],
+  ],
+  categoryColumn: "样本",
+  seriesColumns: ["产品 A", "产品 B", "产品 C"],
+};
+
+const SAMPLE_CANDLESTICK: SampleData = {
+  table: [
+    ["日期", "开盘", "收盘", "最低", "最高"],
+    ["7/01", "102", "108", "99", "112"],
+    ["7/02", "108", "105", "101", "111"],
+    ["7/03", "105", "113", "104", "116"],
+    ["7/04", "113", "110", "107", "117"],
+    ["7/05", "110", "118", "109", "121"],
+    ["7/06", "118", "122", "115", "126"],
+  ],
+  categoryColumn: "日期",
+  seriesColumns: ["开盘", "收盘", "最低", "最高"],
+};
+
+const SAMPLE_FUNNEL: SampleData = {
+  table: [
+    ["阶段", "人数"],
+    ["访问", "4800"],
+    ["注册", "2100"],
+    ["试用", "960"],
+    ["付费", "420"],
+    ["续费", "260"],
+  ],
+  categoryColumn: "阶段",
+  seriesColumns: ["人数"],
+};
+
+const SAMPLE_GAUGE: SampleData = {
+  table: [
+    ["指标", "完成率"],
+    ["本月目标", "76"],
+  ],
+  categoryColumn: "指标",
+  seriesColumns: ["完成率"],
+};
+
+const SAMPLE_FLOW: SampleData = {
+  table: [
+    ["来源", "去向", "流量"],
+    ["官网", "注册", "340"],
+    ["广告", "注册", "280"],
+    ["社媒", "注册", "180"],
+    ["注册", "试用", "520"],
+    ["试用", "付费", "210"],
+    ["注册", "流失", "280"],
+  ],
+  categoryColumn: "来源",
+  seriesColumns: ["流量"],
+  roleDefaults: {
+    source: "来源",
+    target: "去向",
+    value: "流量",
+  },
+};
+
 // --- Shared validators -----------------------------------------------------
 // Each returns null (pass) or a human-readable error string. Validators read
 // only the ValidationContext (parsed table + resolved categoryColumn /
@@ -390,11 +606,27 @@ const requireTwoNumericColumns =
       ctx.parsed.numericHeaders.length < 2 ? message : null,
   });
 
+const requireFourNumericColumns =
+  (message: string): DataValidator => ({
+    validate: (ctx) =>
+      ctx.parsed.numericHeaders.length < 4 ? message : null,
+  });
+
+const requireSankeyColumns: DataValidator = {
+  validate: (ctx) => {
+    const textHeaders = ctx.parsed.headers.filter(
+      (header) => !ctx.parsed.numericHeaders.includes(header),
+    );
+    if (textHeaders.length < 2) return "桑基图需要 2 个文本列（来源和去向）";
+    return null;
+  },
+};
+
 // Most templates only need rows + at least one numeric column.
 const BASE_VALIDATORS: DataValidator[] = [requireRows, requireNumericColumn];
 
 // --- The registry ----------------------------------------------------------
-// All 20 templates are registered with their family renderer.
+// Every template is registered with its family renderer.
 
 export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
   // --- Bar / column family (migrated) -------------------------------------
@@ -625,6 +857,109 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_CARTESIAN,
     buildOption: buildDivergingOption,
     sampleData: SAMPLE_PYRAMID,
+  },
+  dotPlot: {
+    id: "dotPlot",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS_NO_LEGEND,
+    capabilities: CAP_CARTESIAN_NO_LEGEND,
+    buildOption: buildDotPlotOption,
+    sampleData: SAMPLE_QUARTERLY,
+  },
+  waterfall: {
+    id: "waterfall",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS_NO_LEGEND,
+    capabilities: CAP_CARTESIAN_NO_LEGEND,
+    buildOption: buildWaterfallOption,
+    sampleData: SAMPLE_WATERFALL,
+  },
+  heatmap: {
+    id: "heatmap",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_CARTESIAN_NO_LEGEND,
+    buildOption: buildHeatmapOption,
+    sampleData: SAMPLE_HEATMAP,
+  },
+  treemap: {
+    id: "treemap",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildTreemapOption,
+    sampleData: SAMPLE_SHARE,
+  },
+  funnel: {
+    id: "funnel",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildFunnelOption,
+    sampleData: SAMPLE_FUNNEL,
+  },
+  gauge: {
+    id: "gauge",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildGaugeOption,
+    sampleData: SAMPLE_GAUGE,
+  },
+  radar: {
+    id: "radar",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: RADAR_GROUPS,
+    capabilities: CAP_NON_CARTESIAN,
+    buildOption: buildRadarOption,
+    sampleData: SAMPLE_RADAR,
+  },
+  boxplot: {
+    id: "boxplot",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_DISTRIBUTION_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_CARTESIAN_NO_LEGEND,
+    buildOption: buildBoxplotOption,
+    sampleData: SAMPLE_DISTRIBUTION,
+  },
+  candlestick: {
+    id: "candlestick",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_OHLC_MULTIPLE],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireFourNumericColumns("蜡烛图需要 4 个数值列（开盘、收盘、最低、最高）"),
+    ],
+    settingsGroups: CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_CARTESIAN_NO_LEGEND,
+    buildOption: buildCandlestickOption,
+    sampleData: SAMPLE_CANDLESTICK,
+  },
+  sankey: {
+    id: "sankey",
+    family: "other",
+    dataBindings: [BIND_SOURCE, BIND_TARGET, BIND_VALUE_SINGLE],
+    validators: [...BASE_VALIDATORS, requireSankeyColumns],
+    settingsGroups: NON_CARTESIAN_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildSankeyOption,
+    sampleData: SAMPLE_FLOW,
   },
 };
 

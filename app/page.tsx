@@ -18,9 +18,12 @@ import {
   ImageDown,
   LayoutGrid,
   LineChart,
+  LogIn,
+  LogOut,
   LoaderCircle,
   Lock,
   LockOpen,
+  Mail,
   Palette,
   PanelLeftClose,
   PanelLeftOpen,
@@ -38,11 +41,13 @@ import {
   Table2,
   Trash2,
   Italic,
+  User,
   X,
 } from "lucide-react";
 import {
   ChangeEvent,
   CSSProperties,
+  FormEvent,
   ReactNode,
   useEffect,
   useMemo,
@@ -91,6 +96,21 @@ type TextStyleState = {
   color: string;
   bold: boolean;
   italic: boolean;
+};
+
+type AuthMode = "login" | "register";
+
+type AuthUser = {
+  id: string;
+  email: string;
+  role: "user" | "admin";
+  emailVerified: boolean;
+};
+
+type AuthResponse = {
+  user?: AuthUser | null;
+  message?: string;
+  verificationUrl?: string | null;
 };
 
 // Field role bindings: single-column roles map to a string, the multi-column
@@ -282,6 +302,87 @@ const PROJECT_FILE_VERSION = 1;
 const CHART_TYPE_IDS = new Set<ChartType>(
   CHART_TEMPLATES.map((template) => template.id),
 );
+const LINE_WIDTH_CONTROL_TYPES = new Set<ChartType>([
+  "line",
+  "smoothLine",
+  "stepLine",
+  "area",
+  "stackedArea",
+  "proportionalArea",
+  "combo",
+  "radar",
+]);
+const SMOOTH_CONTROL_TYPES = new Set<ChartType>(["line", "area", "combo"]);
+const LINE_AREA_EXTRA_CONTROL_TYPES = new Set<ChartType>([
+  "line",
+  "smoothLine",
+  "stepLine",
+  "area",
+  "stackedArea",
+  "proportionalArea",
+]);
+const LINE_END_LABEL_TYPES = new Set<ChartType>([
+  "line",
+  "smoothLine",
+  "stepLine",
+]);
+const POINT_SIZE_CONTROL_TYPES = new Set<ChartType>([
+  "line",
+  "smoothLine",
+  "stepLine",
+  "area",
+  "stackedArea",
+  "proportionalArea",
+  "combo",
+  "scatter",
+  "dotPlot",
+  "radar",
+]);
+const BAR_SHAPE_CONTROL_TYPES = new Set<ChartType>([
+  "bar",
+  "stackedBar",
+  "proportionalBar",
+  "column",
+  "groupedColumn",
+  "stackedColumn",
+  "proportionalColumn",
+  "combo",
+  "divergingBar",
+  "populationPyramid",
+  "waterfall",
+]);
+const AREA_OPACITY_CONTROL_TYPES = new Set<ChartType>([
+  "area",
+  "stackedArea",
+  "proportionalArea",
+  "radar",
+]);
+const MARK_OPACITY_CONTROL_TYPES = new Set<ChartType>([
+  "line",
+  "smoothLine",
+  "stepLine",
+  "area",
+  "stackedArea",
+  "proportionalArea",
+  "bar",
+  "stackedBar",
+  "proportionalBar",
+  "column",
+  "groupedColumn",
+  "stackedColumn",
+  "proportionalColumn",
+  "combo",
+  "scatter",
+  "divergingBar",
+  "populationPyramid",
+  "dotPlot",
+  "waterfall",
+  "pie",
+  "donut",
+  "treemap",
+  "funnel",
+  "sankey",
+]);
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const LABEL_POSITION_VALUES = [
   "auto",
@@ -1096,7 +1197,7 @@ function TemplateGallery({
     <div className="template-overlay" role="dialog" aria-modal="true">
       <div className="template-dialog">
         <div className="template-gallery-header">
-          <h1>折线、柱状与饼图</h1>
+          <h1>图表模板</h1>
           <div className="gallery-actions">
             <label className="template-search">
               <Search size={16} />
@@ -1339,6 +1440,17 @@ export default function Home() {
   const [previewScale, setPreviewScale] = useState(1);
   const [status, setStatus] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authPanelOpen, setAuthPanelOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [authVerificationUrl, setAuthVerificationUrl] = useState<string | null>(
+    null,
+  );
+  const [authSubmitting, setAuthSubmitting] = useState(false);
 
   const chartElementRef = useRef<HTMLDivElement | null>(null);
   const previewHostRef = useRef<HTMLDivElement | null>(null);
@@ -1380,7 +1492,7 @@ export default function Home() {
   // unchanged. Behavior matches the legacy selectedCategory/effectiveSeries
   // fallbacks for the generic templates, and the per-template selectedColumns
   // fallbacks for scatter (X/Y) and diverging (left/right).
-  const { categoryColumn, seriesColumns, resolvedRoles } = useMemo(() => {
+  const { categoryColumn, seriesColumns, sourceColumn, targetColumn, resolvedRoles } = useMemo(() => {
     const headers = parsed.headers;
     const numeric = parsed.numericHeaders;
     const firstNumeric = numeric[0] ?? "";
@@ -1402,6 +1514,15 @@ export default function Home() {
       return numeric[fallbackIndex] ?? firstNumeric;
     };
 
+    const resolveHeader = (
+      role: DataBindingRole,
+      fallback: string,
+    ): string => {
+      const bound = fieldRoles[role];
+      if (typeof bound === "string" && headers.includes(bound)) return bound;
+      return fallback;
+    };
+
     const categoryColumn = resolveCategory();
     // Per-role resolved values, so the single-column <select>s can display
     // exactly what the renderer will receive (including fallbacks), instead of
@@ -1414,7 +1535,24 @@ export default function Home() {
     // series columns. Each template family maps cleanly to one case.
     const roles = new Set(templateDefinition.dataBindings.map((b) => b.role));
     let seriesColumns: string[];
-    if (roles.has("x") || roles.has("y")) {
+    let sourceColumn: string | undefined;
+    let targetColumn: string | undefined;
+    if (roles.has("source") || roles.has("target")) {
+      const firstText = headers.find((h) => !numeric.includes(h)) ?? headers[0] ?? "";
+      const secondText =
+        headers.find((h) => h !== firstText && !numeric.includes(h)) ??
+        headers.find((h) => h !== firstText) ??
+        firstText;
+      const source = resolveHeader("source", firstText);
+      const target = resolveHeader("target", secondText);
+      const value = resolveSingle("value", 0);
+      sourceColumn = source;
+      targetColumn = target;
+      seriesColumns = [value];
+      resolvedRoles.source = source;
+      resolvedRoles.target = target;
+      resolvedRoles.value = value;
+    } else if (roles.has("x") || roles.has("y")) {
       // scatter: X then Y, mirroring the renderer's selectedColumns[0]/[1].
       const x = resolveSingle("x", 0);
       const y = resolveSingle("y", 1) || x;
@@ -1436,7 +1574,7 @@ export default function Home() {
       seriesColumns = selected.length ? selected : numeric.slice(0, 1);
     }
 
-    return { categoryColumn, seriesColumns, resolvedRoles };
+    return { categoryColumn, seriesColumns, sourceColumn, targetColumn, resolvedRoles };
   }, [
     fieldRoles,
     parsed.headers,
@@ -1478,6 +1616,8 @@ export default function Home() {
         parsed,
         categoryColumn,
         seriesColumns,
+        sourceColumn,
+        targetColumn,
         title,
         subtitle,
         width,
@@ -1596,6 +1736,7 @@ export default function Home() {
       shapeColumn,
       sizeColumn,
       colorColumn,
+      sourceColumn,
       startAngle,
       streamTimeAxis,
       seriesColumns,
@@ -1616,6 +1757,7 @@ export default function Home() {
       title,
       titleAlign,
       titleStyle,
+      targetColumn,
       transparent,
       useThousandsSeparator,
       width,
@@ -1638,13 +1780,32 @@ export default function Home() {
   // data error is present the chart is cleared and PNG export is skipped, so
   // the user never sees a blank or misleading chart from insufficient data.
   const dataError = useMemo(() => {
-    const ctx = { parsed, categoryColumn, seriesColumns };
+    const ctx = { parsed, categoryColumn, seriesColumns, sourceColumn, targetColumn };
     for (const validator of templateDefinition.validators) {
       const message = validator.validate(ctx);
       if (message) return message;
     }
     return null;
-  }, [templateDefinition.validators, parsed, categoryColumn, seriesColumns]);
+  }, [
+    templateDefinition.validators,
+    parsed,
+    categoryColumn,
+    seriesColumns,
+    sourceColumn,
+    targetColumn,
+  ]);
+  const supportsLineWidthControl = LINE_WIDTH_CONTROL_TYPES.has(chartType);
+  const supportsSmoothControl = SMOOTH_CONTROL_TYPES.has(chartType);
+  const supportsLineAreaExtras =
+    LINE_AREA_EXTRA_CONTROL_TYPES.has(chartType);
+  const supportsEndLabelControl = LINE_END_LABEL_TYPES.has(chartType);
+  const supportsPointSizeControl = POINT_SIZE_CONTROL_TYPES.has(chartType);
+  const supportsBarShapeControl = BAR_SHAPE_CONTROL_TYPES.has(chartType);
+  const supportsAreaOpacityControl = AREA_OPACITY_CONTROL_TYPES.has(chartType);
+  const supportsMarkOpacityControl = MARK_OPACITY_CONTROL_TYPES.has(chartType);
+  const supportsLegendControl = templateDefinition.capabilities.legend;
+  const markOpacityLabel =
+    chartType === "sankey" ? "连线不透明度" : "图形不透明度";
 
   const pngDownloadReady =
     !dataError &&
@@ -1763,6 +1924,59 @@ export default function Home() {
     const timeout = window.setTimeout(() => setStatus(""), 2200);
     return () => window.clearTimeout(timeout);
   }, [status]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let frame = 0;
+
+    async function loadSession() {
+      try {
+        const response = await fetch("/api/auth/session", {
+          credentials: "include",
+        });
+        if (!response.ok) throw new Error("Session request failed");
+        const body = (await response.json()) as AuthResponse;
+        if (!cancelled) setAuthUser(body.user ?? null);
+      } catch {
+        if (!cancelled) setAuthUser(null);
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    }
+
+    frame = window.requestAnimationFrame(() => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("verified") === "1") {
+        setAuthMode("login");
+        setAuthPanelOpen(true);
+        setStatus("邮箱验证成功，请登录");
+        params.delete("verified");
+        const nextQuery = params.toString();
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`,
+        );
+      } else if (params.get("auth_error")) {
+        setAuthMode("register");
+        setAuthPanelOpen(true);
+        setAuthMessage("验证链接已失效，请重新注册或获取新的验证邮件");
+        params.delete("auth_error");
+        const nextQuery = params.toString();
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`,
+        );
+      }
+    });
+
+    loadSession();
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -1921,6 +2135,80 @@ export default function Home() {
     );
     if (editingPaletteId === id) setEditingPaletteId(null);
     if (themeId === id) setThemeId("custom");
+  }
+
+  function openAuthPanel(mode: AuthMode) {
+    setAuthMode(mode);
+    setAuthPanelOpen(true);
+    setAuthMessage("");
+    setAuthVerificationUrl(null);
+  }
+
+  function requireDownloadAuth() {
+    if (authLoading) {
+      setStatus("正在确认登录状态，请稍候");
+      return false;
+    }
+    if (!authUser) {
+      setAuthMode("login");
+      setAuthPanelOpen(true);
+      setAuthMessage("登录后才能下载 SVG、PNG 和项目文件");
+      setAuthVerificationUrl(null);
+      setStatus("登录后才能下载");
+      return false;
+    }
+    return true;
+  }
+
+  async function submitAuthForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (authSubmitting) return;
+
+    setAuthSubmitting(true);
+    setAuthMessage("");
+    setAuthVerificationUrl(null);
+
+    try {
+      const response = await fetch(`/api/auth/${authMode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: authEmail, password: authPassword }),
+      });
+      const body = (await response.json().catch(() => ({}))) as AuthResponse;
+      if (!response.ok) {
+        throw new Error(body.message || "账号请求失败");
+      }
+
+      if (authMode === "login") {
+        setAuthUser(body.user ?? null);
+        setAuthPanelOpen(false);
+        setAuthPassword("");
+        setStatus("已登录，可以下载");
+        return;
+      }
+
+      setAuthPassword("");
+      setAuthMessage(body.message || "验证邮件已发送，请完成邮箱验证后再登录");
+      setAuthVerificationUrl(body.verificationUrl ?? null);
+      setStatus("验证邮件已发送");
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : "账号请求失败");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function logout() {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      setAuthUser(null);
+      setStatus("已退出登录");
+    }
   }
 
   function collectProject(): ProjectState {
@@ -2086,6 +2374,7 @@ export default function Home() {
   }
 
   function saveProjectFile() {
+    if (!requireDownloadAuth()) return;
     const payload: ProjectFile = {
       app: PROJECT_FILE_APP,
       version: PROJECT_FILE_VERSION,
@@ -2148,17 +2437,52 @@ export default function Home() {
 
   function loadSample() {
     // Load the current template's semantically appropriate sample data into the
-    // editor. Replaces the table and the generic category/value field roles,
-    // but leaves styling (palette, canvas, margins) untouched. Scatter /
-    // diverging / pyramid sample data is designed so the first two numeric
-    // columns are X/Y or left/right, so the role-specific bindings can stay
-    // unset and the resolver falls back correctly.
+    // editor. Replaces the table and role bindings, but leaves styling
+    // (palette, canvas, margins) untouched.
     const { sampleData } = templateDefinition;
+    const sampleHeaders = sampleData.table[0] ?? [];
+    const sampleNumeric = sampleData.seriesColumns;
+    const firstText =
+      sampleHeaders.find((header) => !sampleNumeric.includes(header)) ??
+      sampleData.categoryColumn;
+    const secondText =
+      sampleHeaders.find(
+        (header) => header !== firstText && !sampleNumeric.includes(header),
+      ) ??
+      sampleHeaders.find((header) => header !== firstText) ??
+      firstText;
+    const nextRoles: FieldRoles = {};
+
+    for (const binding of templateDefinition.dataBindings) {
+      const roleDefault = sampleData.roleDefaults?.[binding.role];
+      const stringDefault =
+        typeof roleDefault === "string" ? roleDefault : undefined;
+      if (binding.role === "category") {
+        nextRoles.category = stringDefault ?? sampleData.categoryColumn;
+      } else if (binding.role === "value") {
+        nextRoles.value = binding.multiple
+          ? Array.isArray(roleDefault)
+            ? roleDefault
+            : [...sampleNumeric]
+          : stringDefault ?? sampleNumeric[0] ?? "";
+      } else if (binding.role === "x") {
+        nextRoles.x = stringDefault ?? sampleNumeric[0] ?? "";
+      } else if (binding.role === "y") {
+        nextRoles.y = stringDefault ?? sampleNumeric[1] ?? sampleNumeric[0] ?? "";
+      } else if (binding.role === "leftValue") {
+        nextRoles.leftValue = stringDefault ?? sampleNumeric[0] ?? "";
+      } else if (binding.role === "rightValue") {
+        nextRoles.rightValue =
+          stringDefault ?? sampleNumeric[1] ?? sampleNumeric[0] ?? "";
+      } else if (binding.role === "source") {
+        nextRoles.source = stringDefault ?? firstText;
+      } else if (binding.role === "target") {
+        nextRoles.target = stringDefault ?? secondText;
+      }
+    }
+
     setTableData(sampleData.table.map((row) => [...row]));
-    setFieldRoles({
-      category: sampleData.categoryColumn,
-      value: [...sampleData.seriesColumns],
-    });
+    setFieldRoles(nextRoles);
     setStatus("已加载示例数据");
   }
 
@@ -2312,6 +2636,7 @@ export default function Home() {
   }
 
   function exportSvg() {
+    if (!requireDownloadAuth()) return;
     if (!chartRef.current) return;
     downloadBlob(
       new Blob([chartRef.current.renderToSVGString({ useViewBox: true })], {
@@ -2323,6 +2648,7 @@ export default function Home() {
   }
 
   async function copyPng() {
+    if (!requireDownloadAuth()) return;
     setExporting(true);
     try {
       const blob =
@@ -2371,8 +2697,11 @@ export default function Home() {
         </div>
       )}
       {templateDefinition.dataBindings.map((binding) => {
-        const isCategory = binding.role === "category";
-        const options = isCategory ? parsed.headers : parsed.numericHeaders;
+        const acceptsAnyColumn =
+          binding.role === "category" ||
+          binding.role === "source" ||
+          binding.role === "target";
+        const options = acceptsAnyColumn ? parsed.headers : parsed.numericHeaders;
         if (binding.multiple) {
           // Multi-column value role: checkbox list, selection order preserved
           // (toggleSeries appends to the end).
@@ -2653,6 +2982,39 @@ export default function Home() {
         </div>
 
         <div className="export-toolbar">
+          <div className="toolbar-group auth-toolbar" aria-label="账号">
+            {authLoading ? (
+              <span className="auth-state">
+                <LoaderCircle className="spin" size={15} />
+                检查登录
+              </span>
+            ) : authUser ? (
+              <>
+                <span className="auth-email" title={authUser.email}>
+                  <User size={15} />
+                  {authUser.email}
+                </span>
+                <button
+                  type="button"
+                  className="icon-button toolbar-icon-button"
+                  onClick={logout}
+                  title="退出登录"
+                  aria-label="退出登录"
+                >
+                  <LogOut size={16} />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="button button-secondary auth-login-button"
+                onClick={() => openAuthPanel("login")}
+              >
+                <LogIn size={16} />
+                登录 / 注册
+              </button>
+            )}
+          </div>
           <div className="toolbar-group project-toolbar" aria-label="项目">
             <button
               type="button"
@@ -2701,8 +3063,8 @@ export default function Home() {
               type="button"
               className="icon-button"
               onClick={copyPng}
-              title="复制 PNG"
-              aria-label="复制 PNG"
+              title={authUser ? "复制 PNG" : "登录后复制 PNG"}
+              aria-label={authUser ? "复制 PNG" : "登录后复制 PNG"}
               disabled={exporting || Boolean(dataError)}
               aria-hidden={Boolean(dataError)}
             >
@@ -2714,17 +3076,25 @@ export default function Home() {
               onClick={exportSvg}
               disabled={Boolean(dataError)}
               aria-hidden={Boolean(dataError)}
+              title={authUser ? "下载 SVG" : "登录后下载 SVG"}
             >
               <Download size={17} />
               SVG
             </button>
             <a
               className="button button-primary"
-              href={pngDownloadReady ? pngDownload?.objectUrl : undefined}
+              href={
+                authUser && pngDownloadReady ? pngDownload?.objectUrl : undefined
+              }
               download={`${safeFilename(title)}@${pixelRatio}x.png`}
-              aria-disabled={!pngDownloadReady}
+              aria-disabled={!authUser || authLoading || !pngDownloadReady}
+              title={authUser ? "下载 PNG" : "登录后下载 PNG"}
               onClick={(event) => {
                 if (dataError) {
+                  event.preventDefault();
+                  return;
+                }
+                if (!requireDownloadAuth()) {
                   event.preventDefault();
                   return;
                 }
@@ -2769,7 +3139,7 @@ export default function Home() {
               </span>
               <span>
                 <strong>{selectedTemplate.name}</strong>
-                <small>20 种图表</small>
+                <small>{CHART_TEMPLATES.length} 种图表</small>
               </span>
               <ChevronDown size={15} />
             </button>
@@ -3378,38 +3748,35 @@ export default function Home() {
             }
             onToggle={() => toggleSettingsSection("marks")}
           >
-            {(selectedTemplate.family === "line" ||
-              selectedTemplate.family === "area" ||
-              chartType === "combo") && (
-              <>
-                <label className="range-field">
-                  <span>
-                    线条宽度 <strong>{lineWidth}px</strong>
-                  </span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={12}
-                    value={lineWidth}
-                    onChange={(event) => setLineWidth(Number(event.target.value))}
-                  />
-                </label>
-                <Toggle
-                  label="平滑曲线"
-                  checked={smooth}
-                  onChange={setSmooth}
+            {supportsLineWidthControl && (
+              <label className="range-field">
+                <span>
+                  线条宽度 <strong>{lineWidth}px</strong>
+                </span>
+                <input
+                  type="range"
+                  min={1}
+                  max={12}
+                  value={lineWidth}
+                  onChange={(event) => setLineWidth(Number(event.target.value))}
                 />
-              </>
+              </label>
             )}
-            {(selectedTemplate.family === "line" ||
-              selectedTemplate.family === "area") && (
+            {supportsSmoothControl && (
+              <Toggle
+                label="平滑曲线"
+                checked={smooth}
+                onChange={setSmooth}
+              />
+            )}
+            {supportsLineAreaExtras && (
               <>
                 <Toggle
                   label="连接缺失值"
                   checked={connectNulls}
                   onChange={setConnectNulls}
                 />
-                {selectedTemplate.family === "line" && (
+                {supportsEndLabelControl && (
                   <Toggle
                     label="末端标签"
                     checked={endLabel}
@@ -3438,10 +3805,7 @@ export default function Home() {
                 </label>
               </>
             )}
-            {(selectedTemplate.family === "line" ||
-              selectedTemplate.family === "area" ||
-              chartType === "combo" ||
-              chartType === "scatter") && (
+            {supportsPointSizeControl && (
               <label className="range-field">
                 <span>
                   数据点大小 <strong>{pointSize}px</strong>
@@ -3495,10 +3859,7 @@ export default function Home() {
                 onChange={setStreamTimeAxis}
               />
             )}
-            {(selectedTemplate.family === "bar" ||
-              chartType === "combo" ||
-              chartType === "divergingBar" ||
-              chartType === "populationPyramid") && (
+            {supportsBarShapeControl && (
               <>
                 <label className="range-field">
                   <span>
@@ -3609,32 +3970,34 @@ export default function Home() {
                 )}
               </>
             )}
-            {selectedTemplate.family === "area" && (
+            {supportsAreaOpacityControl && (
               <label className="range-field">
                 <span>
                   面积透明度 <strong>{areaOpacity}%</strong>
                 </span>
+	                <input
+	                  type="range"
+	                  min={5}
+	                  max={100}
+	                  value={areaOpacity}
+	                  onChange={(event) => setAreaOpacity(Number(event.target.value))}
+	                />
+	              </label>
+            )}
+            {supportsMarkOpacityControl && (
+              <label className="range-field">
+                <span>
+                  {markOpacityLabel} <strong>{markOpacity}%</strong>
+                </span>
                 <input
                   type="range"
-                  min={5}
+                  min={10}
                   max={100}
-                  value={areaOpacity}
-                  onChange={(event) => setAreaOpacity(Number(event.target.value))}
+                  value={markOpacity}
+                  onChange={(event) => setMarkOpacity(Number(event.target.value))}
                 />
               </label>
             )}
-            <label className="range-field">
-              <span>
-                图形不透明度 <strong>{markOpacity}%</strong>
-              </span>
-              <input
-                type="range"
-                min={10}
-                max={100}
-                value={markOpacity}
-                onChange={(event) => setMarkOpacity(Number(event.target.value))}
-              />
-            </label>
           </SettingsSection>
 
           <SettingsSection
@@ -3885,45 +4248,49 @@ export default function Home() {
             hidden={!sectionShown("legend", "图例与交互", "位置 对齐 居中 靠左 靠右 靠上 靠下 提示 悬停 筛选")}
             onToggle={() => toggleSettingsSection("legend")}
           >
-            <Toggle
-              label="显示图例"
-              checked={showLegend}
-              onChange={setShowLegend}
-            />
-            <label className="field settings-field">
-              <span>图例位置</span>
-              <select
-                value={legendPosition}
-                onChange={(event) => {
-                  const nextPosition = event.target.value as LegendPosition;
-                  setLegendPosition(nextPosition);
-                  setLegendAlign(defaultLegendAlignForPosition(nextPosition));
-                }}
-              >
-                <option value="top">顶部</option>
-                <option value="bottom">底部</option>
-                <option value="left">左侧</option>
-                <option value="right">右侧</option>
-              </select>
-            </label>
-            <label className="field settings-field">
-              <span>图例对齐</span>
-              <select
-                value={legendAlign}
-                onChange={(event) =>
-                  setLegendAlign(event.target.value as LegendAlign)
-                }
-              >
-                {(legendPosition === "left" || legendPosition === "right"
-                  ? LEGEND_VERTICAL_ALIGN_OPTIONS
-                  : LEGEND_HORIZONTAL_ALIGN_OPTIONS
-                ).map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {supportsLegendControl && (
+              <>
+                <Toggle
+                  label="显示图例"
+                  checked={showLegend}
+                  onChange={setShowLegend}
+                />
+                <label className="field settings-field">
+                  <span>图例位置</span>
+                  <select
+                    value={legendPosition}
+                    onChange={(event) => {
+                      const nextPosition = event.target.value as LegendPosition;
+                      setLegendPosition(nextPosition);
+                      setLegendAlign(defaultLegendAlignForPosition(nextPosition));
+                    }}
+                  >
+                    <option value="top">顶部</option>
+                    <option value="bottom">底部</option>
+                    <option value="left">左侧</option>
+                    <option value="right">右侧</option>
+                  </select>
+                </label>
+                <label className="field settings-field">
+                  <span>图例对齐</span>
+                  <select
+                    value={legendAlign}
+                    onChange={(event) =>
+                      setLegendAlign(event.target.value as LegendAlign)
+                    }
+                  >
+                    {(legendPosition === "left" || legendPosition === "right"
+                      ? LEGEND_VERTICAL_ALIGN_OPTIONS
+                      : LEGEND_HORIZONTAL_ALIGN_OPTIONS
+                    ).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
             <Toggle
               label="悬停提示"
               checked={showTooltip}
@@ -4016,6 +4383,121 @@ export default function Home() {
         onClose={() => setTemplateOpen(false)}
         onSelect={selectTemplate}
       />
+
+      {authPanelOpen && (
+        <div
+          className="auth-overlay"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setAuthPanelOpen(false);
+          }}
+        >
+          <section
+            className="auth-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="auth-dialog-title"
+          >
+            <div className="auth-dialog-header">
+              <div className="auth-title-block">
+                <span className="auth-title-icon" aria-hidden="true">
+                  <Mail size={16} />
+                </span>
+                <div>
+                  <h2 id="auth-dialog-title">
+                    {authMode === "login" ? "登录图作账号" : "注册图作账号"}
+                  </h2>
+                  <p>登录后可下载 SVG、PNG 和项目文件</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setAuthPanelOpen(false)}
+                aria-label="关闭账号面板"
+                title="关闭"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="auth-mode-switch" role="tablist" aria-label="账号操作">
+              <button
+                type="button"
+                className={authMode === "login" ? "active" : ""}
+                onClick={() => openAuthPanel("login")}
+                role="tab"
+                aria-selected={authMode === "login"}
+              >
+                登录
+              </button>
+              <button
+                type="button"
+                className={authMode === "register" ? "active" : ""}
+                onClick={() => openAuthPanel("register")}
+                role="tab"
+                aria-selected={authMode === "register"}
+              >
+                注册
+              </button>
+            </div>
+
+            <form className="auth-form" onSubmit={submitAuthForm}>
+              <label className="field">
+                <span>邮箱</span>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  autoComplete="email"
+                  placeholder="name@example.com"
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>密码</span>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  autoComplete={
+                    authMode === "login" ? "current-password" : "new-password"
+                  }
+                  minLength={8}
+                  required
+                />
+              </label>
+
+              {authMode === "register" && (
+                <p className="auth-note">注册后需要完成邮箱验证，再登录下载。</p>
+              )}
+
+              {authMessage && (
+                <div className="auth-message" role="status">
+                  <span>{authMessage}</span>
+                  {authVerificationUrl && (
+                    <a
+                      href={authVerificationUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      打开验证链接
+                    </a>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="button button-primary auth-submit-button"
+                disabled={authSubmitting}
+              >
+                {authSubmitting && <LoaderCircle className="spin" size={16} />}
+                {authMode === "login" ? "登录" : "发送验证邮件"}
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
 
       {status && (
         <div className="toast" role="status">

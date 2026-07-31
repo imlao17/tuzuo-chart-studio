@@ -4,7 +4,11 @@ import handler from "vinext/server/app-router-entry";
 
 interface Env {
   ASSETS: Fetcher;
-  DB: D1Database;
+  DB?: D1Database;
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
+  APP_BASE_URL?: string;
+  AUTH_DEV_SHOW_VERIFICATION_LINK?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {

@@ -8,7 +8,7 @@
 
 ## 模板与家族
 
-20 个起始样式，按 7 个渲染家族组织，每个家族有独立的 renderer、数据角色、设置菜单和能力声明：
+30 个起始样式，按 renderer 家族组织，每个家族有独立的数据角色、设置菜单和能力声明：
 
 | 家族 | 模板 |
 |---|---|
@@ -18,6 +18,7 @@
 | 组合 | 柱线组合图 |
 | 散点 | 散点图 |
 | 发散 | 发散条形图、人口金字塔 |
+| 高级常用 | 点图、瀑布图、热力图、矩形树图、漏斗图、仪表盘、雷达图、箱线图、蜡烛图、桑基图 |
 
 每个模板在 `app/template-definition.ts` 的 `TEMPLATE_REGISTRY` 里声明自己的数据绑定（角色）、校验器、设置组、能力，以及专属示例数据。
 
@@ -33,10 +34,13 @@ buildChartOption(config)          ← 薄分派器
 ```
 
 - `app/template-definition.ts` — `TemplateDefinition` 注册表（角色 / 校验 / 菜单 / 能力 / 示例数据）
-- `app/renderers/*.ts` — 每个家族一个 renderer（bar / line-area / pie / combo / scatter / diverging / streamgraph）
+- `app/renderers/*.ts` — 每个家族一个 renderer（bar / line-area / pie / combo / scatter / diverging / streamgraph / advanced）
 - `app/renderers/shared.ts` — 共享的轴原语、上下文组装、最终 option 拼装
 - `app/chart-model.ts` — `ChartConfig` 类型、数据解析、`buildChartOption` 分派器
 - `app/page.tsx` — 编辑器 UI（模板库、数据字段角色绑定、设置面板、预览、PNG/SVG 导出）
+- `app/auth-server.ts` — 邮箱注册、邮箱验证、登录会话、下载权限的服务端逻辑
+- `app/api/auth/*` — 注册 / 登录 / 登出 / 会话 / 邮箱验证 API
+- `db/schema.ts` — D1/Drizzle 用户、验证 token、会话表结构
 - `docs/project-stage-and-control.md` — 当前阶段、风险和接管建议
 - `docs/layout-redesign-plan.md` — 下一轮左右布局调整方案
 
@@ -52,6 +56,30 @@ npm test         # 构建 + HTML 回归测试 + 行为测试
 npm run lint
 ```
 
+## 上线账号体系
+
+当前版本已经接入最小可上线账号闭环：邮箱注册、邮箱验证、登录会话、登出，以及下载权限拦截。未登录用户可以编辑和预览，只有保存 `.tuzuo.json` 项目文件、复制 PNG、导出 SVG、下载 PNG 时需要登录。
+
+生产环境需要配置：
+
+| 配置 | 用途 |
+|---|---|
+| `DB` | Cloudflare D1 绑定名，已在 `.openai/hosting.json` 里声明为 `"d1": "DB"` |
+| `RESEND_API_KEY` | 发送邮箱验证邮件 |
+| `EMAIL_FROM` | 验证邮件发件人，例如 `图作 <no-reply@example.com>` |
+| `APP_BASE_URL` | 生产站点根地址，用来生成邮箱验证链接 |
+
+本地开发可临时配置 `AUTH_DEV_SHOW_VERIFICATION_LINK=true`。这样即使没有配置邮件服务，注册接口也会返回验证链接，方便本地验证流程；生产环境不要开启。
+
+数据库迁移流程：
+
+```bash
+npm run db:generate
+# 然后用部署控制台或 wrangler 将 drizzle/ 里的迁移应用到 D1
+```
+
+如果直接使用 `wrangler d1 migrations apply DB --local/--remote`，需要先在 `wrangler.jsonc` 里声明 D1 数据库；当前 Sites 部署配置以 `.openai/hosting.json` 为准。
+
 ## 测试
 
 两类测试，`npm test` 会依次运行：
@@ -61,4 +89,4 @@ npm run lint
 
 ## 技术栈
 
-vinext + Next.js 16 + React 19 + ECharts 6 + Tailwind 4。可选 Cloudflare D1 / Drizzle（当前未使用）。
+vinext + Next.js 16 + React 19 + ECharts 6 + Tailwind 4 + Cloudflare D1 / Drizzle。

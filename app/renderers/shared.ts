@@ -41,6 +41,9 @@ export type RendererResult = {
   xAxis?: EChartsOption["xAxis"];
   yAxis?: EChartsOption["yAxis"];
   singleAxis?: EChartsOption["singleAxis"];
+  radar?: EChartsOption["radar"];
+  visualMap?: EChartsOption["visualMap"];
+  tooltipTrigger?: "axis" | "item";
 };
 
 type ArrayElement<T> = T extends readonly (infer Item)[] ? Item : T;
@@ -51,7 +54,7 @@ type ResolvedTextStyle = {
   color: string;
   fontSize: number;
   fontWeight: number;
-  fontStyle: "normal" | "italic";
+  fontStyle: "normal" | "italic" | "oblique";
 };
 
 export function dataLabelColor(config: ChartConfig) {
@@ -396,9 +399,12 @@ function assembleOption(
   // slice its visible series (e.g. `column` keeps only the first), so we must
   // pass the pre-slice count from the context, not derive it from the rendered
   // series length, or `column` would wrongly hide the legend.
-  const isPieFamily = !capabilities.axes;
+  const nonCartesianFamily = !capabilities.axes;
   const legendVisible =
-    !compact && showLegend && (dataSeriesCount > 1 || isPieFamily);
+    !compact &&
+    showLegend &&
+    capabilities.legend &&
+    (dataSeriesCount > 1 || nonCartesianFamily);
 
   const titleBlock = compact ? 0 : title || subtitle ? 74 : 12;
   const gridTop =
@@ -531,19 +537,22 @@ function assembleOption(
     },
     tooltip:
       compact || !showTooltip
-        ? { show: false }
-        : {
-            trigger: isPieFamily ? "item" : "axis",
+	        ? { show: false }
+	        : {
+	            trigger:
+	              result.tooltipTrigger ?? (nonCartesianFamily ? "item" : "axis"),
             backgroundColor: "rgba(24, 28, 33, 0.94)",
             borderWidth: 0,
             textStyle: { color: "#ffffff", fontSize },
             padding: [10, 12],
           },
-    grid,
-    singleAxis: patched.singleAxis,
-    xAxis: patched.xAxis,
-    yAxis: patched.yAxis,
-    series: patched.series,
+      grid,
+      singleAxis: patched.singleAxis,
+      radar: patched.radar,
+      visualMap: patched.visualMap,
+      xAxis: patched.xAxis,
+      yAxis: patched.yAxis,
+      series: patched.series,
   };
 }
 

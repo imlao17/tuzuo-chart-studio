@@ -495,7 +495,7 @@ test("table with no numeric columns reports a numeric error for every template",
   }
 });
 
-test("single numeric column passes generic templates but fails scatter/diverging/pyramid", () => {
+test("single numeric column passes generic templates but fails role-specific templates", () => {
   const ctx: ValidationContext = {
     parsed: tableToParsed([
       ["月份", "数值"],
@@ -505,14 +505,94 @@ test("single numeric column passes generic templates but fails scatter/diverging
     categoryColumn: "月份",
     seriesColumns: ["数值"],
   };
-  const needsTwo: ChartType[] = ["scatter", "divergingBar", "populationPyramid"];
   for (const type of ALL_TYPES) {
     const err = firstError(type, ctx);
-    if (needsTwo.includes(type)) {
+    if (["scatter", "divergingBar", "populationPyramid"].includes(type)) {
       assert.ok(err && err.includes("2 个数值列"), `${type}: expected 2-column error, got ${err}`);
+    } else if (type === "candlestick") {
+      assert.ok(err && err.includes("4 个数值列"), `${type}: expected OHLC error, got ${err}`);
+    } else if (type === "sankey") {
+      assert.ok(err && err.includes("2 个文本列"), `${type}: expected flow-column error, got ${err}`);
     } else {
       assert.equal(err, null, `${type}: should accept a single numeric column`);
     }
+  }
+});
+
+test("advanced templates emit their intended ECharts series and coordinate options", () => {
+  const expectedSeriesTypes = {
+    dotPlot: "scatter",
+    waterfall: "bar",
+    heatmap: "heatmap",
+    treemap: "treemap",
+    funnel: "funnel",
+    gauge: "gauge",
+    radar: "radar",
+    boxplot: "boxplot",
+    candlestick: "candlestick",
+    sankey: "sankey",
+  } as const satisfies Partial<Record<ChartType, string>>;
+
+  for (const [type, expectedType] of Object.entries(expectedSeriesTypes) as Array<
+    [ChartType, string]
+  >) {
+    const option = renderSample(type);
+    const first = seriesList(option)[0] as { type?: string };
+    assert.equal(first.type, expectedType, `${type}: wrong series type`);
+    if (type === "radar") assert.ok(option.radar, "radar: missing radar coordinate");
+    if (type === "heatmap") assert.ok(option.visualMap, "heatmap: missing visualMap");
+    if (type === "sankey") {
+      const sankey = first as { links?: unknown[]; data?: unknown[] };
+      assert.ok((sankey.links?.length ?? 0) > 0, "sankey: missing links");
+      assert.ok((sankey.data?.length ?? 0) > 0, "sankey: missing nodes");
+    }
+  }
+});
+
+test("advanced template settings expose only effective groups", () => {
+  const groupIds = (type: ChartType) =>
+    getTemplateDefinition(type).settingsGroups.map((group) => group.id);
+  const noLegendTypes: ChartType[] = [
+    "dotPlot",
+    "waterfall",
+    "heatmap",
+    "treemap",
+    "funnel",
+    "gauge",
+    "boxplot",
+    "candlestick",
+    "sankey",
+  ];
+  for (const type of noLegendTypes) {
+    const def = getTemplateDefinition(type);
+    assert.equal(def.capabilities.legend, false, `${type}: should not support legend controls`);
+    assert.equal(groupIds(type).includes("legend"), true, `${type}: should keep tooltip controls available`);
+  }
+  for (const type of ["heatmap", "boxplot", "candlestick", "gauge"] as ChartType[]) {
+    assert.equal(groupIds(type).includes("marks"), false, `${type}: should not expose inactive mark controls`);
+  }
+  for (const type of ["dotPlot", "waterfall", "treemap", "funnel", "radar", "sankey"] as ChartType[]) {
+    assert.equal(groupIds(type).includes("marks"), true, `${type}: should expose active mark controls`);
+  }
+});
+
+test("advanced mark controls change the rendered options they advertise", () => {
+  const cases: Array<[ChartType, Partial<ChartConfig>]> = [
+    ["dotPlot", { pointSize: 18 }],
+    ["waterfall", { barWidth: 20, markOpacity: 48 }],
+    ["radar", { lineWidth: 6, pointSize: 12, areaOpacity: 44 }],
+    ["treemap", { markOpacity: 52 }],
+    ["funnel", { markOpacity: 52 }],
+    ["sankey", { markOpacity: 52 }],
+    ["pie", { markOpacity: 52 }],
+  ];
+
+  for (const [type, overrides] of cases) {
+    assert.notEqual(
+      sig(renderSample(type)),
+      sig(renderSample(type, overrides)),
+      `${type}: advertised controls had no effect`,
+    );
   }
 });
 

@@ -35,6 +35,7 @@ export function buildPieOption(ctx: RenderContext): RendererResult {
   const legendPosition = config.legendPosition ?? "top";
   const legendVisible = !compact && config.showLegend;
   const titleBlock = compact ? 0 : title || subtitle ? 74 : 12;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
 
   const innerTop =
     margins.top +
@@ -123,6 +124,7 @@ export function buildPieOption(ctx: RenderContext): RendererResult {
         borderColor: transparent ? "rgba(255,255,255,0.82)" : backgroundColor,
         borderWidth: compact ? 1 : 2,
         borderRadius: compact ? 1 : 3,
+        opacity: markOpacity,
       },
       label: {
         show: compact ? false : config.showLabels,

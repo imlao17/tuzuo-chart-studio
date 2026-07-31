@@ -21,7 +21,17 @@ export type ChartType =
   | "scatter"
   | "divergingBar"
   | "populationPyramid"
-  | "streamgraph";
+  | "streamgraph"
+  | "dotPlot"
+  | "waterfall"
+  | "heatmap"
+  | "treemap"
+  | "funnel"
+  | "gauge"
+  | "radar"
+  | "boxplot"
+  | "candlestick"
+  | "sankey";
 
 export type ChartFamily = "line" | "area" | "bar" | "pie" | "other";
 
@@ -88,6 +98,8 @@ export type ChartConfig = {
   parsed: ParsedTable;
   categoryColumn: string;
   seriesColumns: string[];
+  sourceColumn?: string;
+  targetColumn?: string;
   title: string;
   subtitle: string;
   width: number;
@@ -331,6 +343,16 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "divergingBar", name: "发散条形图", family: "other" },
   { id: "populationPyramid", name: "人口金字塔", family: "other" },
   { id: "streamgraph", name: "河流图", family: "area" },
+  { id: "dotPlot", name: "点图", family: "other" },
+  { id: "waterfall", name: "瀑布图", family: "other" },
+  { id: "heatmap", name: "热力图", family: "other" },
+  { id: "treemap", name: "矩形树图", family: "other" },
+  { id: "funnel", name: "漏斗图", family: "other" },
+  { id: "gauge", name: "仪表盘", family: "other" },
+  { id: "radar", name: "雷达图", family: "other" },
+  { id: "boxplot", name: "箱线图", family: "other" },
+  { id: "candlestick", name: "蜡烛图", family: "other" },
+  { id: "sankey", name: "桑基图", family: "other" },
 ];
 
 export function toNumber(value: string) {
@@ -510,9 +532,9 @@ export function numericBound(value: string | undefined) {
 }
 
 export function buildChartOption(config: ChartConfig): EChartsOption {
-  // All 20 templates are registered with a per-family renderer; the legacy
-  // monolithic builder has been removed. buildWithRenderer assembles the
-  // shared title/legend/tooltip/grid/textStyle around the renderer's output.
+  // Every template is registered with a per-family renderer; the legacy
+  // monolithic builder has been removed. buildWithRenderer assembles the shared
+  // title/legend/tooltip/grid/textStyle around the renderer's output.
   return buildWithRenderer(config, getTemplateDefinition(config.type));
 }
 
@@ -522,11 +544,15 @@ export function buildThumbnailOption(type: ChartType): EChartsOption {
   // a real point cloud, pyramid shows age bands) instead of one generic table.
   const { sampleData } = getTemplateDefinition(type);
   const parsed = tableToParsed(sampleData.table);
+  const sourceDefault = sampleData.roleDefaults?.source;
+  const targetDefault = sampleData.roleDefaults?.target;
   return buildChartOption({
     type,
     parsed,
     categoryColumn: sampleData.categoryColumn,
     seriesColumns: sampleData.seriesColumns,
+    sourceColumn: typeof sourceDefault === "string" ? sourceDefault : undefined,
+    targetColumn: typeof targetDefault === "string" ? targetDefault : undefined,
     title: "",
     subtitle: "",
     width: 240,

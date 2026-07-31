@@ -48,3 +48,4 @@ tsconfig.tsbuildinfo
 /.playwright-mcp/
 /.workbuddy/
 /.zcode/
+.omx/
