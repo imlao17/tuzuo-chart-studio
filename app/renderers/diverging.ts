@@ -16,7 +16,11 @@
  */
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
-import { colorFor } from "./shared";
+import {
+  colorFor,
+  dataLabelTextStyle,
+  resolveDataLabelPosition,
+} from "./shared";
 import {
   buildCategoryAxis,
   buildValueAxis,
@@ -33,6 +37,14 @@ export function buildDivergingOption(ctx: RenderContext): RendererResult {
   const markOpacity = (config.markOpacity ?? 100) / 100;
 
   const textColor = theme.text;
+  const defaultLabelTextStyle = dataLabelTextStyle(config);
+  const labelTextStyle = {
+    ...defaultLabelTextStyle,
+    color:
+      config.labelStyle?.color || config.labelColor
+        ? defaultLabelTextStyle.color
+        : "#ffffff",
+  };
   const valueAxis = buildValueAxis(ctx, textColor, fontSize, compact);
   const categoryAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
 
@@ -68,8 +80,8 @@ export function buildDivergingOption(ctx: RenderContext): RendererResult {
   const borderRadius: [number, number, number, number] = [0, barRadius, barRadius, 0];
   const insideLabel = {
     show: compact ? false : config.showLabels,
-    position: "inside" as const,
-    color: "#ffffff",
+    position: resolveDataLabelPosition(config, "inside", "inside"),
+    ...labelTextStyle,
     formatter: (params: unknown) => {
       const item = params as { value: number };
       return formatNumber(Math.abs(item.value));

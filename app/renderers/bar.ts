@@ -16,7 +16,11 @@
  */
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
-import { colorFor } from "./shared";
+import {
+  colorFor,
+  dataLabelTextStyle,
+  resolveDataLabelPosition,
+} from "./shared";
 import {
   buildCategoryAxis,
   buildValueAxis,
@@ -87,7 +91,7 @@ export function buildBarOption(ctx: RenderContext): RendererResult {
       )
     : [];
 
-  const textColor = theme.text;
+  const labelTextStyle = dataLabelTextStyle(config);
   const showLabels = compact ? false : config.showLabels;
 
   const series: SeriesOption[] = ordered.map(({ item, originalIndex }, topIndex) => {
@@ -121,10 +125,11 @@ export function buildBarOption(ctx: RenderContext): RendererResult {
       areaStyle: undefined,
       label: {
         show: showLabels,
-        position:
-          config.labelPosition === "inside" ? "inside" : isHorizontal ? "right" : "top",
-        color: textColor,
-        fontSize,
+        position: resolveDataLabelPosition(
+          config,
+          isHorizontal ? "right" : "top",
+        ),
+        ...labelTextStyle,
         formatter: (params: unknown) => {
           // Stack totals replace the segment value on the topmost series so
           // each column shows one sum instead of per-segment labels.

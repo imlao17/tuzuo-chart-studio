@@ -17,7 +17,11 @@
  */
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
-import { colorFor } from "./shared";
+import {
+  colorFor,
+  dataLabelTextStyle,
+  resolveDataLabelPosition,
+} from "./shared";
 import {
   buildCategoryAxis,
   buildValueAxis,
@@ -45,6 +49,7 @@ export function buildLineAreaOption(ctx: RenderContext): RendererResult {
   // Legacy axes (legacy lines 465-466): line/area are vertical, so
   // xAxis=categoryAxis, yAxis=valueAxis.
   const textColor = theme.text;
+  const labelTextStyle = dataLabelTextStyle(config);
   const xAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
   const yAxis = buildValueAxis(ctx, textColor, fontSize, compact);
 
@@ -120,11 +125,8 @@ export function buildLineAreaOption(ctx: RenderContext): RendererResult {
         : undefined,
       label: {
         show: showPerPointLabel,
-        // isHorizontal is false for line/area, so position is "top" unless
-        // the user forced "inside".
-        position: config.labelPosition === "inside" ? "inside" : "top",
-        color: textColor,
-        fontSize,
+        position: resolveDataLabelPosition(config, "top"),
+        ...labelTextStyle,
         formatter: (params: unknown) => {
           const entry = params as { value: string | number };
           return formatNumber(entry.value);
@@ -136,7 +138,9 @@ export function buildLineAreaOption(ctx: RenderContext): RendererResult {
             show: true,
             formatter: "{a}",
             color,
-            fontSize,
+            fontSize: labelTextStyle.fontSize,
+            fontWeight: labelTextStyle.fontWeight,
+            fontStyle: labelTextStyle.fontStyle,
           }
         : undefined,
       // P1-2 marks attach to the first series only.

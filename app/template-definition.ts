@@ -63,8 +63,7 @@ export type SettingsGroupId =
   | "xAxis"
   | "yAxis"
   | "legend"
-  | "numbers"
-  | "canvas";
+  | "numbers";
 
 export type SettingsGroup = {
   id: SettingsGroupId;
@@ -132,7 +131,7 @@ const GROUP_MARKS: SettingsGroup = {
 const GROUP_LABELS: SettingsGroup = {
   id: "labels",
   title: "数据标签",
-  keywords: "数据标签 标签位置 字号",
+  keywords: "数据标签 标签位置 标签颜色 标签对齐 字号",
 };
 const GROUP_X_AXIS: SettingsGroup = {
   id: "xAxis",
@@ -147,19 +146,13 @@ const GROUP_Y_AXIS: SettingsGroup = {
 const GROUP_LEGEND: SettingsGroup = {
   id: "legend",
   title: "图例与交互",
-  keywords: "图例 提示 交互 位置 tooltip",
+  keywords: "图例 提示 交互 位置 对齐 居中 靠左 靠右 靠上 靠下 tooltip",
 };
 const GROUP_NUMBERS: SettingsGroup = {
   id: "numbers",
   title: "数字格式",
   keywords: "数字格式 小数 前缀 后缀 千分位",
 };
-const GROUP_CANVAS: SettingsGroup = {
-  id: "canvas",
-  title: "画布与布局",
-  keywords: "画布 背景 透明 尺寸 边距 对齐",
-};
-
 const CARTESIAN_GROUPS: SettingsGroup[] = [
   GROUP_COLORS,
   GROUP_MARKS,
@@ -168,7 +161,6 @@ const CARTESIAN_GROUPS: SettingsGroup[] = [
   GROUP_Y_AXIS,
   GROUP_LEGEND,
   GROUP_NUMBERS,
-  GROUP_CANVAS,
 ];
 
 const PIE_GROUPS: SettingsGroup[] = [
@@ -177,7 +169,6 @@ const PIE_GROUPS: SettingsGroup[] = [
   GROUP_LABELS,
   GROUP_LEGEND,
   GROUP_NUMBERS,
-  GROUP_CANVAS,
 ];
 
 // --- Shared capability presets ---------------------------------------------

@@ -4,7 +4,7 @@
 
 ## 定位
 
-图作不是 Flourish 那样的发布/协作平台，而是专注一件事：**快速生成一张干净的、透明背景的、可直接复用的图表图片**。所有控件都真实影响预览与导出，每个模板都有独立的数据字段、校验、菜单和行为。
+图作不是 Flourish 那样的发布/协作平台，而是专注一件事：**快速生成一张干净的、透明背景的、可直接复用的图表图片**。所有控件都真实影响预览与导出，每个模板都有独立的数据字段、校验、菜单和行为。当前编辑状态会自动保存在浏览器本地，也可以保存/打开 `.tuzuo.json` 项目文件。
 
 ## 模板与家族
 
@@ -37,6 +37,8 @@ buildChartOption(config)          ← 薄分派器
 - `app/renderers/shared.ts` — 共享的轴原语、上下文组装、最终 option 拼装
 - `app/chart-model.ts` — `ChartConfig` 类型、数据解析、`buildChartOption` 分派器
 - `app/page.tsx` — 编辑器 UI（模板库、数据字段角色绑定、设置面板、预览、PNG/SVG 导出）
+- `docs/project-stage-and-control.md` — 当前阶段、风险和接管建议
+- `docs/layout-redesign-plan.md` — 下一轮左右布局调整方案
 
 ## 快速开始
 

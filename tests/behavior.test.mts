@@ -82,6 +82,41 @@ const sig = (option: unknown) => JSON.stringify(option);
 const seriesList = (option: { series?: unknown }) =>
   Array.isArray(option.series) ? option.series : option.series ? [option.series] : [];
 
+const gridBox = (option: { grid?: unknown }) =>
+  option.grid as { top: number; right: number; bottom: number; left: number };
+
+const singleAxisBox = (option: { singleAxis?: unknown }) =>
+  option.singleAxis as {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
+
+test("default themes include the four Flourish palettes", () => {
+  const flourishThemes = THEMES.filter((theme) =>
+    theme.id.startsWith("flourish"),
+  );
+  assert.deepEqual(
+    flourishThemes.map((theme) => theme.name),
+    [
+      "Flourish",
+      "Flourish Alternate",
+      "Flourish Light",
+      "Flourish Light Alternate",
+    ],
+  );
+  for (const theme of flourishThemes) {
+    assert.equal(theme.colors.length, 11, `${theme.name}: expected 11 colors`);
+  }
+  assert.deepEqual(flourishThemes[0].colors.slice(0, 4), [
+    "#0053d7",
+    "#098efa",
+    "#8a4bcf",
+    "#f2457f",
+  ]);
+});
+
 // ---------------------------------------------------------------------------
 // Group: option exportability — every template yields a non-empty, serializable
 // option from its sample data. Covers "PNG/SVG 导出回归 100% 家族覆盖".
@@ -126,6 +161,214 @@ test("toggling showLabels changes the option for every label-bearing template", 
     const on = sig(renderSample(type, { showLabels: true }));
     assert.notEqual(off, on, `${type}: showLabels had no effect`);
   }
+});
+
+test("label color and precise label positions flow into rendered labels", () => {
+  const color = "#ff3366";
+  const columnLabel = (seriesList(
+    renderSample("groupedColumn", {
+      labelColor: color,
+      labelPosition: "outsideLeft",
+    }),
+  )[0] as { label?: { color?: string; position?: string } }).label;
+  assert.equal(columnLabel?.color, color);
+  assert.equal(columnLabel?.position, "left");
+
+  const barLabel = (seriesList(
+    renderSample("bar", { labelPosition: "insideRight" }),
+  )[0] as { label?: { position?: string } }).label;
+  assert.equal(barLabel?.position, "insideRight");
+
+  const lineLabel = (seriesList(
+    renderSample("line", { labelPosition: "outsideBottom" }),
+  )[0] as { label?: { position?: string } }).label;
+  assert.equal(lineLabel?.position, "bottom");
+
+  const pieLabel = (seriesList(
+    renderSample("pie", { labelColor: color, labelPosition: "outsideRight" }),
+  )[0] as { label?: { color?: string; position?: string } }).label;
+  assert.equal(pieLabel?.color, color);
+  assert.equal(pieLabel?.position, "outside");
+});
+
+test("text style controls flow into title, axes, and data labels", () => {
+  const option = renderSample("groupedColumn", {
+    title: "收入",
+    subtitle: "单位：万元",
+    xAxisTitle: "月份",
+    yAxisTitle: "金额",
+    titleStyle: {
+      color: "#123456",
+      fontSize: 28,
+      bold: false,
+      italic: true,
+    },
+    subtitleStyle: {
+      color: "#654321",
+      fontSize: 15,
+      bold: true,
+      italic: true,
+    },
+    xAxisTitleStyle: {
+      color: "#225588",
+      fontSize: 16,
+      bold: true,
+      italic: false,
+    },
+    yAxisTitleStyle: {
+      color: "#882255",
+      fontSize: 17,
+      bold: false,
+      italic: true,
+    },
+    xAxisLabelStyle: {
+      color: "#116633",
+      fontSize: 12,
+      bold: true,
+      italic: true,
+    },
+    yAxisLabelStyle: {
+      color: "#663311",
+      fontSize: 13,
+      bold: false,
+      italic: true,
+    },
+    labelStyle: {
+      color: "#aa3355",
+      fontSize: 18,
+      bold: true,
+      italic: true,
+    },
+  });
+
+  const title = option.title as {
+    textStyle?: Record<string, unknown>;
+    subtextStyle?: Record<string, unknown>;
+  };
+  assert.deepEqual(title.textStyle, {
+    color: "#123456",
+    fontSize: 28,
+    fontWeight: 400,
+    fontStyle: "italic",
+  });
+  assert.deepEqual(title.subtextStyle, {
+    color: "#654321",
+    fontSize: 15,
+    fontWeight: 700,
+    fontStyle: "italic",
+  });
+
+  const xAxis = option.xAxis as {
+    axisLabel?: Record<string, unknown>;
+    nameTextStyle?: Record<string, unknown>;
+  };
+  const yAxis = option.yAxis as {
+    axisLabel?: Record<string, unknown>;
+    nameTextStyle?: Record<string, unknown>;
+  };
+  assert.equal(xAxis.nameTextStyle?.color, "#225588");
+  assert.equal(xAxis.nameTextStyle?.fontSize, 16);
+  assert.equal(xAxis.nameTextStyle?.fontWeight, 700);
+  assert.equal(xAxis.axisLabel?.color, "#116633");
+  assert.equal(xAxis.axisLabel?.fontStyle, "italic");
+  assert.equal(yAxis.nameTextStyle?.color, "#882255");
+  assert.equal(yAxis.nameTextStyle?.fontStyle, "italic");
+  assert.equal(yAxis.axisLabel?.color, "#663311");
+  assert.equal(yAxis.axisLabel?.fontWeight, 400);
+
+  const label = (seriesList(option)[0] as { label?: Record<string, unknown> })
+    .label;
+  assert.equal(label?.color, "#aa3355");
+  assert.equal(label?.fontSize, 18);
+  assert.equal(label?.fontWeight, 700);
+  assert.equal(label?.fontStyle, "italic");
+});
+
+test("legend positions reserve chart space instead of overlapping the plot", () => {
+  const hidden = gridBox(
+    renderSample("groupedColumn", {
+      showLegend: false,
+      title: "标题",
+      subtitle: "副标题",
+    }),
+  );
+  const topOption = renderSample("groupedColumn", {
+    legendPosition: "top",
+    title: "标题",
+    subtitle: "副标题",
+  });
+  const top = gridBox(topOption);
+  const topLegend = topOption.legend as { top?: number };
+  const topTitle = topOption.title as { top?: number };
+  assert.ok(top.top > hidden.top);
+  assert.ok((topLegend.top ?? 0) > (topTitle.top ?? 0));
+
+  const bottom = gridBox(
+    renderSample("groupedColumn", { legendPosition: "bottom" }),
+  );
+  assert.ok(bottom.bottom > hidden.bottom);
+
+  const left = gridBox(
+    renderSample("groupedColumn", { legendPosition: "left" }),
+  );
+  assert.ok(left.left > hidden.left);
+
+  const right = gridBox(
+    renderSample("groupedColumn", { legendPosition: "right" }),
+  );
+  assert.ok(right.right > hidden.right);
+
+  const streamHidden = singleAxisBox(
+    renderSample("streamgraph", { showLegend: false }),
+  );
+  const streamTop = singleAxisBox(
+    renderSample("streamgraph", { legendPosition: "top" }),
+  );
+  assert.ok(streamTop.top > streamHidden.top);
+});
+
+test("legend alignment controls horizontal and vertical anchoring", () => {
+  const topLeft = renderSample("groupedColumn", {
+    legendPosition: "top",
+    legendAlign: "start",
+  }).legend as { left?: number | string; right?: number | string };
+  assert.equal(topLeft.left, 38);
+  assert.equal(topLeft.right, undefined);
+
+  const topCenter = renderSample("groupedColumn", {
+    legendPosition: "top",
+    legendAlign: "center",
+  }).legend as { left?: number | string; right?: number | string };
+  assert.equal(topCenter.left, "center");
+  assert.equal(topCenter.right, undefined);
+
+  const topRight = renderSample("groupedColumn", {
+    legendPosition: "top",
+    legendAlign: "end",
+  }).legend as { left?: number | string; right?: number | string };
+  assert.equal(topRight.left, undefined);
+  assert.equal(topRight.right, 32);
+
+  const leftTop = renderSample("groupedColumn", {
+    legendPosition: "left",
+    legendAlign: "start",
+  }).legend as { top?: number | string; bottom?: number | string };
+  assert.equal(leftTop.top, 102);
+  assert.equal(leftTop.bottom, undefined);
+
+  const leftMiddle = renderSample("groupedColumn", {
+    legendPosition: "left",
+    legendAlign: "center",
+  }).legend as { top?: number | string; bottom?: number | string };
+  assert.equal(leftMiddle.top, "middle");
+  assert.equal(leftMiddle.bottom, undefined);
+
+  const rightBottom = renderSample("groupedColumn", {
+    legendPosition: "right",
+    legendAlign: "end",
+  }).legend as { top?: number | string; bottom?: number | string };
+  assert.equal(rightBottom.top, undefined);
+  assert.equal(rightBottom.bottom, 36);
 });
 
 test("changing numberDecimals changes numeric formatting for cartesian templates", () => {

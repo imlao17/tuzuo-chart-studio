@@ -1,12 +1,14 @@
 "use client";
 
-import { init as initECharts, type ECharts } from "echarts";
+import type { ECharts } from "echarts";
+import Image from "next/image";
 import {
   AlertTriangle,
   AreaChart,
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  Bold,
   Check,
   ChevronDown,
   Clipboard,
@@ -20,6 +22,11 @@ import {
   Lock,
   LockOpen,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Pencil,
   PieChart,
   Plus,
   RefreshCcw,
@@ -30,6 +37,7 @@ import {
   Sparkles,
   Table2,
   Trash2,
+  Italic,
   X,
 } from "lucide-react";
 import {
@@ -49,7 +57,11 @@ import {
   type ChartConfig,
   ChartType,
   INITIAL_TABLE,
+  type LabelPosition,
+  type LegendAlign,
+  type LegendPosition,
   Margins,
+  defaultLegendAlignForPosition,
   parseDelimitedTable,
   tableToParsed,
   THEMES,
@@ -65,6 +77,8 @@ const DEFAULT_MARGINS: Margins = {
   bottom: 36,
   left: 38,
 };
+const CANVAS_WIDTH_BOUNDS = { min: 320, max: 2400 };
+const CANVAS_HEIGHT_BOUNDS = { min: 240, max: 1800 };
 
 type SavedPalette = {
   id: string;
@@ -72,22 +86,109 @@ type SavedPalette = {
   colors: string[];
 };
 
+type TextStyleState = {
+  fontSize: number;
+  color: string;
+  bold: boolean;
+  italic: boolean;
+};
+
 // Field role bindings: single-column roles map to a string, the multi-column
 // `value` role maps to a string[] (selection order = render order). Missing
 // roles are resolved with sensible fallbacks by `resolveFieldBindings`.
 type FieldRoles = Partial<Record<DataBindingRole, string | string[]>>;
 
+// A saved project: every editable field that defines a chart, excluding
+// transient UI state (modals, toasts, export caches, search queries).
+// `DEFAULT_PROJECT` is the single source of truth — collect/apply both
+// derive from it so a field is never accidentally dropped.
+type ProjectState = {
+  tableData: string[][];
+  chartType: ChartType;
+  fieldRoles: FieldRoles;
+  seriesKind: Record<string, "bar" | "line">;
+  title: string;
+  subtitle: string;
+  width: number;
+  height: number;
+  margins: Margins;
+  transparent: boolean;
+  backgroundColor: string;
+  themeId: string;
+  paletteColors: string[];
+  colorOverridesText: string;
+  showLabels: boolean;
+  showLegend: boolean;
+  showGrid: boolean;
+  smooth: boolean;
+  fontSize: number;
+  labelColor: string;
+  labelPosition: LabelPosition;
+  legendPosition: LegendPosition;
+  legendAlign: LegendAlign;
+  showTooltip: boolean;
+  gridLineType: "solid" | "dashed" | "dotted";
+  lineWidth: number;
+  pointSize: number;
+  barWidth: number;
+  barRadius: number;
+  markOpacity: number;
+  areaOpacity: number;
+  showXAxis: boolean;
+  showYAxis: boolean;
+  xAxisTitle: string;
+  yAxisTitle: string;
+  axisLabelRotation: number;
+  yAxisMin: string;
+  yAxisMax: string;
+  numberDecimals: number;
+  numberPrefix: string;
+  numberSuffix: string;
+  useThousandsSeparator: boolean;
+  titleAlign: "left" | "center" | "right";
+  titleStyle: TextStyleState;
+  subtitleStyle: TextStyleState;
+  xAxisTitleStyle: TextStyleState;
+  yAxisTitleStyle: TextStyleState;
+  xAxisLabelStyle: TextStyleState;
+  yAxisLabelStyle: TextStyleState;
+  labelStyle: TextStyleState;
+  sortCategories: { bySeries: string; order: "asc" | "desc" } | null;
+  showStackTotals: boolean;
+  stackOrder: "asc" | "desc" | null;
+  barGap: number | null;
+  barCategoryGap: number | null;
+  connectNulls: boolean;
+  endLabel: boolean;
+  referenceBandsText: string;
+  referenceLinesText: string;
+  pieLabelContent: "value" | "percent" | "both" | null;
+  donutInnerRadius: number | null;
+  pieSort: "asc" | "desc" | null;
+  startAngle: number | null;
+  pieOtherThreshold: number | null;
+  sizeColumn: string | null;
+  colorColumn: string | null;
+  shapeColumn: string | null;
+  scatterTrendLine: boolean;
+  comboDualAxis: boolean;
+  y2AxisTitle: string;
+  comboAxisSync: boolean;
+  streamTimeAxis: boolean;
+};
+
 type SettingsSectionId =
+  | "data"
   | "colors"
   | "marks"
   | "labels"
   | "xAxis"
   | "yAxis"
   | "legend"
-  | "numbers"
-  | "canvas";
+  | "numbers";
 
 const DEFAULT_SETTINGS_OPEN: Record<SettingsSectionId, boolean> = {
+  data: true,
   colors: true,
   marks: false,
   labels: false,
@@ -95,8 +196,584 @@ const DEFAULT_SETTINGS_OPEN: Record<SettingsSectionId, boolean> = {
   yAxis: false,
   legend: false,
   numbers: false,
-  canvas: true,
 };
+
+// Single source of truth for project defaults. collectProject / applyProject
+// both reference this so a field is never dropped, and partial/old project
+// files fall back to these values for any missing key.
+const DEFAULT_PROJECT: ProjectState = {
+  tableData: INITIAL_TABLE.map((row) => [...row]),
+  chartType: "groupedColumn",
+  fieldRoles: { category: "月份", value: ["实际收入", "目标"] },
+  seriesKind: {},
+  title: "上半年收入趋势",
+  subtitle: "单位：万元",
+  width: 960,
+  height: 540,
+  margins: { ...DEFAULT_MARGINS },
+  transparent: true,
+  backgroundColor: "#ffffff",
+  themeId: "editorial",
+  paletteColors: [...THEMES[0].colors],
+  colorOverridesText: "",
+  showLabels: true,
+  showLegend: true,
+  showGrid: true,
+  smooth: true,
+  fontSize: 14,
+  labelColor: "",
+  labelPosition: "auto",
+  legendPosition: "top",
+  legendAlign: defaultLegendAlignForPosition("top"),
+  showTooltip: true,
+  gridLineType: "dashed",
+  lineWidth: 3,
+  pointSize: 7,
+  barWidth: 48,
+  barRadius: 3,
+  markOpacity: 100,
+  areaOpacity: 22,
+  showXAxis: true,
+  showYAxis: true,
+  xAxisTitle: "",
+  yAxisTitle: "",
+  axisLabelRotation: 0,
+  yAxisMin: "",
+  yAxisMax: "",
+  numberDecimals: 0,
+  numberPrefix: "",
+  numberSuffix: "",
+  useThousandsSeparator: true,
+  titleAlign: "left",
+  titleStyle: { fontSize: 24, color: "", bold: true, italic: false },
+  subtitleStyle: { fontSize: 13, color: "#68727d", bold: false, italic: false },
+  xAxisTitleStyle: { fontSize: 14, color: "", bold: false, italic: false },
+  yAxisTitleStyle: { fontSize: 14, color: "", bold: false, italic: false },
+  xAxisLabelStyle: { fontSize: 14, color: "", bold: false, italic: false },
+  yAxisLabelStyle: { fontSize: 14, color: "", bold: false, italic: false },
+  labelStyle: { fontSize: 14, color: "", bold: false, italic: false },
+  sortCategories: null,
+  showStackTotals: false,
+  stackOrder: null,
+  barGap: null,
+  barCategoryGap: null,
+  connectNulls: false,
+  endLabel: false,
+  referenceBandsText: "",
+  referenceLinesText: "",
+  pieLabelContent: null,
+  donutInnerRadius: null,
+  pieSort: null,
+  startAngle: null,
+  pieOtherThreshold: null,
+  sizeColumn: null,
+  colorColumn: null,
+  shapeColumn: null,
+  scatterTrendLine: false,
+  comboDualAxis: false,
+  y2AxisTitle: "",
+  comboAxisSync: false,
+  streamTimeAxis: false,
+};
+
+const PROJECT_STORAGE_KEY = "tuzuo-current-project";
+const PROJECT_FILE_APP = "tuzuo-chart-studio";
+const PROJECT_FILE_VERSION = 1;
+const CHART_TYPE_IDS = new Set<ChartType>(
+  CHART_TEMPLATES.map((template) => template.id),
+);
+const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+const LABEL_POSITION_VALUES = [
+  "auto",
+  "outside",
+  "outsideTop",
+  "outsideRight",
+  "outsideBottom",
+  "outsideLeft",
+  "inside",
+  "insideCenter",
+  "insideLeft",
+  "insideRight",
+  "insideTop",
+  "insideBottom",
+] as const;
+const LABEL_POSITION_OPTIONS: Array<{ value: LabelPosition; label: string }> = [
+  { value: "auto", label: "自动" },
+  { value: "outside", label: "外侧默认" },
+  { value: "outsideTop", label: "外侧上方" },
+  { value: "outsideRight", label: "外侧右侧" },
+  { value: "outsideBottom", label: "外侧下方" },
+  { value: "outsideLeft", label: "外侧左侧" },
+  { value: "inside", label: "内部默认" },
+  { value: "insideCenter", label: "内部居中" },
+  { value: "insideLeft", label: "内部左侧" },
+  { value: "insideRight", label: "内部右侧" },
+  { value: "insideTop", label: "内部上方" },
+  { value: "insideBottom", label: "内部下方" },
+];
+const TEXT_STYLE_SIZE_OPTIONS = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
+const LEGEND_POSITION_VALUES = ["top", "bottom", "left", "right"] as const;
+const LEGEND_ALIGN_VALUES = ["start", "center", "end"] as const;
+const LEGEND_HORIZONTAL_ALIGN_OPTIONS: Array<{
+  value: LegendAlign;
+  label: string;
+}> = [
+  { value: "start", label: "靠左" },
+  { value: "center", label: "居中" },
+  { value: "end", label: "靠右" },
+];
+const LEGEND_VERTICAL_ALIGN_OPTIONS: Array<{
+  value: LegendAlign;
+  label: string;
+}> = [
+  { value: "start", label: "靠上" },
+  { value: "center", label: "居中" },
+  { value: "end", label: "靠下" },
+];
+const GRID_LINE_VALUES = ["solid", "dashed", "dotted"] as const;
+const TITLE_ALIGN_VALUES = ["left", "center", "right"] as const;
+const SORT_ORDER_VALUES = ["asc", "desc"] as const;
+const PIE_LABEL_VALUES = ["value", "percent", "both"] as const;
+const SERIES_KIND_VALUES = ["bar", "line"] as const;
+
+type ProjectFile = {
+  app: typeof PROJECT_FILE_APP;
+  version: number;
+  savedAt: string;
+  project: ProjectState;
+};
+
+function cloneFieldRoles(roles: FieldRoles): FieldRoles {
+  return Object.fromEntries(
+    Object.entries(roles).map(([role, value]) => [
+      role,
+      Array.isArray(value) ? [...value] : value,
+    ]),
+  ) as FieldRoles;
+}
+
+function cloneProject(project: ProjectState = DEFAULT_PROJECT): ProjectState {
+  return {
+    ...project,
+    tableData: project.tableData.map((row) => [...row]),
+    fieldRoles: cloneFieldRoles(project.fieldRoles),
+    seriesKind: { ...project.seriesKind },
+    margins: { ...project.margins },
+    paletteColors: [...project.paletteColors],
+    titleStyle: { ...project.titleStyle },
+    subtitleStyle: { ...project.subtitleStyle },
+    xAxisTitleStyle: { ...project.xAxisTitleStyle },
+    yAxisTitleStyle: { ...project.yAxisTitleStyle },
+    xAxisLabelStyle: { ...project.xAxisLabelStyle },
+    yAxisLabelStyle: { ...project.yAxisLabelStyle },
+    labelStyle: { ...project.labelStyle },
+    sortCategories: project.sortCategories
+      ? { ...project.sortCategories }
+      : null,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isChartType(value: unknown): value is ChartType {
+  return typeof value === "string" && CHART_TYPE_IDS.has(value as ChartType);
+}
+
+function textValue(value: unknown, fallback: string) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return fallback;
+}
+
+function optionalTextValue(value: unknown, fallback: string | null) {
+  if (value === null || value === "") return null;
+  return typeof value === "string" ? value : fallback;
+}
+
+function booleanValue(value: unknown, fallback: boolean) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function numberCandidate(value: unknown) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim()) return Number(value);
+  return Number.NaN;
+}
+
+function boundedNumber(
+  value: unknown,
+  fallback: number,
+  {
+    min,
+    max,
+    integer,
+  }: { min?: number; max?: number; integer?: boolean } = {},
+) {
+  const candidate = numberCandidate(value);
+  if (!Number.isFinite(candidate)) return fallback;
+  let next = integer ? Math.round(candidate) : candidate;
+  if (typeof min === "number") next = Math.max(min, next);
+  if (typeof max === "number") next = Math.min(max, next);
+  return next;
+}
+
+function canvasDimensionValue(
+  value: unknown,
+  fallback: number,
+  bounds: { min: number; max: number },
+) {
+  return boundedNumber(value, fallback, {
+    ...bounds,
+    integer: true,
+  });
+}
+
+function nullableBoundedNumber(
+  value: unknown,
+  fallback: number | null,
+  bounds: { min?: number; max?: number; integer?: boolean } = {},
+) {
+  if (value === null || value === "") return null;
+  const candidate = numberCandidate(value);
+  if (!Number.isFinite(candidate)) return fallback;
+  return boundedNumber(candidate, fallback ?? 0, bounds);
+}
+
+function oneOf<T extends string>(
+  value: unknown,
+  options: readonly T[],
+  fallback: T,
+) {
+  return typeof value === "string" &&
+    (options as readonly string[]).includes(value)
+    ? (value as T)
+    : fallback;
+}
+
+function nullableOneOf<T extends string>(
+  value: unknown,
+  options: readonly T[],
+  fallback: T | null,
+) {
+  if (value === null || value === "") return null;
+  return typeof value === "string" &&
+    (options as readonly string[]).includes(value)
+    ? (value as T)
+    : fallback;
+}
+
+function colorValue(value: unknown, fallback: string) {
+  return typeof value === "string" && HEX_COLOR_PATTERN.test(value)
+    ? value
+    : fallback;
+}
+
+function normalizeTableData(
+  value: unknown,
+  fallback: ProjectState["tableData"],
+) {
+  if (!Array.isArray(value)) return fallback.map((row) => [...row]);
+  const rows = value
+    .filter(Array.isArray)
+    .map((row) => row.map((cell) => String(cell ?? "")))
+    .filter((row) => row.length > 0);
+  return rows.length ? rows : fallback.map((row) => [...row]);
+}
+
+function normalizeFieldRoles(value: unknown, fallback: FieldRoles) {
+  if (!isRecord(value)) return cloneFieldRoles(fallback);
+  const normalized: FieldRoles = {};
+  for (const [role, bound] of Object.entries(value)) {
+    if (typeof bound === "string") {
+      normalized[role as DataBindingRole] = bound;
+      continue;
+    }
+    if (Array.isArray(bound)) {
+      const columns = bound
+        .filter((column): column is string => typeof column === "string")
+        .filter(Boolean);
+      if (columns.length) normalized[role as DataBindingRole] = columns;
+    }
+  }
+  return Object.keys(normalized).length ? normalized : cloneFieldRoles(fallback);
+}
+
+function normalizeSeriesKind(
+  value: unknown,
+  fallback: ProjectState["seriesKind"],
+) {
+  if (!isRecord(value)) return { ...fallback };
+  const normalized: ProjectState["seriesKind"] = {};
+  for (const [series, kind] of Object.entries(value)) {
+    if (
+      typeof series === "string" &&
+      typeof kind === "string" &&
+      (SERIES_KIND_VALUES as readonly string[]).includes(kind)
+    ) {
+      normalized[series] = kind as "bar" | "line";
+    }
+  }
+  return normalized;
+}
+
+function normalizeMargins(value: unknown, fallback: Margins) {
+  const source = isRecord(value) ? value : {};
+  return {
+    top: boundedNumber(source.top, fallback.top, { min: 0, max: 240 }),
+    right: boundedNumber(source.right, fallback.right, { min: 0, max: 240 }),
+    bottom: boundedNumber(source.bottom, fallback.bottom, {
+      min: 0,
+      max: 240,
+    }),
+    left: boundedNumber(source.left, fallback.left, { min: 0, max: 240 }),
+  };
+}
+
+function textStyleColorValue(value: unknown, fallback: string) {
+  if (value === "" || value === null || value === undefined) return "";
+  return colorValue(value, fallback);
+}
+
+function normalizeTextStyle(
+  value: unknown,
+  fallback: TextStyleState,
+  legacy: {
+    fontSize?: unknown;
+    color?: unknown;
+    bold?: unknown;
+    italic?: unknown;
+  } = {},
+) {
+  const source = isRecord(value) ? value : {};
+  return {
+    fontSize: boundedNumber(source.fontSize ?? legacy.fontSize, fallback.fontSize, {
+      min: 8,
+      max: 56,
+      integer: true,
+    }),
+    color: textStyleColorValue(source.color ?? legacy.color, fallback.color),
+    bold: booleanValue(source.bold ?? legacy.bold, fallback.bold),
+    italic: booleanValue(source.italic ?? legacy.italic, fallback.italic),
+  };
+}
+
+function normalizeSortCategories(value: unknown) {
+  if (!isRecord(value) || typeof value.bySeries !== "string") return null;
+  const order = oneOf(value.order, SORT_ORDER_VALUES, "asc");
+  return { bySeries: value.bySeries, order };
+}
+
+function normalizePaletteColors(value: unknown, fallback: string[]) {
+  if (!Array.isArray(value)) return [...fallback];
+  const colors = value
+    .map((color) => String(color))
+    .filter((color) => HEX_COLOR_PATTERN.test(color));
+  return colors.length ? colors : [...fallback];
+}
+
+function normalizeProject(input: unknown): ProjectState | null {
+  const source =
+    isRecord(input) && isRecord(input.project) ? input.project : input;
+  if (!isRecord(source)) return null;
+
+  const base = cloneProject();
+  const chartType = isChartType(source.chartType)
+    ? source.chartType
+    : base.chartType;
+  const legendPosition = oneOf(
+    source.legendPosition,
+    LEGEND_POSITION_VALUES,
+    base.legendPosition,
+  );
+  const legendAlign = oneOf(
+    source.legendAlign,
+    LEGEND_ALIGN_VALUES,
+    defaultLegendAlignForPosition(legendPosition),
+  );
+
+  return {
+    tableData: normalizeTableData(source.tableData, base.tableData),
+    chartType,
+    fieldRoles: normalizeFieldRoles(source.fieldRoles, base.fieldRoles),
+    seriesKind: normalizeSeriesKind(source.seriesKind, base.seriesKind),
+    title: textValue(source.title, base.title),
+    subtitle: textValue(source.subtitle, base.subtitle),
+    width: canvasDimensionValue(source.width, base.width, CANVAS_WIDTH_BOUNDS),
+    height: canvasDimensionValue(source.height, base.height, CANVAS_HEIGHT_BOUNDS),
+    margins: normalizeMargins(source.margins, base.margins),
+    transparent: booleanValue(source.transparent, base.transparent),
+    backgroundColor: colorValue(source.backgroundColor, base.backgroundColor),
+    themeId: textValue(source.themeId, base.themeId),
+    paletteColors: normalizePaletteColors(
+      source.paletteColors,
+      base.paletteColors,
+    ),
+    colorOverridesText: textValue(
+      source.colorOverridesText,
+      base.colorOverridesText,
+    ),
+    showLabels: booleanValue(source.showLabels, base.showLabels),
+    showLegend: booleanValue(source.showLegend, base.showLegend),
+    showGrid: booleanValue(source.showGrid, base.showGrid),
+    smooth: booleanValue(source.smooth, base.smooth),
+    fontSize: boundedNumber(source.fontSize, base.fontSize, {
+      min: 10,
+      max: 20,
+      integer: true,
+    }),
+    labelColor: colorValue(source.labelColor, base.labelColor),
+    labelPosition: oneOf(
+      source.labelPosition,
+      LABEL_POSITION_VALUES,
+      base.labelPosition,
+    ),
+    legendPosition,
+    legendAlign,
+    showTooltip: booleanValue(source.showTooltip, base.showTooltip),
+    gridLineType: oneOf(
+      source.gridLineType,
+      GRID_LINE_VALUES,
+      base.gridLineType,
+    ),
+    lineWidth: boundedNumber(source.lineWidth, base.lineWidth, {
+      min: 1,
+      max: 12,
+    }),
+    pointSize: boundedNumber(source.pointSize, base.pointSize, {
+      min: 0,
+      max: 24,
+    }),
+    barWidth: boundedNumber(source.barWidth, base.barWidth, {
+      min: 8,
+      max: 96,
+    }),
+    barRadius: boundedNumber(source.barRadius, base.barRadius, {
+      min: 0,
+      max: 24,
+    }),
+    markOpacity: boundedNumber(source.markOpacity, base.markOpacity, {
+      min: 10,
+      max: 100,
+    }),
+    areaOpacity: boundedNumber(source.areaOpacity, base.areaOpacity, {
+      min: 5,
+      max: 100,
+    }),
+    showXAxis: booleanValue(source.showXAxis, base.showXAxis),
+    showYAxis: booleanValue(source.showYAxis, base.showYAxis),
+    xAxisTitle: textValue(source.xAxisTitle, base.xAxisTitle),
+    yAxisTitle: textValue(source.yAxisTitle, base.yAxisTitle),
+    axisLabelRotation: boundedNumber(
+      source.axisLabelRotation,
+      base.axisLabelRotation,
+      { min: -90, max: 90, integer: true },
+    ),
+    yAxisMin: textValue(source.yAxisMin, base.yAxisMin),
+    yAxisMax: textValue(source.yAxisMax, base.yAxisMax),
+    numberDecimals: boundedNumber(
+      source.numberDecimals,
+      base.numberDecimals,
+      { min: 0, max: 4, integer: true },
+    ),
+    numberPrefix: textValue(source.numberPrefix, base.numberPrefix),
+    numberSuffix: textValue(source.numberSuffix, base.numberSuffix),
+    useThousandsSeparator: booleanValue(
+      source.useThousandsSeparator,
+      base.useThousandsSeparator,
+    ),
+    titleAlign: oneOf(source.titleAlign, TITLE_ALIGN_VALUES, base.titleAlign),
+    titleStyle: normalizeTextStyle(source.titleStyle, base.titleStyle),
+    subtitleStyle: normalizeTextStyle(source.subtitleStyle, base.subtitleStyle),
+    xAxisTitleStyle: normalizeTextStyle(
+      source.xAxisTitleStyle,
+      base.xAxisTitleStyle,
+      isRecord(source.axisTitleStyle) ? source.axisTitleStyle : {},
+    ),
+    yAxisTitleStyle: normalizeTextStyle(
+      source.yAxisTitleStyle,
+      base.yAxisTitleStyle,
+      isRecord(source.axisTitleStyle) ? source.axisTitleStyle : {},
+    ),
+    xAxisLabelStyle: normalizeTextStyle(
+      source.xAxisLabelStyle,
+      base.xAxisLabelStyle,
+      isRecord(source.axisLabelStyle) ? source.axisLabelStyle : {},
+    ),
+    yAxisLabelStyle: normalizeTextStyle(
+      source.yAxisLabelStyle,
+      base.yAxisLabelStyle,
+      isRecord(source.axisLabelStyle) ? source.axisLabelStyle : {},
+    ),
+    labelStyle: normalizeTextStyle(source.labelStyle, base.labelStyle, {
+      fontSize: source.fontSize,
+      color: source.labelColor,
+    }),
+    sortCategories: normalizeSortCategories(source.sortCategories),
+    showStackTotals: booleanValue(
+      source.showStackTotals,
+      base.showStackTotals,
+    ),
+    stackOrder: nullableOneOf(
+      source.stackOrder,
+      SORT_ORDER_VALUES,
+      base.stackOrder,
+    ),
+    barGap: nullableBoundedNumber(source.barGap, base.barGap, {
+      min: 0,
+      max: 100,
+    }),
+    barCategoryGap: nullableBoundedNumber(
+      source.barCategoryGap,
+      base.barCategoryGap,
+      { min: 0, max: 80 },
+    ),
+    connectNulls: booleanValue(source.connectNulls, base.connectNulls),
+    endLabel: booleanValue(source.endLabel, base.endLabel),
+    referenceBandsText: textValue(
+      source.referenceBandsText,
+      base.referenceBandsText,
+    ),
+    referenceLinesText: textValue(
+      source.referenceLinesText,
+      base.referenceLinesText,
+    ),
+    pieLabelContent: nullableOneOf(
+      source.pieLabelContent,
+      PIE_LABEL_VALUES,
+      base.pieLabelContent,
+    ),
+    donutInnerRadius: nullableBoundedNumber(
+      source.donutInnerRadius,
+      base.donutInnerRadius,
+      { min: 0, max: 0.9 },
+    ),
+    pieSort: nullableOneOf(source.pieSort, SORT_ORDER_VALUES, base.pieSort),
+    startAngle: nullableBoundedNumber(source.startAngle, base.startAngle, {
+      min: 0,
+      max: 360,
+    }),
+    pieOtherThreshold: nullableBoundedNumber(
+      source.pieOtherThreshold,
+      base.pieOtherThreshold,
+      { min: 0, max: 20 },
+    ),
+    sizeColumn: optionalTextValue(source.sizeColumn, base.sizeColumn),
+    colorColumn: optionalTextValue(source.colorColumn, base.colorColumn),
+    shapeColumn: optionalTextValue(source.shapeColumn, base.shapeColumn),
+    scatterTrendLine: booleanValue(
+      source.scatterTrendLine,
+      base.scatterTrendLine,
+    ),
+    comboDualAxis: booleanValue(source.comboDualAxis, base.comboDualAxis),
+    y2AxisTitle: textValue(source.y2AxisTitle, base.y2AxisTitle),
+    comboAxisSync: booleanValue(source.comboAxisSync, base.comboAxisSync),
+    streamTimeAxis: booleanValue(source.streamTimeAxis, base.streamTimeAxis),
+  };
+}
 
 function downloadDataUrl(dataUrl: string, filename: string) {
   const link = document.createElement("a");
@@ -140,7 +817,7 @@ function safeFilename(value: string) {
   );
 }
 
-function renderPngDataUrl({
+async function renderPngDataUrl({
   option,
   width,
   height,
@@ -165,7 +842,8 @@ function renderPngDataUrl({
   exportHost.setAttribute("aria-hidden", "true");
   document.body.appendChild(exportHost);
 
-  const exportChart = initECharts(exportHost, undefined, {
+  const { init } = await import("echarts");
+  const exportChart = init(exportHost, undefined, {
     renderer: "canvas",
     width,
     height,
@@ -266,6 +944,82 @@ function Toggle({
         <span className="toggle-thumb" />
       </span>
     </label>
+  );
+}
+
+function TextStyleControls({
+  label,
+  style,
+  fallbackColor,
+  onChange,
+}: {
+  label: string;
+  style: TextStyleState;
+  fallbackColor: string;
+  onChange: (next: TextStyleState) => void;
+}) {
+  const resolvedColor = style.color || fallbackColor;
+  const updateStyle = (patch: Partial<TextStyleState>) =>
+    onChange({ ...style, ...patch });
+
+  return (
+    <div className="text-style-control">
+      <span className="settings-caption">{label}</span>
+      <div className="text-style-row">
+        <label className="text-size-select">
+          <span className="sr-only">{label}字号</span>
+          <select
+            value={style.fontSize}
+            onChange={(event) =>
+              updateStyle({ fontSize: Number(event.target.value) })
+            }
+            aria-label={`${label}字号`}
+          >
+            {TEXT_STYLE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}px
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className={style.bold ? "style-toggle active" : "style-toggle"}
+          onClick={() => updateStyle({ bold: !style.bold })}
+          aria-pressed={style.bold}
+          aria-label={`${label}粗体`}
+          title="粗体"
+        >
+          <Bold size={14} />
+        </button>
+        <button
+          type="button"
+          className={style.italic ? "style-toggle active" : "style-toggle"}
+          onClick={() => updateStyle({ italic: !style.italic })}
+          aria-pressed={style.italic}
+          aria-label={`${label}斜体`}
+          title="斜体"
+        >
+          <Italic size={14} />
+        </button>
+        <button
+          type="button"
+          className="text-style-reset"
+          onClick={() => updateStyle({ color: "" })}
+        >
+          跟随
+        </button>
+        <span className="color-input-wrap text-color-input">
+          <input
+            type="color"
+            value={resolvedColor}
+            onChange={(event) => updateStyle({ color: event.target.value })}
+            aria-label={`${label}颜色`}
+          />
+          <span>{resolvedColor.toUpperCase()}</span>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -392,109 +1146,195 @@ function TemplateGallery({
 
 export default function Home() {
   const [tableData, setTableData] = useState<string[][]>(() =>
-    INITIAL_TABLE.map((row) => [...row]),
+    DEFAULT_PROJECT.tableData.map((row) => [...row]),
   );
-  const [chartType, setChartType] = useState<ChartType>("groupedColumn");
+  const [chartType, setChartType] = useState<ChartType>(
+    DEFAULT_PROJECT.chartType,
+  );
   const [workspaceMode, setWorkspaceMode] = useState<"preview" | "data">(
     "preview",
   );
   const [templateOpen, setTemplateOpen] = useState(false);
-  const [title, setTitle] = useState("上半年收入趋势");
-  const [subtitle, setSubtitle] = useState("单位：万元");
-  const [width, setWidth] = useState(960);
-  const [height, setHeight] = useState(540);
-  const [fieldRoles, setFieldRoles] = useState<FieldRoles>({
-    category: "月份",
-    value: ["实际收入", "目标"],
-  });
+  const [title, setTitle] = useState(DEFAULT_PROJECT.title);
+  const [subtitle, setSubtitle] = useState(DEFAULT_PROJECT.subtitle);
+  const [width, setWidth] = useState(DEFAULT_PROJECT.width);
+  const [height, setHeight] = useState(DEFAULT_PROJECT.height);
+  const [widthInput, setWidthInput] = useState(String(DEFAULT_PROJECT.width));
+  const [heightInput, setHeightInput] = useState(String(DEFAULT_PROJECT.height));
+  const [fieldRoles, setFieldRoles] = useState<FieldRoles>(() =>
+    cloneFieldRoles(DEFAULT_PROJECT.fieldRoles),
+  );
   // Combo chart only: per-series bar/line role. Empty = renderer falls back to
   // the legacy rule (first series bar, rest line), so default output is stable.
   const [seriesKind, setSeriesKind] = useState<
     Record<string, "bar" | "line">
-  >({});
-  const [themeId, setThemeId] = useState("editorial");
+  >(() => ({ ...DEFAULT_PROJECT.seriesKind }));
+  const [themeId, setThemeId] = useState(DEFAULT_PROJECT.themeId);
   const [paletteColors, setPaletteColors] = useState<string[]>([
-    ...THEMES[0].colors,
+    ...DEFAULT_PROJECT.paletteColors,
   ]);
   const [customPalettes, setCustomPalettes] = useState<SavedPalette[]>([]);
+  const [editingPaletteId, setEditingPaletteId] = useState<string | null>(null);
   const [palettesLoaded, setPalettesLoaded] = useState(false);
+  // Guards the auto-save/restore effect so the initial render's defaults
+  // aren't written to localStorage before the saved project is restored.
+  const [projectLoaded, setProjectLoaded] = useState(false);
+  const projectStorageWarningRef = useRef(false);
+  const paletteStorageWarningRef = useRef(false);
   const [paletteName, setPaletteName] = useState("我的配色");
-  const [colorOverridesText, setColorOverridesText] = useState("");
-  const [transparent, setTransparent] = useState(true);
-  const [backgroundColor, setBackgroundColor] = useState("#ffffff");
-  const [margins, setMargins] = useState<Margins>(DEFAULT_MARGINS);
+  const [colorOverridesText, setColorOverridesText] = useState(
+    DEFAULT_PROJECT.colorOverridesText,
+  );
+  const [transparent, setTransparent] = useState(DEFAULT_PROJECT.transparent);
+  const [backgroundColor, setBackgroundColor] = useState(
+    DEFAULT_PROJECT.backgroundColor,
+  );
+  const [margins, setMargins] = useState<Margins>({
+    ...DEFAULT_PROJECT.margins,
+  });
   const [marginsLinked, setMarginsLinked] = useState(false);
-  const [showLabels, setShowLabels] = useState(true);
-  const [showLegend, setShowLegend] = useState(true);
-  const [showGrid, setShowGrid] = useState(true);
-  const [smooth, setSmooth] = useState(true);
-  const [fontSize, setFontSize] = useState(14);
-  const [lineWidth, setLineWidth] = useState(3);
-  const [pointSize, setPointSize] = useState(7);
-  const [barWidth, setBarWidth] = useState(48);
-  const [barRadius, setBarRadius] = useState(3);
+  const [showLabels, setShowLabels] = useState(DEFAULT_PROJECT.showLabels);
+  const [showLegend, setShowLegend] = useState(DEFAULT_PROJECT.showLegend);
+  const [showGrid, setShowGrid] = useState(DEFAULT_PROJECT.showGrid);
+  const [smooth, setSmooth] = useState(DEFAULT_PROJECT.smooth);
+  const [titleStyle, setTitleStyle] = useState<TextStyleState>({
+    ...DEFAULT_PROJECT.titleStyle,
+  });
+  const [subtitleStyle, setSubtitleStyle] = useState<TextStyleState>({
+    ...DEFAULT_PROJECT.subtitleStyle,
+  });
+  const [xAxisTitleStyle, setXAxisTitleStyle] = useState<TextStyleState>({
+    ...DEFAULT_PROJECT.xAxisTitleStyle,
+  });
+  const [yAxisTitleStyle, setYAxisTitleStyle] = useState<TextStyleState>({
+    ...DEFAULT_PROJECT.yAxisTitleStyle,
+  });
+  const [xAxisLabelStyle, setXAxisLabelStyle] = useState<TextStyleState>({
+    ...DEFAULT_PROJECT.xAxisLabelStyle,
+  });
+  const [yAxisLabelStyle, setYAxisLabelStyle] = useState<TextStyleState>({
+    ...DEFAULT_PROJECT.yAxisLabelStyle,
+  });
+  const [lineWidth, setLineWidth] = useState(DEFAULT_PROJECT.lineWidth);
+  const [pointSize, setPointSize] = useState(DEFAULT_PROJECT.pointSize);
+  const [barWidth, setBarWidth] = useState(DEFAULT_PROJECT.barWidth);
+  const [barRadius, setBarRadius] = useState(DEFAULT_PROJECT.barRadius);
   // P1-1 bar deepening: category sort, stack totals, stack order, group gaps.
   // Empty = renderer default (no sort / no totals / ECharts default spacing).
   const [sortCategories, setSortCategories] = useState<
     { bySeries: string; order: "asc" | "desc" } | null
-  >(null);
-  const [showStackTotals, setShowStackTotals] = useState(false);
-  const [stackOrder, setStackOrder] = useState<"asc" | "desc" | null>(null);
-  const [barGap, setBarGap] = useState<number | null>(null);
-  const [barCategoryGap, setBarCategoryGap] = useState<number | null>(null);
-  const [markOpacity, setMarkOpacity] = useState(100);
-  const [areaOpacity, setAreaOpacity] = useState(22);
+  >(DEFAULT_PROJECT.sortCategories);
+  const [showStackTotals, setShowStackTotals] = useState(
+    DEFAULT_PROJECT.showStackTotals,
+  );
+  const [stackOrder, setStackOrder] = useState<"asc" | "desc" | null>(
+    DEFAULT_PROJECT.stackOrder,
+  );
+  const [barGap, setBarGap] = useState<number | null>(DEFAULT_PROJECT.barGap);
+  const [barCategoryGap, setBarCategoryGap] = useState<number | null>(
+    DEFAULT_PROJECT.barCategoryGap,
+  );
+  const [markOpacity, setMarkOpacity] = useState(DEFAULT_PROJECT.markOpacity);
+  const [areaOpacity, setAreaOpacity] = useState(DEFAULT_PROJECT.areaOpacity);
   // P1-2 line/area deepening. All default to off/empty = renderer unchanged.
-  const [connectNulls, setConnectNulls] = useState(false);
-  const [endLabel, setEndLabel] = useState(false);
-  const [referenceBandsText, setReferenceBandsText] = useState("");
-  const [referenceLinesText, setReferenceLinesText] = useState("");
+  const [connectNulls, setConnectNulls] = useState(
+    DEFAULT_PROJECT.connectNulls,
+  );
+  const [endLabel, setEndLabel] = useState(DEFAULT_PROJECT.endLabel);
+  const [referenceBandsText, setReferenceBandsText] = useState(
+    DEFAULT_PROJECT.referenceBandsText,
+  );
+  const [referenceLinesText, setReferenceLinesText] = useState(
+    DEFAULT_PROJECT.referenceLinesText,
+  );
   // P1-3 pie/donut deepening. All default to off/undefined = renderer unchanged.
   const [pieLabelContent, setPieLabelContent] = useState<
     "value" | "percent" | "both" | null
-  >(null);
-  const [donutInnerRadius, setDonutInnerRadius] = useState<number | null>(null);
-  const [pieSort, setPieSort] = useState<"asc" | "desc" | null>(null);
-  const [startAngle, setStartAngle] = useState<number | null>(null);
-  const [pieOtherThreshold, setPieOtherThreshold] = useState<number | null>(null);
+  >(DEFAULT_PROJECT.pieLabelContent);
+  const [donutInnerRadius, setDonutInnerRadius] = useState<number | null>(
+    DEFAULT_PROJECT.donutInnerRadius,
+  );
+  const [pieSort, setPieSort] = useState<"asc" | "desc" | null>(
+    DEFAULT_PROJECT.pieSort,
+  );
+  const [startAngle, setStartAngle] = useState<number | null>(
+    DEFAULT_PROJECT.startAngle,
+  );
+  const [pieOtherThreshold, setPieOtherThreshold] = useState<number | null>(
+    DEFAULT_PROJECT.pieOtherThreshold,
+  );
   // P1-4 scatter deepening. All default to unset = single global style.
-  const [sizeColumn, setSizeColumn] = useState<string | null>(null);
-  const [colorColumn, setColorColumn] = useState<string | null>(null);
-  const [shapeColumn, setShapeColumn] = useState<string | null>(null);
-  const [scatterTrendLine, setScatterTrendLine] = useState(false);
+  const [sizeColumn, setSizeColumn] = useState<string | null>(
+    DEFAULT_PROJECT.sizeColumn,
+  );
+  const [colorColumn, setColorColumn] = useState<string | null>(
+    DEFAULT_PROJECT.colorColumn,
+  );
+  const [shapeColumn, setShapeColumn] = useState<string | null>(
+    DEFAULT_PROJECT.shapeColumn,
+  );
+  const [scatterTrendLine, setScatterTrendLine] = useState(
+    DEFAULT_PROJECT.scatterTrendLine,
+  );
   // P1-5 combo dual Y axis. All default to off/empty = renderer unchanged.
-  const [comboDualAxis, setComboDualAxis] = useState(false);
-  const [y2AxisTitle, setY2AxisTitle] = useState("");
-  const [comboAxisSync, setComboAxisSync] = useState(false);
+  const [comboDualAxis, setComboDualAxis] = useState(
+    DEFAULT_PROJECT.comboDualAxis,
+  );
+  const [y2AxisTitle, setY2AxisTitle] = useState(
+    DEFAULT_PROJECT.y2AxisTitle,
+  );
+  const [comboAxisSync, setComboAxisSync] = useState(
+    DEFAULT_PROJECT.comboAxisSync,
+  );
   // P1-6 streamgraph time axis. Default off = row-index axis (unchanged).
-  const [streamTimeAxis, setStreamTimeAxis] = useState(false);
-  const [labelPosition, setLabelPosition] = useState<
-    "auto" | "inside" | "outside"
-  >("auto");
-  const [showXAxis, setShowXAxis] = useState(true);
-  const [showYAxis, setShowYAxis] = useState(true);
-  const [xAxisTitle, setXAxisTitle] = useState("");
-  const [yAxisTitle, setYAxisTitle] = useState("");
-  const [axisLabelRotation, setAxisLabelRotation] = useState(0);
-  const [yAxisMin, setYAxisMin] = useState("");
-  const [yAxisMax, setYAxisMax] = useState("");
-  const [legendPosition, setLegendPosition] = useState<
-    "top" | "bottom" | "left" | "right"
-  >("top");
-  const [showTooltip, setShowTooltip] = useState(true);
+  const [streamTimeAxis, setStreamTimeAxis] = useState(
+    DEFAULT_PROJECT.streamTimeAxis,
+  );
+  const [labelStyle, setLabelStyle] = useState<TextStyleState>({
+    ...DEFAULT_PROJECT.labelStyle,
+  });
+  const [labelPosition, setLabelPosition] = useState<LabelPosition>(
+    DEFAULT_PROJECT.labelPosition,
+  );
+  const [showXAxis, setShowXAxis] = useState(DEFAULT_PROJECT.showXAxis);
+  const [showYAxis, setShowYAxis] = useState(DEFAULT_PROJECT.showYAxis);
+  const [xAxisTitle, setXAxisTitle] = useState(DEFAULT_PROJECT.xAxisTitle);
+  const [yAxisTitle, setYAxisTitle] = useState(DEFAULT_PROJECT.yAxisTitle);
+  const [axisLabelRotation, setAxisLabelRotation] = useState(
+    DEFAULT_PROJECT.axisLabelRotation,
+  );
+  const [yAxisMin, setYAxisMin] = useState(DEFAULT_PROJECT.yAxisMin);
+  const [yAxisMax, setYAxisMax] = useState(DEFAULT_PROJECT.yAxisMax);
+  const [legendPosition, setLegendPosition] = useState<LegendPosition>(
+    DEFAULT_PROJECT.legendPosition,
+  );
+  const [legendAlign, setLegendAlign] = useState<LegendAlign>(
+    DEFAULT_PROJECT.legendAlign,
+  );
+  const [showTooltip, setShowTooltip] = useState(DEFAULT_PROJECT.showTooltip);
   const [gridLineType, setGridLineType] = useState<
     "solid" | "dashed" | "dotted"
-  >("dashed");
-  const [numberDecimals, setNumberDecimals] = useState(0);
-  const [numberPrefix, setNumberPrefix] = useState("");
-  const [numberSuffix, setNumberSuffix] = useState("");
-  const [useThousandsSeparator, setUseThousandsSeparator] = useState(true);
+  >(DEFAULT_PROJECT.gridLineType);
+  const [numberDecimals, setNumberDecimals] = useState(
+    DEFAULT_PROJECT.numberDecimals,
+  );
+  const [numberPrefix, setNumberPrefix] = useState(
+    DEFAULT_PROJECT.numberPrefix,
+  );
+  const [numberSuffix, setNumberSuffix] = useState(
+    DEFAULT_PROJECT.numberSuffix,
+  );
+  const [useThousandsSeparator, setUseThousandsSeparator] = useState(
+    DEFAULT_PROJECT.useThousandsSeparator,
+  );
   const [titleAlign, setTitleAlign] = useState<"left" | "center" | "right">(
-    "left",
+    DEFAULT_PROJECT.titleAlign,
   );
   const [settingsQuery, setSettingsQuery] = useState("");
   const [settingsOpen, setSettingsOpen] =
     useState<Record<SettingsSectionId, boolean>>(DEFAULT_SETTINGS_OPEN);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [pixelRatio, setPixelRatio] = useState(2);
   const [previewScale, setPreviewScale] = useState(1);
   const [status, setStatus] = useState("");
@@ -504,6 +1344,7 @@ export default function Home() {
   const previewHostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ECharts | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const projectInputRef = useRef<HTMLInputElement | null>(null);
 
   const parsed = useMemo(() => tableToParsed(tableData), [tableData]);
   const colorOverrides = useMemo(
@@ -653,7 +1494,7 @@ export default function Home() {
         showLegend,
         showGrid,
         smooth,
-        fontSize,
+        fontSize: labelStyle.fontSize,
         lineWidth,
         pointSize,
         barWidth,
@@ -682,6 +1523,8 @@ export default function Home() {
         streamTimeAxis: streamTimeAxis || undefined,
         markOpacity,
         areaOpacity,
+        labelColor: labelStyle.color,
+        labelStyle,
         labelPosition,
         showXAxis,
         showYAxis,
@@ -691,6 +1534,7 @@ export default function Home() {
         yAxisMin,
         yAxisMax,
         legendPosition,
+        legendAlign,
         showTooltip,
         gridLineType,
         numberDecimals,
@@ -698,6 +1542,12 @@ export default function Home() {
         numberSuffix,
         useThousandsSeparator,
         titleAlign,
+        titleStyle,
+        subtitleStyle,
+        xAxisTitleStyle,
+        yAxisTitleStyle,
+        xAxisLabelStyle,
+        yAxisLabelStyle,
         seriesKind,
       }),
     [
@@ -716,10 +1566,15 @@ export default function Home() {
       connectNulls,
       donutInnerRadius,
       endLabel,
-      fontSize,
       gridLineType,
       height,
+      xAxisLabelStyle,
+      xAxisTitleStyle,
+      yAxisLabelStyle,
+      yAxisTitleStyle,
+      labelStyle,
       labelPosition,
+      legendAlign,
       legendPosition,
       lineWidth,
       margins,
@@ -756,9 +1611,11 @@ export default function Home() {
       sortCategories,
       stackOrder,
       subtitle,
+      subtitleStyle,
       theme,
       title,
       titleAlign,
+      titleStyle,
       transparent,
       useThousandsSeparator,
       width,
@@ -802,7 +1659,9 @@ export default function Home() {
       if (!chartElementRef.current || chartRef.current) return;
       if (cancelled || !chartElementRef.current) return;
       const initial = initialChartStateRef.current;
-      chartRef.current = initECharts(chartElementRef.current, undefined, {
+      const { init } = await import("echarts");
+      if (cancelled || !chartElementRef.current || chartRef.current) return;
+      chartRef.current = init(chartElementRef.current, undefined, {
         renderer: "svg",
         width: initial.width,
         height: initial.height,
@@ -842,7 +1701,7 @@ export default function Home() {
     let cancelled = false;
     const timeout = window.setTimeout(async () => {
       try {
-        const dataUrl = renderPngDataUrl({
+        const dataUrl = await renderPngDataUrl({
           option,
           width,
           height,
@@ -906,6 +1765,43 @@ export default function Home() {
   }, [status]);
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const saved = window.localStorage.getItem(PROJECT_STORAGE_KEY);
+        const restored = saved ? normalizeProject(JSON.parse(saved)) : null;
+        if (restored) applyProject(restored, "已恢复上次编辑");
+      } catch {
+        window.localStorage.removeItem(PROJECT_STORAGE_KEY);
+      } finally {
+        setProjectLoaded(true);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!projectLoaded) return;
+    const timeout = window.setTimeout(() => {
+      const payload: ProjectFile = {
+        app: PROJECT_FILE_APP,
+        version: PROJECT_FILE_VERSION,
+        savedAt: new Date().toISOString(),
+        project: collectProject(),
+      };
+      try {
+        window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(payload));
+        projectStorageWarningRef.current = false;
+      } catch {
+        if (!projectStorageWarningRef.current) {
+          projectStorageWarningRef.current = true;
+          setStatus("自动保存失败，请手动保存项目文件");
+        }
+      }
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  });
+
+  useEffect(() => {
     let nextPalettes: SavedPalette[] = [];
     try {
       const saved = window.localStorage.getItem("tuzuo-custom-palettes");
@@ -922,21 +1818,39 @@ export default function Home() {
 
   useEffect(() => {
     if (!palettesLoaded) return;
-    window.localStorage.setItem(
-      "tuzuo-custom-palettes",
-      JSON.stringify(customPalettes),
-    );
+    try {
+      window.localStorage.setItem(
+        "tuzuo-custom-palettes",
+        JSON.stringify(customPalettes),
+      );
+      paletteStorageWarningRef.current = false;
+    } catch {
+      if (!paletteStorageWarningRef.current) {
+        paletteStorageWarningRef.current = true;
+        setStatus("配色保存失败，请导出项目文件备份");
+      }
+    }
   }, [customPalettes, palettesLoaded]);
 
   function selectTheme(nextTheme: (typeof THEMES)[number]) {
     setThemeId(nextTheme.id);
     setPaletteColors([...nextTheme.colors]);
+    setEditingPaletteId(null);
   }
 
   function selectSavedPalette(palette: SavedPalette) {
     setThemeId(palette.id);
     setPaletteColors([...palette.colors]);
     setPaletteName(palette.name);
+    setEditingPaletteId(null);
+  }
+
+  function editSavedPalette(palette: SavedPalette) {
+    setThemeId(palette.id);
+    setPaletteColors([...palette.colors]);
+    setPaletteName(palette.name);
+    setEditingPaletteId(palette.id);
+    setStatus(`正在编辑「${palette.name}」`);
   }
 
   function updatePaletteColor(index: number, color: string) {
@@ -978,9 +1892,13 @@ export default function Home() {
 
   function saveCurrentPalette() {
     const name = paletteName.trim() || `自定义配色 ${customPalettes.length + 1}`;
-    const existing = customPalettes.find(
+    const existingById = editingPaletteId
+      ? customPalettes.find((palette) => palette.id === editingPaletteId)
+      : undefined;
+    const existingByName = customPalettes.find(
       (palette) => palette.name.toLowerCase() === name.toLowerCase(),
     );
+    const existing = existingById ?? existingByName;
     const saved: SavedPalette = {
       id: existing?.id ?? `custom-${Date.now()}`,
       name,
@@ -993,6 +1911,7 @@ export default function Home() {
     );
     setThemeId(saved.id);
     setPaletteName(name);
+    setEditingPaletteId(saved.id);
     setStatus(existing ? "自定义配色已更新" : "自定义配色已保存");
   }
 
@@ -1000,7 +1919,202 @@ export default function Home() {
     setCustomPalettes((current) =>
       current.filter((palette) => palette.id !== id),
     );
+    if (editingPaletteId === id) setEditingPaletteId(null);
     if (themeId === id) setThemeId("custom");
+  }
+
+  function collectProject(): ProjectState {
+    return {
+      tableData: tableData.map((row) => [...row]),
+      chartType,
+      fieldRoles: cloneFieldRoles(fieldRoles),
+      seriesKind: { ...seriesKind },
+      title,
+      subtitle,
+      width,
+      height,
+      margins: { ...margins },
+      transparent,
+      backgroundColor,
+      themeId,
+      paletteColors: [...paletteColors],
+      colorOverridesText,
+      showLabels,
+      showLegend,
+      showGrid,
+      smooth,
+      fontSize: labelStyle.fontSize,
+      labelColor: labelStyle.color,
+      labelPosition,
+      legendPosition,
+      legendAlign,
+      showTooltip,
+      gridLineType,
+      lineWidth,
+      pointSize,
+      barWidth,
+      barRadius,
+      markOpacity,
+      areaOpacity,
+      showXAxis,
+      showYAxis,
+      xAxisTitle,
+      yAxisTitle,
+      axisLabelRotation,
+      yAxisMin,
+      yAxisMax,
+      numberDecimals,
+      numberPrefix,
+      numberSuffix,
+      useThousandsSeparator,
+      titleAlign,
+      titleStyle: { ...titleStyle },
+      subtitleStyle: { ...subtitleStyle },
+      xAxisTitleStyle: { ...xAxisTitleStyle },
+      yAxisTitleStyle: { ...yAxisTitleStyle },
+      xAxisLabelStyle: { ...xAxisLabelStyle },
+      yAxisLabelStyle: { ...yAxisLabelStyle },
+      labelStyle: { ...labelStyle },
+      sortCategories: sortCategories ? { ...sortCategories } : null,
+      showStackTotals,
+      stackOrder,
+      barGap,
+      barCategoryGap,
+      connectNulls,
+      endLabel,
+      referenceBandsText,
+      referenceLinesText,
+      pieLabelContent,
+      donutInnerRadius,
+      pieSort,
+      startAngle,
+      pieOtherThreshold,
+      sizeColumn,
+      colorColumn,
+      shapeColumn,
+      scatterTrendLine,
+      comboDualAxis,
+      y2AxisTitle,
+      comboAxisSync,
+      streamTimeAxis,
+    };
+  }
+
+  function applyProject(project: ProjectState, message?: string) {
+    setTableData(project.tableData.map((row) => [...row]));
+    setChartType(project.chartType);
+    setWorkspaceMode("preview");
+    setTemplateOpen(false);
+    setFieldRoles(cloneFieldRoles(project.fieldRoles));
+    setSeriesKind({ ...project.seriesKind });
+    setTitle(project.title);
+    setSubtitle(project.subtitle);
+    setWidth(project.width);
+    setHeight(project.height);
+    setWidthInput(String(project.width));
+    setHeightInput(String(project.height));
+    setThemeId(project.themeId);
+    setPaletteColors([...project.paletteColors]);
+    setPaletteName("我的配色");
+    setEditingPaletteId(null);
+    setColorOverridesText(project.colorOverridesText);
+    setTransparent(project.transparent);
+    setBackgroundColor(project.backgroundColor);
+    setMargins({ ...project.margins });
+    setMarginsLinked(false);
+    setShowLabels(project.showLabels);
+    setShowLegend(project.showLegend);
+    setShowGrid(project.showGrid);
+    setSmooth(project.smooth);
+    setLineWidth(project.lineWidth);
+    setPointSize(project.pointSize);
+    setBarWidth(project.barWidth);
+    setBarRadius(project.barRadius);
+    setSortCategories(
+      project.sortCategories ? { ...project.sortCategories } : null,
+    );
+    setShowStackTotals(project.showStackTotals);
+    setStackOrder(project.stackOrder);
+    setBarGap(project.barGap);
+    setBarCategoryGap(project.barCategoryGap);
+    setConnectNulls(project.connectNulls);
+    setEndLabel(project.endLabel);
+    setReferenceBandsText(project.referenceBandsText);
+    setReferenceLinesText(project.referenceLinesText);
+    setPieLabelContent(project.pieLabelContent);
+    setDonutInnerRadius(project.donutInnerRadius);
+    setPieSort(project.pieSort);
+    setStartAngle(project.startAngle);
+    setPieOtherThreshold(project.pieOtherThreshold);
+    setSizeColumn(project.sizeColumn);
+    setColorColumn(project.colorColumn);
+    setShapeColumn(project.shapeColumn);
+    setScatterTrendLine(project.scatterTrendLine);
+    setComboDualAxis(project.comboDualAxis);
+    setY2AxisTitle(project.y2AxisTitle);
+    setComboAxisSync(project.comboAxisSync);
+    setStreamTimeAxis(project.streamTimeAxis);
+    setMarkOpacity(project.markOpacity);
+    setAreaOpacity(project.areaOpacity);
+    setLabelPosition(project.labelPosition);
+    setShowXAxis(project.showXAxis);
+    setShowYAxis(project.showYAxis);
+    setXAxisTitle(project.xAxisTitle);
+    setYAxisTitle(project.yAxisTitle);
+    setAxisLabelRotation(project.axisLabelRotation);
+    setYAxisMin(project.yAxisMin);
+    setYAxisMax(project.yAxisMax);
+    setLegendPosition(project.legendPosition);
+    setLegendAlign(project.legendAlign);
+    setShowTooltip(project.showTooltip);
+    setGridLineType(project.gridLineType);
+    setNumberDecimals(project.numberDecimals);
+    setNumberPrefix(project.numberPrefix);
+    setNumberSuffix(project.numberSuffix);
+    setUseThousandsSeparator(project.useThousandsSeparator);
+    setTitleAlign(project.titleAlign);
+    setTitleStyle({ ...project.titleStyle });
+    setSubtitleStyle({ ...project.subtitleStyle });
+    setXAxisTitleStyle({ ...project.xAxisTitleStyle });
+    setYAxisTitleStyle({ ...project.yAxisTitleStyle });
+    setXAxisLabelStyle({ ...project.xAxisLabelStyle });
+    setYAxisLabelStyle({ ...project.yAxisLabelStyle });
+    setLabelStyle({ ...project.labelStyle });
+    setSettingsQuery("");
+    setSettingsOpen(DEFAULT_SETTINGS_OPEN);
+    if (message) setStatus(message);
+  }
+
+  function saveProjectFile() {
+    const payload: ProjectFile = {
+      app: PROJECT_FILE_APP,
+      version: PROJECT_FILE_VERSION,
+      savedAt: new Date().toISOString(),
+      project: collectProject(),
+    };
+    downloadBlob(
+      new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json;charset=utf-8",
+      }),
+      `${safeFilename(title || "图作项目")}.tuzuo.json`,
+    );
+    setStatus("项目文件已保存");
+  }
+
+  async function handleProjectFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const project = normalizeProject(JSON.parse(await file.text()));
+      if (!project) throw new Error("Invalid project file");
+      applyProject(project, `已打开 ${file.name}`);
+      setProjectLoaded(true);
+    } catch {
+      setStatus("项目文件读取失败");
+    } finally {
+      event.target.value = "";
+    }
   }
 
   function toggleSettingsSection(id: SettingsSectionId) {
@@ -1016,6 +2130,7 @@ export default function Home() {
   // the registry's settingsGroups so the panel only shows sections that mean
   // something for the current chart (e.g. pie/donut hide X/Y axis sections).
   function sectionInTemplate(id: SettingsSectionId) {
+    if (id === "data") return true;
     return templateDefinition.settingsGroups.some((group) => group.id === id);
   }
 
@@ -1214,7 +2329,7 @@ export default function Home() {
         pngDownloadReady && pngDownload
           ? pngDownload.blob
           : await fetch(
-              renderPngDataUrl({
+              await renderPngDataUrl({
                 option,
                 width,
                 height,
@@ -1234,77 +2349,193 @@ export default function Home() {
   }
 
   function resetAll() {
-    setTableData(INITIAL_TABLE.map((row) => [...row]));
-    setChartType("groupedColumn");
-    setWorkspaceMode("preview");
-    setTitle("上半年收入趋势");
-    setSubtitle("单位：万元");
-    setWidth(960);
-    setHeight(540);
-    setFieldRoles({ category: "月份", value: ["实际收入", "目标"] });
-    setSeriesKind({});
-    setThemeId("editorial");
-    setPaletteColors([...THEMES[0].colors]);
-    setPaletteName("我的配色");
-    setColorOverridesText("");
-    setTransparent(true);
-    setBackgroundColor("#ffffff");
-    setMargins(DEFAULT_MARGINS);
-    setMarginsLinked(false);
-    setShowLabels(true);
-    setShowLegend(true);
-    setShowGrid(true);
-    setSmooth(true);
-    setFontSize(14);
-    setLineWidth(3);
-    setPointSize(7);
-    setBarWidth(48);
-    setBarRadius(3);
-    setSortCategories(null);
-    setShowStackTotals(false);
-    setStackOrder(null);
-    setBarGap(null);
-    setBarCategoryGap(null);
-    setConnectNulls(false);
-    setEndLabel(false);
-    setReferenceBandsText("");
-    setReferenceLinesText("");
-    setPieLabelContent(null);
-    setDonutInnerRadius(null);
-    setPieSort(null);
-    setStartAngle(null);
-    setPieOtherThreshold(null);
-    setSizeColumn(null);
-    setColorColumn(null);
-    setShapeColumn(null);
-    setScatterTrendLine(false);
-    setComboDualAxis(false);
-    setY2AxisTitle("");
-    setComboAxisSync(false);
-    setStreamTimeAxis(false);
-    setMarkOpacity(100);
-    setAreaOpacity(22);
-    setLabelPosition("auto");
-    setShowXAxis(true);
-    setShowYAxis(true);
-    setXAxisTitle("");
-    setYAxisTitle("");
-    setAxisLabelRotation(0);
-    setYAxisMin("");
-    setYAxisMax("");
-    setLegendPosition("top");
-    setShowTooltip(true);
-    setGridLineType("dashed");
-    setNumberDecimals(0);
-    setNumberPrefix("");
-    setNumberSuffix("");
-    setUseThousandsSeparator(true);
-    setTitleAlign("left");
-    setSettingsQuery("");
-    setSettingsOpen(DEFAULT_SETTINGS_OPEN);
+    applyProject(cloneProject(DEFAULT_PROJECT));
     setPixelRatio(2);
     setStatus("已恢复示例");
   }
+
+  const dataFieldControls = (
+    <>
+      {!dataMatchesSample && (
+        <div className="sample-hint" role="note">
+          <span>
+            当前数据可能不适合「{selectedTemplate.name}」，可加载专属示例数据。
+          </span>
+          <button
+            type="button"
+            className="sample-hint-button"
+            onClick={loadSample}
+          >
+            加载示例
+          </button>
+        </div>
+      )}
+      {templateDefinition.dataBindings.map((binding) => {
+        const isCategory = binding.role === "category";
+        const options = isCategory ? parsed.headers : parsed.numericHeaders;
+        if (binding.multiple) {
+          // Multi-column value role: checkbox list, selection order preserved
+          // (toggleSeries appends to the end).
+          const selected = (fieldRoles.value as string[] | undefined) ?? [];
+          return (
+            <div key={binding.role} className="series-list">
+              <span className="field-caption">
+                {binding.label}
+                {binding.hint ? ` · ${binding.hint}` : ""}
+              </span>
+              {parsed.numericHeaders.map((header, index) => {
+                const isSelected = selected.includes(header);
+                // Combo only: a per-series 柱/线 toggle lets the user assign
+                // which selected columns render as bars vs lines.
+                const kind =
+                  seriesKind[header] ?? (index === 0 ? "bar" : "line");
+                return (
+                  <label
+                    key={header}
+                    className={`series-option${
+                      isSelected && chartType === "combo"
+                        ? " series-option-combo"
+                        : ""
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSeries(header)}
+                    />
+                    <span
+                      className="series-color"
+                      style={{
+                        background:
+                          index === 0
+                            ? primaryColor
+                            : index === 1
+                              ? secondaryColor
+                              : theme.colors[index % theme.colors.length],
+                      }}
+                    />
+                    <span>{header}</span>
+                    {isSelected && chartType === "combo" && (
+                      <span
+                        className="series-kind"
+                        role="group"
+                        aria-label={`${header} 图形`}
+                      >
+                        {(["bar", "line"] as const).map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            className={`series-kind-btn${
+                              kind === option ? " is-active" : ""
+                            }`}
+                            aria-pressed={kind === option}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setSeriesKind((current) => ({
+                                ...current,
+                                [header]: option,
+                              }));
+                            }}
+                          >
+                            {option === "bar" ? "柱" : "线"}
+                          </button>
+                        ))}
+                      </span>
+                    )}
+                    {isSelected && chartType !== "combo" && (
+                      <Check size={13} />
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          );
+        }
+
+        // Scatter optional roles (size/color/shape) bind to dedicated
+        // ChartConfig fields with a "无" option, not the generic role map.
+        if (
+          chartType === "scatter" &&
+          (binding.role === "size" ||
+            binding.role === "color" ||
+            binding.role === "shape")
+        ) {
+          const isSize = binding.role === "size";
+          const roleOptions = isSize ? parsed.numericHeaders : parsed.headers;
+          const value =
+            binding.role === "size"
+              ? sizeColumn
+              : binding.role === "color"
+                ? colorColumn
+                : shapeColumn;
+          const setValue =
+            binding.role === "size"
+              ? setSizeColumn
+              : binding.role === "color"
+                ? setColorColumn
+                : setShapeColumn;
+          return (
+            <label key={binding.role} className="field">
+              <span>{binding.label}</span>
+              <select
+                value={value ?? ""}
+                onChange={(event) => setValue(event.target.value || null)}
+              >
+                <option value="">无</option>
+                {roleOptions.map((header) => (
+                  <option key={header} value={header}>
+                    {header}
+                  </option>
+                ))}
+              </select>
+            </label>
+          );
+        }
+
+        // Single-column role (category / x / y / leftValue / rightValue).
+        // Display the resolved value (includes fallbacks) so the select always
+        // matches what the renderer receives.
+        const current = resolvedRoles[binding.role] ?? options[0] ?? "";
+        return (
+          <label key={binding.role} className="field">
+            <span>{binding.label}</span>
+            <select
+              value={options.includes(current) ? current : (options[0] ?? "")}
+              onChange={(event) =>
+                setFieldRoles((roles) => ({
+                  ...roles,
+                  [binding.role]: event.target.value,
+                }))
+              }
+            >
+              {options.map((header) => (
+                <option key={header} value={header}>
+                  {header}
+                </option>
+              ))}
+            </select>
+          </label>
+        );
+      })}
+      <button
+        type="button"
+        className="text-button"
+        onClick={loadSample}
+        title="为当前图表加载示例数据"
+      >
+        <Sparkles size={14} />
+        加载示例
+      </button>
+      <button
+        type="button"
+        className="text-button"
+        onClick={() => setWorkspaceMode("data")}
+      >
+        <Table2 size={14} />
+        编辑数据表
+      </button>
+    </>
+  );
 
   const previewStyle = {
     "--preview-width": `${width * previewScale}px`,
@@ -1314,15 +2545,88 @@ export default function Home() {
     "--preview-scale": previewScale,
     "--solid-background": backgroundColor,
   } as CSSProperties;
+
+  function updateCanvasDimensionDraft(
+    raw: string,
+    bounds: { min: number; max: number },
+    setDraft: (value: string) => void,
+    setDimension: (value: number) => void,
+  ) {
+    setDraft(raw);
+    const candidate = numberCandidate(raw);
+    if (Number.isFinite(candidate) && candidate >= bounds.min && candidate <= bounds.max) {
+      setDimension(Math.round(candidate));
+    }
+  }
+
+  function commitCanvasDimensionDraft(
+    raw: string,
+    current: number,
+    bounds: { min: number; max: number },
+    setDraft: (value: string) => void,
+    setDimension: (value: number) => void,
+  ) {
+    const next = canvasDimensionValue(raw, current, bounds);
+    setDimension(next);
+    setDraft(String(next));
+  }
+
+  const studioGridClassName = [
+    "studio-grid",
+    leftPanelCollapsed ? "left-collapsed" : "",
+    rightPanelCollapsed ? "right-collapsed" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <main className="studio-shell">
       <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            <BarChart3 size={17} />
-          </span>
-          <span className="brand-name">图作</span>
-          <span className="brand-subtitle">透明图表工具</span>
+        <div className="brand-zone">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true">
+              <Image
+                className="brand-logo"
+                src="/favicon.svg"
+                alt=""
+                width={24}
+                height={24}
+                priority
+              />
+            </span>
+            <span className="brand-name">图作</span>
+            <span className="brand-subtitle">透明图表工具</span>
+          </div>
+          <div className="panel-toggle-group" aria-label="侧栏显示">
+            <button
+              type="button"
+              className="icon-button panel-toggle-button"
+              onClick={() => setLeftPanelCollapsed((current) => !current)}
+              aria-pressed={!leftPanelCollapsed}
+              aria-label={leftPanelCollapsed ? "展开左侧栏" : "收起左侧栏"}
+              title={leftPanelCollapsed ? "展开左侧栏" : "收起左侧栏"}
+            >
+              {leftPanelCollapsed ? (
+                <PanelLeftOpen size={17} />
+              ) : (
+                <PanelLeftClose size={17} />
+              )}
+            </button>
+            <button
+              type="button"
+              className="icon-button panel-toggle-button"
+              onClick={() => setRightPanelCollapsed((current) => !current)}
+              aria-pressed={!rightPanelCollapsed}
+              aria-label={rightPanelCollapsed ? "展开右侧栏" : "收起右侧栏"}
+              title={rightPanelCollapsed ? "展开右侧栏" : "收起右侧栏"}
+            >
+              {rightPanelCollapsed ? (
+                <PanelRightOpen size={17} />
+              ) : (
+                <PanelRightClose size={17} />
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="workspace-tabs" role="tablist">
@@ -1349,74 +2653,108 @@ export default function Home() {
         </div>
 
         <div className="export-toolbar">
-          <div className="ratio-control" aria-label="PNG 导出倍率">
-            {[1, 2, 4].map((ratio) => (
-              <button
-                key={ratio}
-                type="button"
-                className={pixelRatio === ratio ? "active" : ""}
-                onClick={() => setPixelRatio(ratio)}
-                aria-pressed={pixelRatio === ratio}
-              >
-                {ratio}×
-              </button>
-            ))}
+          <div className="toolbar-group project-toolbar" aria-label="项目">
+            <button
+              type="button"
+              className="icon-button toolbar-icon-button"
+              onClick={() => projectInputRef.current?.click()}
+              title="打开图作项目"
+              aria-label="打开图作项目"
+            >
+              <FileUp size={16} />
+            </button>
+            <input
+              ref={projectInputRef}
+              className="sr-only"
+              type="file"
+              accept=".tuzuo.json,.json,application/json"
+              onChange={handleProjectFile}
+            />
+            <button
+              type="button"
+              className="icon-button toolbar-icon-button"
+              onClick={saveProjectFile}
+              title="保存图作项目"
+              aria-label="保存图作项目"
+            >
+              <Save size={16} />
+            </button>
           </div>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={copyPng}
-            title="复制 PNG"
-            aria-label="复制 PNG"
-            disabled={exporting || Boolean(dataError)}
-            aria-hidden={Boolean(dataError)}
-          >
-            <Clipboard size={17} />
-          </button>
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={exportSvg}
-            disabled={Boolean(dataError)}
-            aria-hidden={Boolean(dataError)}
-          >
-            <Download size={17} />
-            SVG
-          </button>
-          <a
-            className="button button-primary"
-            href={pngDownloadReady ? pngDownload?.objectUrl : undefined}
-            download={`${safeFilename(title)}@${pixelRatio}x.png`}
-            aria-disabled={!pngDownloadReady}
-            onClick={(event) => {
-              if (dataError) {
-                event.preventDefault();
-                return;
-              }
-              if (!pngDownloadReady) {
-                event.preventDefault();
-                setStatus("PNG 正在准备，请稍候");
-                return;
-              }
-              setStatus("PNG 已开始下载");
-            }}
-          >
-            {!pngDownloadReady ? (
-              <LoaderCircle className="spin" size={17} />
-            ) : (
-              <ImageDown size={17} />
-            )}
-            PNG
-          </a>
+          <div className="toolbar-group ratio-toolbar">
+            <span className="toolbar-label">倍率</span>
+            <div className="ratio-control" aria-label="PNG 导出倍率">
+              {[1, 2, 4].map((ratio) => (
+                <button
+                  key={ratio}
+                  type="button"
+                  className={pixelRatio === ratio ? "active" : ""}
+                  onClick={() => setPixelRatio(ratio)}
+                  aria-pressed={pixelRatio === ratio}
+                >
+                  {ratio}×
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="toolbar-group export-actions" aria-label="导出">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={copyPng}
+              title="复制 PNG"
+              aria-label="复制 PNG"
+              disabled={exporting || Boolean(dataError)}
+              aria-hidden={Boolean(dataError)}
+            >
+              <Clipboard size={17} />
+            </button>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={exportSvg}
+              disabled={Boolean(dataError)}
+              aria-hidden={Boolean(dataError)}
+            >
+              <Download size={17} />
+              SVG
+            </button>
+            <a
+              className="button button-primary"
+              href={pngDownloadReady ? pngDownload?.objectUrl : undefined}
+              download={`${safeFilename(title)}@${pixelRatio}x.png`}
+              aria-disabled={!pngDownloadReady}
+              onClick={(event) => {
+                if (dataError) {
+                  event.preventDefault();
+                  return;
+                }
+                if (!pngDownloadReady) {
+                  event.preventDefault();
+                  setStatus("PNG 正在准备，请稍候");
+                  return;
+                }
+                setStatus("PNG 已开始下载");
+              }}
+            >
+              {!pngDownloadReady ? (
+                <LoaderCircle className="spin" size={17} />
+              ) : (
+                <ImageDown size={17} />
+              )}
+              PNG
+            </a>
+          </div>
         </div>
       </header>
 
-      <div className="studio-grid">
-        <aside className="panel panel-left">
+      <div className={studioGridClassName}>
+        <aside
+          className={`panel panel-left ${leftPanelCollapsed ? "is-collapsed" : ""}`}
+          aria-hidden={leftPanelCollapsed}
+        >
           <section className="panel-section">
             <div className="section-heading">
               <span>图表模板</span>
-              <span className="step-index">01</span>
             </div>
             <button
               type="button"
@@ -1440,7 +2778,6 @@ export default function Home() {
           <section className="panel-section">
             <div className="section-heading">
               <span>内容</span>
-              <span className="step-index">02</span>
             </div>
             <label className="field">
               <span>标题</span>
@@ -1449,6 +2786,32 @@ export default function Home() {
                 onChange={(event) => setTitle(event.target.value)}
               />
             </label>
+            <TextStyleControls
+              label="标题样式"
+              style={titleStyle}
+              fallbackColor={theme.text}
+              onChange={setTitleStyle}
+            />
+            <span className="settings-caption">标题对齐</span>
+            <div className="segmented-control three">
+              {(
+                [
+                  ["left", "左"],
+                  ["center", "中"],
+                  ["right", "右"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={titleAlign === value ? "active" : ""}
+                  onClick={() => setTitleAlign(value)}
+                  aria-pressed={titleAlign === value}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <label className="field">
               <span>副标题</span>
               <input
@@ -1456,193 +2819,157 @@ export default function Home() {
                 onChange={(event) => setSubtitle(event.target.value)}
               />
             </label>
+            <TextStyleControls
+              label="副标题样式"
+              style={subtitleStyle}
+              fallbackColor="#68727d"
+              onChange={setSubtitleStyle}
+            />
           </section>
 
-          <section className="panel-section">
+          <section className="panel-section panel-section-canvas">
             <div className="section-heading">
-              <span>数据字段</span>
-              <Table2 size={15} />
+              <span>画布</span>
             </div>
-            {!dataMatchesSample && (
-              <div className="sample-hint" role="note">
-                <span>
-                  当前数据可能不适合「{selectedTemplate.name}」，可加载专属示例数据。
+            <div className="field-row canvas-size-row">
+              <label className="field">
+                <span>宽度（px）</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder={`${CANVAS_WIDTH_BOUNDS.min}-${CANVAS_WIDTH_BOUNDS.max}`}
+                  value={widthInput}
+                  onChange={(event) =>
+                    updateCanvasDimensionDraft(
+                      event.target.value,
+                      CANVAS_WIDTH_BOUNDS,
+                      setWidthInput,
+                      setWidth,
+                    )
+                  }
+                  onBlur={() =>
+                    commitCanvasDimensionDraft(
+                      widthInput,
+                      width,
+                      CANVAS_WIDTH_BOUNDS,
+                      setWidthInput,
+                      setWidth,
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      commitCanvasDimensionDraft(
+                        widthInput,
+                        width,
+                        CANVAS_WIDTH_BOUNDS,
+                        setWidthInput,
+                        setWidth,
+                      );
+                    }
+                    if (event.key === "Escape") {
+                      setWidthInput(String(width));
+                    }
+                  }}
+                />
+              </label>
+              <label className="field">
+                <span>高度（px）</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder={`${CANVAS_HEIGHT_BOUNDS.min}-${CANVAS_HEIGHT_BOUNDS.max}`}
+                  value={heightInput}
+                  onChange={(event) =>
+                    updateCanvasDimensionDraft(
+                      event.target.value,
+                      CANVAS_HEIGHT_BOUNDS,
+                      setHeightInput,
+                      setHeight,
+                    )
+                  }
+                  onBlur={() =>
+                    commitCanvasDimensionDraft(
+                      heightInput,
+                      height,
+                      CANVAS_HEIGHT_BOUNDS,
+                      setHeightInput,
+                      setHeight,
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      commitCanvasDimensionDraft(
+                        heightInput,
+                        height,
+                        CANVAS_HEIGHT_BOUNDS,
+                        setHeightInput,
+                        setHeight,
+                      );
+                    }
+                    if (event.key === "Escape") {
+                      setHeightInput(String(height));
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            <Toggle
+              label="透明背景"
+              checked={transparent}
+              onChange={setTransparent}
+            />
+            {!transparent && (
+              <label className="background-field">
+                <span>背景色</span>
+                <span className="color-input-wrap">
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(event) => setBackgroundColor(event.target.value)}
+                    aria-label="背景色"
+                  />
+                  <span>{backgroundColor.toUpperCase()}</span>
                 </span>
+              </label>
+            )}
+            <div className="canvas-margin-block">
+              <div className="margin-heading">
+                <span>四周边距（px）</span>
                 <button
                   type="button"
-                  className="sample-hint-button"
-                  onClick={loadSample}
+                  onClick={() => setMarginsLinked((current) => !current)}
+                  title={marginsLinked ? "取消联动" : "联动四边"}
+                  aria-label={marginsLinked ? "取消联动边距" : "联动四周边距"}
                 >
-                  加载示例
+                  {marginsLinked ? <Lock size={14} /> : <LockOpen size={14} />}
                 </button>
               </div>
-            )}
-            {templateDefinition.dataBindings.map((binding) => {
-              const isCategory = binding.role === "category";
-              const options = isCategory
-                ? parsed.headers
-                : parsed.numericHeaders;
-              if (binding.multiple) {
-                // Multi-column value role: checkbox list, selection order
-                // preserved (toggleSeries appends to the end).
-                const selected = (fieldRoles.value as string[] | undefined) ??
-                  [];
-                return (
-                  <div key={binding.role} className="series-list">
-                    <span className="field-caption">
-                      {binding.label}
-                      {binding.hint ? ` · ${binding.hint}` : ""}
-                    </span>
-                    {parsed.numericHeaders.map((header, index) => {
-                      const isSelected = selected.includes(header);
-                      // Combo only: a per-series 柱/线 toggle lets the user
-                      // assign which selected columns render as bars vs lines,
-                      // instead of relying on selection order. Default (no
-                      // explicit kind) keeps the renderer's legacy rule.
-                      const kind =
-                        seriesKind[header] ??
-                        (index === 0 ? "bar" : "line");
-                      return (
-                        <label
-                          key={header}
-                          className={`series-option${
-                            isSelected && chartType === "combo"
-                              ? " series-option-combo"
-                              : ""
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSeries(header)}
-                          />
-                          <span
-                            className="series-color"
-                            style={{
-                              background:
-                                index === 0
-                                  ? primaryColor
-                                  : index === 1
-                                    ? secondaryColor
-                                    : theme.colors[index % theme.colors.length],
-                            }}
-                          />
-                          <span>{header}</span>
-                          {isSelected && chartType === "combo" && (
-                            <span className="series-kind" role="group" aria-label={`${header} 图形`}>
-                              {(["bar", "line"] as const).map((option) => (
-                                <button
-                                  key={option}
-                                  type="button"
-                                  className={`series-kind-btn${
-                                    kind === option ? " is-active" : ""
-                                  }`}
-                                  aria-pressed={kind === option}
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    setSeriesKind((current) => ({
-                                      ...current,
-                                      [header]: option,
-                                    }));
-                                  }}
-                                >
-                                  {option === "bar" ? "柱" : "线"}
-                                </button>
-                              ))}
-                            </span>
-                          )}
-                          {isSelected && chartType !== "combo" && (
-                            <Check size={13} />
-                          )}
-                        </label>
-                      );
-                    })}
-                  </div>
-                );
-              }
-              // Scatter optional roles (size/color/shape) bind to dedicated
-              // ChartConfig fields with a "无" option, not the generic role map.
-              if (
-                chartType === "scatter" &&
-                (binding.role === "size" ||
-                  binding.role === "color" ||
-                  binding.role === "shape")
-              ) {
-                const isSize = binding.role === "size";
-                const roleOptions = isSize ? parsed.numericHeaders : parsed.headers;
-                const value =
-                  binding.role === "size"
-                    ? sizeColumn
-                    : binding.role === "color"
-                      ? colorColumn
-                      : shapeColumn;
-                const setValue =
-                  binding.role === "size"
-                    ? setSizeColumn
-                    : binding.role === "color"
-                      ? setColorColumn
-                      : setShapeColumn;
-                return (
-                  <label key={binding.role} className="field">
-                    <span>{binding.label}</span>
-                    <select
-                      value={value ?? ""}
+              <div className="margin-grid">
+                {(
+                  [
+                    ["top", "上"],
+                    ["right", "右"],
+                    ["bottom", "下"],
+                    ["left", "左"],
+                  ] as [keyof Margins, string][]
+                ).map(([side, label]) => (
+                  <label key={side}>
+                    <span>{label}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={240}
+                      value={margins[side]}
                       onChange={(event) =>
-                        setValue(event.target.value || null)
+                        updateMargin(side, Number(event.target.value))
                       }
-                    >
-                      <option value="">无</option>
-                      {roleOptions.map((header) => (
-                        <option key={header} value={header}>
-                          {header}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
-                );
-              }
-              // Single-column role (category / x / y / leftValue / rightValue).
-              // Display the resolved value (includes fallbacks) so the select
-              // always matches what the renderer receives.
-              const current = resolvedRoles[binding.role] ?? options[0] ?? "";
-              return (
-                <label key={binding.role} className="field">
-                  <span>{binding.label}</span>
-                  <select
-                    value={options.includes(current) ? current : (options[0] ?? "")}
-                    onChange={(event) =>
-                      setFieldRoles((roles) => ({
-                        ...roles,
-                        [binding.role]: event.target.value,
-                      }))
-                    }
-                  >
-                    {options.map((header) => (
-                      <option key={header} value={header}>
-                        {header}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              );
-            })}
-            <button
-              type="button"
-              className="text-button"
-              onClick={loadSample}
-              title="为当前图表加载示例数据"
-            >
-              <Sparkles size={14} />
-              加载示例
-            </button>
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => setWorkspaceMode("data")}
-            >
-              <Table2 size={14} />
-              编辑数据表
-            </button>
+                ))}
+              </div>
+            </div>
           </section>
         </aside>
 
@@ -1814,7 +3141,10 @@ export default function Home() {
             <p className="sheet-hint">可直接从 Excel 或表格软件复制后粘贴到任意单元格</p>
         </section>
 
-        <aside className="panel panel-right">
+        <aside
+          className={`panel panel-right ${rightPanelCollapsed ? "is-collapsed" : ""}`}
+          aria-hidden={rightPanelCollapsed}
+        >
           <div className="settings-toolbar">
             <label className="settings-search">
               <Search size={14} />
@@ -1845,6 +3175,22 @@ export default function Home() {
               <RefreshCcw size={15} />
             </button>
           </div>
+
+          <SettingsSection
+            title="数据字段"
+            icon={<Table2 size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.data}
+            hidden={
+              !sectionShown(
+                "data",
+                "数据字段",
+                "字段 系列 选择 绑定 数据 示例 表格",
+              )
+            }
+            onToggle={() => toggleSettingsSection("data")}
+          >
+            {dataFieldControls}
+          </SettingsSection>
 
           <SettingsSection
             title="配色"
@@ -1905,6 +3251,15 @@ export default function Home() {
                       <button
                         type="button"
                         className="palette-row-action"
+                        onClick={() => editSavedPalette(palette)}
+                        aria-label={`编辑配色 ${palette.name}`}
+                        title="编辑配色"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="palette-row-action palette-row-danger"
                         onClick={() => deleteSavedPalette(palette.id)}
                         aria-label={`删除配色 ${palette.name}`}
                         title="删除配色"
@@ -1994,7 +3349,7 @@ export default function Home() {
                 onClick={saveCurrentPalette}
               >
                 <Save size={14} />
-                保存
+                {editingPaletteId ? "更新" : "保存"}
               </button>
             </div>
 
@@ -2286,7 +3641,7 @@ export default function Home() {
             title="数据标签"
             icon={<Table2 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.labels}
-            hidden={!sectionShown("labels", "数据标签", "数值 位置 字号 显示")}
+            hidden={!sectionShown("labels", "数据标签", "数值 位置 字号 显示 颜色 对齐 粗体 斜体 样式")}
             onToggle={() => toggleSettingsSection("labels")}
           >
             <Toggle
@@ -2294,40 +3649,27 @@ export default function Home() {
               checked={showLabels}
               onChange={setShowLabels}
             />
-            <span className="settings-caption">标签位置</span>
-            <div className="segmented-control three">
-              {(
-                [
-                  ["auto", "自动"],
-                  ["outside", "外侧"],
-                  ["inside", "内部"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={labelPosition === value ? "active" : ""}
-                  onClick={() => setLabelPosition(value)}
-                  aria-pressed={labelPosition === value}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
             <label className="field settings-field">
-              <span>标签字号</span>
+              <span>标签位置</span>
               <select
-                value={fontSize}
-                onChange={(event) => setFontSize(Number(event.target.value))}
+                value={labelPosition}
+                onChange={(event) =>
+                  setLabelPosition(event.target.value as LabelPosition)
+                }
               >
-                <option value={10}>10 px</option>
-                <option value={12}>12 px</option>
-                <option value={14}>14 px</option>
-                <option value={16}>16 px</option>
-                <option value={18}>18 px</option>
-                <option value={20}>20 px</option>
+                {LABEL_POSITION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
+            <TextStyleControls
+              label="标签样式"
+              style={labelStyle}
+              fallbackColor={theme.text}
+              onChange={setLabelStyle}
+            />
             {(chartType === "pie" || chartType === "donut") && (
               <>
                 <label className="field settings-field">
@@ -2417,7 +3759,7 @@ export default function Home() {
             title="X 轴"
             icon={<Columns3 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.xAxis}
-            hidden={!sectionShown("xAxis", "X 轴", "横轴 标题 标签 旋转")}
+            hidden={!sectionShown("xAxis", "X 轴", "横轴 标题 标签 旋转 样式 粗体 斜体 颜色 字号")}
             onToggle={() => toggleSettingsSection("xAxis")}
           >
             <Toggle
@@ -2433,6 +3775,12 @@ export default function Home() {
                 placeholder="留空则不显示"
               />
             </label>
+            <TextStyleControls
+              label="X 轴标题样式"
+              style={xAxisTitleStyle}
+              fallbackColor={theme.text}
+              onChange={setXAxisTitleStyle}
+            />
             <label className="range-field">
               <span>
                 标签旋转 <strong>{axisLabelRotation}°</strong>
@@ -2448,13 +3796,19 @@ export default function Home() {
                 }
               />
             </label>
+            <TextStyleControls
+              label="X 轴刻度样式"
+              style={xAxisLabelStyle}
+              fallbackColor={theme.text}
+              onChange={setXAxisLabelStyle}
+            />
           </SettingsSection>
 
           <SettingsSection
             title="Y 轴"
             icon={<BarChart3 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.yAxis}
-            hidden={!sectionShown("yAxis", "Y 轴", "纵轴 范围 最小 最大 网格线")}
+            hidden={!sectionShown("yAxis", "Y 轴", "纵轴 范围 最小 最大 网格线 样式 粗体 斜体 颜色 字号")}
             onToggle={() => toggleSettingsSection("yAxis")}
           >
             <Toggle
@@ -2470,6 +3824,12 @@ export default function Home() {
                 placeholder="留空则不显示"
               />
             </label>
+            <TextStyleControls
+              label="Y 轴标题样式"
+              style={yAxisTitleStyle}
+              fallbackColor={theme.text}
+              onChange={setYAxisTitleStyle}
+            />
             <div className="field-row">
               <label className="field settings-field">
                 <span>最小值</span>
@@ -2490,6 +3850,12 @@ export default function Home() {
                 />
               </label>
             </div>
+            <TextStyleControls
+              label="Y 轴刻度样式"
+              style={yAxisLabelStyle}
+              fallbackColor={theme.text}
+              onChange={setYAxisLabelStyle}
+            />
             <Toggle
               label="显示网格线"
               checked={showGrid}
@@ -2516,7 +3882,7 @@ export default function Home() {
             title="图例与交互"
             icon={<LayoutGrid size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.legend}
-            hidden={!sectionShown("legend", "图例与交互", "位置 提示 悬停 筛选")}
+            hidden={!sectionShown("legend", "图例与交互", "位置 对齐 居中 靠左 靠右 靠上 靠下 提示 悬停 筛选")}
             onToggle={() => toggleSettingsSection("legend")}
           >
             <Toggle
@@ -2528,16 +3894,34 @@ export default function Home() {
               <span>图例位置</span>
               <select
                 value={legendPosition}
-                onChange={(event) =>
-                  setLegendPosition(
-                    event.target.value as "top" | "bottom" | "left" | "right",
-                  )
-                }
+                onChange={(event) => {
+                  const nextPosition = event.target.value as LegendPosition;
+                  setLegendPosition(nextPosition);
+                  setLegendAlign(defaultLegendAlignForPosition(nextPosition));
+                }}
               >
                 <option value="top">顶部</option>
                 <option value="bottom">底部</option>
                 <option value="left">左侧</option>
                 <option value="right">右侧</option>
+              </select>
+            </label>
+            <label className="field settings-field">
+              <span>图例对齐</span>
+              <select
+                value={legendAlign}
+                onChange={(event) =>
+                  setLegendAlign(event.target.value as LegendAlign)
+                }
+              >
+                {(legendPosition === "left" || legendPosition === "right"
+                  ? LEGEND_VERTICAL_ALIGN_OPTIONS
+                  : LEGEND_HORIZONTAL_ALIGN_OPTIONS
+                ).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
             <Toggle
@@ -2594,140 +3978,32 @@ export default function Home() {
             />
           </SettingsSection>
 
-          <SettingsSection
-            title="画布与布局"
-            icon={<Settings2 size={15} />}
-            open={Boolean(settingsQuery) || settingsOpen.canvas}
-            hidden={!sectionShown("canvas", "画布与布局", "背景 尺寸 边距 标题 对齐 透明")}
-            onToggle={() => toggleSettingsSection("canvas")}
-          >
-            <Toggle
-              label="透明背景"
-              checked={transparent}
-              onChange={setTransparent}
-            />
-            {!transparent && (
-              <label className="background-field">
-                <span>背景色</span>
-                <span className="color-input-wrap">
-                  <input
-                    type="color"
-                    value={backgroundColor}
-                    onChange={(event) => setBackgroundColor(event.target.value)}
-                    aria-label="背景色"
-                  />
-                  <span>{backgroundColor.toUpperCase()}</span>
-                </span>
-              </label>
-            )}
-            <span className="settings-caption">标题对齐</span>
-            <div className="segmented-control three">
-              {(
-                [
-                  ["left", "左"],
-                  ["center", "中"],
-                  ["right", "右"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={titleAlign === value ? "active" : ""}
-                  onClick={() => setTitleAlign(value)}
-                  aria-pressed={titleAlign === value}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="field-row canvas-size-row">
-              <label className="field">
-                <span>宽度</span>
-                <input
-                  type="number"
-                  min={320}
-                  max={2400}
-                  step={10}
-                  value={width}
-                  onChange={(event) =>
-                    setWidth(
-                      Math.min(
-                        2400,
-                        Math.max(320, Number(event.target.value) || 320),
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>高度</span>
-                <input
-                  type="number"
-                  min={240}
-                  max={1800}
-                  step={10}
-                  value={height}
-                  onChange={(event) =>
-                    setHeight(
-                      Math.min(
-                        1800,
-                        Math.max(240, Number(event.target.value) || 240),
-                      ),
-                    )
-                  }
-                />
-              </label>
-            </div>
-            <div className="margin-heading">
-              <span>四周边距</span>
-              <button
-                type="button"
-                onClick={() => setMarginsLinked((current) => !current)}
-                title={marginsLinked ? "取消联动" : "联动四边"}
-                aria-label={marginsLinked ? "取消联动边距" : "联动四周边距"}
-              >
-                {marginsLinked ? <Lock size={14} /> : <LockOpen size={14} />}
-              </button>
-            </div>
-            <div className="margin-grid">
-              {(
-                [
-                  ["top", "上"],
-                  ["right", "右"],
-                  ["bottom", "下"],
-                  ["left", "左"],
-                ] as [keyof Margins, string][]
-              ).map(([side, label]) => (
-                <label key={side}>
-                  <span>{label}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={240}
-                    value={margins[side]}
-                    onChange={(event) =>
-                      updateMargin(side, Number(event.target.value))
-                    }
-                  />
-                </label>
-              ))}
-            </div>
-          </SettingsSection>
-
           {settingsQuery &&
             ![
+              sectionShown(
+                "data",
+                "数据字段",
+                "字段 系列 选择 绑定 数据 示例 表格",
+              ),
               sectionShown("colors", "配色", "颜色 调色板 自定义 品牌 系列"),
               sectionShown(
                 "marks",
                 "线条、数据点与面积",
                 "柱宽 圆角 透明度 平滑 点大小 样式",
               ),
-              sectionShown("labels", "数据标签", "数值 位置 字号 显示"),
+              sectionShown(
+                "labels",
+                "数据标签",
+                "数值 位置 字号 显示 颜色 对齐",
+              ),
               sectionShown("xAxis", "X 轴", "横轴 标题 标签 旋转"),
               sectionShown("yAxis", "Y 轴", "纵轴 范围 最小 最大 网格线"),
-              sectionShown("legend", "图例与交互", "位置 提示 悬停 筛选"),
+              sectionShown(
+                "legend",
+                "图例与交互",
+                "位置 对齐 居中 靠左 靠右 靠上 靠下 提示 悬停 筛选",
+              ),
               sectionShown("numbers", "数字格式", "小数 千分位 前缀 后缀 单位"),
-              sectionShown("canvas", "画布与布局", "背景 尺寸 边距 标题 对齐 透明"),
             ].some(Boolean) && (
               <div className="settings-empty">没有匹配的设置</div>
             )}

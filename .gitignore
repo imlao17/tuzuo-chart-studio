@@ -41,5 +41,10 @@ tsconfig.tsbuildinfo
 /.wrangler/
 /outputs/
 /work/
-/.omx/
 /design-qa/
+
+# local agent/tooling state
+/.omx/
+/.playwright-mcp/
+/.workbuddy/
+/.zcode/

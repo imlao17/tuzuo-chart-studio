@@ -8,8 +8,6 @@ import {
   CHART_TEMPLATES,
   tableToParsed,
   THEMES,
-  toNumber,
-  type ChartConfig,
   type ChartType,
 } from "../app/chart-model";
 import { getTemplateDefinition } from "../app/template-definition";

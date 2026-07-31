@@ -46,6 +46,36 @@ export type Margins = {
   left: number;
 };
 
+export type LabelPosition =
+  | "auto"
+  | "outside"
+  | "outsideTop"
+  | "outsideRight"
+  | "outsideBottom"
+  | "outsideLeft"
+  | "inside"
+  | "insideCenter"
+  | "insideLeft"
+  | "insideRight"
+  | "insideTop"
+  | "insideBottom";
+
+export type LegendPosition = "top" | "bottom" | "left" | "right";
+export type LegendAlign = "start" | "center" | "end";
+
+export function defaultLegendAlignForPosition(
+  position: LegendPosition = "top",
+): LegendAlign {
+  return position === "top" ? "end" : "center";
+}
+
+export type TextStyleConfig = {
+  fontSize?: number;
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
+};
+
 export type ParsedTable = {
   headers: string[];
   rows: string[][];
@@ -81,7 +111,8 @@ export type ChartConfig = {
   barRadius?: number;
   markOpacity?: number;
   areaOpacity?: number;
-  labelPosition?: "auto" | "inside" | "outside";
+  labelColor?: string;
+  labelPosition?: LabelPosition;
   showXAxis?: boolean;
   showYAxis?: boolean;
   xAxisTitle?: string;
@@ -89,7 +120,8 @@ export type ChartConfig = {
   axisLabelRotation?: number;
   yAxisMin?: string;
   yAxisMax?: string;
-  legendPosition?: "top" | "bottom" | "left" | "right";
+  legendPosition?: LegendPosition;
+  legendAlign?: LegendAlign;
   showTooltip?: boolean;
   gridLineType?: "solid" | "dashed" | "dotted";
   numberDecimals?: number;
@@ -97,6 +129,15 @@ export type ChartConfig = {
   numberSuffix?: string;
   useThousandsSeparator?: boolean;
   titleAlign?: "left" | "center" | "right";
+  titleStyle?: TextStyleConfig;
+  subtitleStyle?: TextStyleConfig;
+  axisTitleStyle?: TextStyleConfig;
+  axisLabelStyle?: TextStyleConfig;
+  xAxisTitleStyle?: TextStyleConfig;
+  yAxisTitleStyle?: TextStyleConfig;
+  xAxisLabelStyle?: TextStyleConfig;
+  yAxisLabelStyle?: TextStyleConfig;
+  labelStyle?: TextStyleConfig;
   // Combo chart only: per-series "bar" or "line" role. When unset for a series
   // the renderer falls back to the legacy rule (first series = bar, rest = line).
   seriesKind?: Record<string, "bar" | "line">;
@@ -160,6 +201,82 @@ export const THEMES: ThemePreset[] = [
     id: "editorial",
     name: "编辑蓝",
     colors: ["#2563eb", "#f15a3a", "#16a36a", "#e8ae17", "#9b51e0"],
+    text: "#17202a",
+    grid: "#dfe3e8",
+  },
+  {
+    id: "flourish",
+    name: "Flourish",
+    colors: [
+      "#0053d7",
+      "#098efa",
+      "#8a4bcf",
+      "#f2457f",
+      "#f9591c",
+      "#f1af2d",
+      "#0b7d8a",
+      "#1ba05e",
+      "#d82731",
+      "#9da1a5",
+      "#757575",
+    ],
+    text: "#17202a",
+    grid: "#dfe3e8",
+  },
+  {
+    id: "flourish-alternate",
+    name: "Flourish Alternate",
+    colors: [
+      "#0053d7",
+      "#f2457f",
+      "#098efa",
+      "#f1af2d",
+      "#8a4bcf",
+      "#0b7d8a",
+      "#f9591c",
+      "#1ba05e",
+      "#d82731",
+      "#9da1a5",
+      "#757575",
+    ],
+    text: "#17202a",
+    grid: "#dfe3e8",
+  },
+  {
+    id: "flourish-light",
+    name: "Flourish Light",
+    colors: [
+      "#296ad7",
+      "#5bb2fb",
+      "#a95fcf",
+      "#fe6d8a",
+      "#f98f56",
+      "#f1bb43",
+      "#37949d",
+      "#50b98b",
+      "#d95254",
+      "#9da1a5",
+      "#757575",
+    ],
+    text: "#17202a",
+    grid: "#dfe3e8",
+  },
+  {
+    id: "flourish-light-alternate",
+    name: "Flourish Light Alternate",
+    colors: [
+      "#296ad7",
+      "#fe6d8a",
+      "#5bb2fb",
+      "#f1bb43",
+      "#a95fcf",
+      "#37949d",
+      "#f98f56",
+      "#50b98b",
+      "#d95254",
+      "#9da1a5",
+      "#757575",
+    ],
     text: "#17202a",
     grid: "#dfe3e8",
   },

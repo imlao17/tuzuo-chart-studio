@@ -14,18 +14,56 @@
  */
 import type { EChartsOption, SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
-import type { RendererResult } from "./shared";
+import {
+  axisLabelTextStyle,
+  LEGEND_HORIZONTAL_SPACE,
+  LEGEND_VERTICAL_SPACE,
+  type RendererResult,
+} from "./shared";
 
 export function buildStreamgraphOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
   const { title, subtitle, margins, theme, fontSize, compact = false } = config;
 
   const textColor = theme.text;
+  const singleAxisTextStyle = axisLabelTextStyle(
+    config.xAxisLabelStyle,
+    config,
+    textColor,
+    fontSize,
+  );
+  const legendPosition = config.legendPosition ?? "top";
+  const legendVisible = !compact && config.showLegend && dataSeries.length > 1;
   const titleBlock = compact ? 0 : title || subtitle ? 74 : 12;
-  const gridTop = compact ? 6 : margins.top + titleBlock;
-  const gridBottom = compact ? 6 : margins.bottom;
-  const gridLeft = compact ? 6 : margins.left;
-  const gridRight = compact ? 6 : margins.right;
+  const gridTop =
+    compact
+      ? 6
+      : margins.top +
+        titleBlock +
+        (legendVisible && legendPosition === "top"
+          ? LEGEND_HORIZONTAL_SPACE
+          : 0);
+  const gridBottom =
+    compact
+      ? 6
+      : margins.bottom +
+        (legendVisible && legendPosition === "bottom"
+          ? LEGEND_HORIZONTAL_SPACE
+          : 0);
+  const gridLeft =
+    compact
+      ? 6
+      : margins.left +
+        (legendVisible && legendPosition === "left"
+          ? LEGEND_VERTICAL_SPACE
+          : 0);
+  const gridRight =
+    compact
+      ? 6
+      : margins.right +
+        (legendVisible && legendPosition === "right"
+          ? LEGEND_VERTICAL_SPACE
+          : 0);
 
   const splitLine = {
     show: compact ? false : config.showGrid,
@@ -73,8 +111,7 @@ export function buildStreamgraphOption(ctx: RenderContext): RendererResult {
     right: gridRight,
     axisLabel: {
       show: !compact,
-      color: textColor,
-      fontSize,
+      ...singleAxisTextStyle,
       formatter: allDates
         ? (value: number) => formatTimeLabel(value)
         : (value: number) => categories[Math.round(value)] ?? "",

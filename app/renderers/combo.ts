@@ -15,7 +15,11 @@
  */
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
-import { colorFor } from "./shared";
+import {
+  colorFor,
+  dataLabelTextStyle,
+  resolveDataLabelPosition,
+} from "./shared";
 import {
   buildCategoryAxis,
   buildValueAxis,
@@ -38,6 +42,7 @@ export function buildComboOption(ctx: RenderContext): RendererResult {
   // left (index 0) and right (index 1) value axes. Default (undefined) keeps a
   // single yAxis so default output is unchanged.
   const textColor = theme.text;
+  const labelTextStyle = dataLabelTextStyle(config);
   const xAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
   const dualAxis = !compact && config.comboDualAxis;
   const leftAxis = buildValueAxis(ctx, textColor, fontSize, compact);
@@ -104,10 +109,8 @@ export function buildComboOption(ctx: RenderContext): RendererResult {
       areaStyle: undefined,
       label: {
         show: compact ? false : config.showLabels,
-        // isHorizontal is false, so position is "top" unless forced "inside".
-        position: config.labelPosition === "inside" ? "inside" : "top",
-        color: textColor,
-        fontSize,
+        position: resolveDataLabelPosition(config, "top"),
+        ...labelTextStyle,
         formatter: (params: unknown) => {
           const entry = params as { value: string | number };
           return formatNumber(entry.value);

@@ -9,7 +9,13 @@
  */
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
-import type { RendererResult } from "./shared";
+import {
+  dataLabelTextStyle,
+  LEGEND_HORIZONTAL_SPACE,
+  LEGEND_VERTICAL_SPACE,
+  resolvePieLabelPosition,
+  type RendererResult,
+} from "./shared";
 
 export function buildPieOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries, formatNumber } = ctx;
@@ -20,20 +26,36 @@ export function buildPieOption(ctx: RenderContext): RendererResult {
     width,
     height,
     margins,
-    theme,
     backgroundColor,
     transparent,
-    fontSize,
     compact = false,
   } = config;
 
-  const textColor = theme.text;
+  const labelTextStyle = dataLabelTextStyle(config);
+  const legendPosition = config.legendPosition ?? "top";
+  const legendVisible = !compact && config.showLegend;
   const titleBlock = compact ? 0 : title || subtitle ? 74 : 12;
 
-  const innerTop = margins.top + titleBlock;
-  const innerHeight = Math.max(80, height - innerTop - margins.bottom);
-  const innerWidth = Math.max(80, width - margins.left - margins.right);
-  const centerX = ((margins.left + innerWidth / 2) / width) * 100;
+  const innerTop =
+    margins.top +
+    titleBlock +
+    (legendVisible && legendPosition === "top"
+      ? LEGEND_HORIZONTAL_SPACE
+      : 0);
+  const innerBottom =
+    margins.bottom +
+    (legendVisible && legendPosition === "bottom"
+      ? LEGEND_HORIZONTAL_SPACE
+      : 0);
+  const innerLeft =
+    margins.left +
+    (legendVisible && legendPosition === "left" ? LEGEND_VERTICAL_SPACE : 0);
+  const innerRight =
+    margins.right +
+    (legendVisible && legendPosition === "right" ? LEGEND_VERTICAL_SPACE : 0);
+  const innerHeight = Math.max(80, height - innerTop - innerBottom);
+  const innerWidth = Math.max(80, width - innerLeft - innerRight);
+  const centerX = ((innerLeft + innerWidth / 2) / width) * 100;
   const centerY = ((innerTop + innerHeight / 2) / height) * 100;
   const radius = Math.max(42, Math.min(innerWidth, innerHeight) * 0.38);
 
@@ -104,10 +126,10 @@ export function buildPieOption(ctx: RenderContext): RendererResult {
       },
       label: {
         show: compact ? false : config.showLabels,
-        color: textColor,
-        fontSize,
+        position: resolvePieLabelPosition(config),
+        ...labelTextStyle,
         formatter: labelFormatter,
-        lineHeight: fontSize + 5,
+        lineHeight: labelTextStyle.fontSize + 5,
       },
       data: entries,
     },

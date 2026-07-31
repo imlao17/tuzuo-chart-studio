@@ -14,7 +14,11 @@
 import type { SeriesOption } from "echarts";
 import { columnIndex, toNumber } from "../chart-model";
 import type { RenderContext } from "../template-definition";
-import { colorFor } from "./shared";
+import {
+  colorFor,
+  dataLabelTextStyle,
+  resolveDataLabelPosition,
+} from "./shared";
 import { buildValueAxis, type RendererResult } from "./shared";
 
 export function buildScatterOption(ctx: RenderContext): RendererResult {
@@ -36,6 +40,7 @@ export function buildScatterOption(ctx: RenderContext): RendererResult {
     : parsed.numericHeaders.slice(0, 1);
 
   const textColor = theme.text;
+  const labelTextStyle = dataLabelTextStyle(config);
   // Both axes are value axes (legacy lines 543-544).
   const xAxis = buildValueAxis(ctx, textColor, fontSize, compact);
   const yAxis = buildValueAxis(ctx, textColor, fontSize, compact);
@@ -180,9 +185,8 @@ export function buildScatterOption(ctx: RenderContext): RendererResult {
       },
       label: {
         show: compact ? false : config.showLabels,
-        position: "top",
-        color: textColor,
-        fontSize,
+        position: resolveDataLabelPosition(config, "top"),
+        ...labelTextStyle,
         formatter: (params: unknown) => {
           const item = params as { dataIndex: number };
           return categories[item.dataIndex] ?? "";
