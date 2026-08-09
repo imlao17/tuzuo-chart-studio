@@ -47,7 +47,7 @@
 - Cloudflare Worker 环境类型通过 `worker/types.d.ts` 补齐。
 - favicon 元数据已指向 `public/favicon.svg`。
 - 邮箱验证链接不再从生产请求头里猜测公网地址，生产环境需要显式配置 `APP_BASE_URL`。
-- 开源基础文件已补齐：`LICENSE`、`.env.example`、`CONTRIBUTING.md`、`SECURITY.md`、`docs/deployment.md`。
+- 开源基础文件已补齐：`LICENSE`、`.env.example`、`CONTRIBUTING.md`、`SECURITY.md`、`docs/engineering/deployment.md`。
 - 旧 ChatGPT 头部登录工具和 D1 notes starter 示例已移除。
 
 ## 主要风险
@@ -58,7 +58,7 @@
 
 2. 旧调研文档仍然保留历史口径。
 
-   `docs/flourish-gap-analysis.md` 是很好的方向文档，但部分“当前状态”描述来自旧版本。后续应把它改成历史调研或更新口径。
+   `docs/research/flourish-gap-analysis.md` 是很好的方向文档，但部分“当前状态”描述来自旧版本。后续应把它改成历史调研或更新口径。
 
 3. 账号体系还只是最小可上线闭环。
 

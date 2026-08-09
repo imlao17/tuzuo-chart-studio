@@ -75,6 +75,12 @@ import {
   type DataBindingRole,
   getTemplateDefinition,
 } from "./template-definition";
+import {
+  downloadBlob,
+  renderPngDataUrl,
+  safeFilename,
+} from "../src/studio/export/download";
+import { parseColorOverrides } from "../src/studio/palette/color-overrides";
 
 const DEFAULT_MARGINS: Margins = {
   top: 28,
@@ -876,101 +882,6 @@ function normalizeProject(input: unknown): ProjectState | null {
     comboAxisSync: booleanValue(source.comboAxisSync, base.comboAxisSync),
     streamTimeAxis: booleanValue(source.streamTimeAxis, base.streamTimeAxis),
   };
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement("a");
-  link.href = dataUrl;
-  link.download = filename;
-  link.rel = "noopener";
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  window.requestAnimationFrame(() => link.remove());
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  downloadDataUrl(url, filename);
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
-
-function parseColorOverrides(input: string) {
-  return Object.fromEntries(
-    input
-      .split(/\r?\n/)
-      .map((line) => line.split("::").map((part) => part.trim()))
-      .filter(
-        (parts): parts is [string, string] =>
-          parts.length >= 2 &&
-          Boolean(parts[0]) &&
-          /^#[0-9a-f]{6}$/i.test(parts[1]),
-      )
-      .map(([name, color]) => [name, color]),
-  );
-}
-
-function safeFilename(value: string) {
-  return (
-    value
-      .trim()
-      .replace(/[\\/:*?"<>|]/g, "-")
-      .replace(/\s+/g, " ")
-      .slice(0, 80) || "图表"
-  );
-}
-
-async function renderPngDataUrl({
-  option,
-  width,
-  height,
-  pixelRatio,
-  transparent,
-  backgroundColor,
-}: {
-  option: Parameters<ECharts["setOption"]>[0];
-  width: number;
-  height: number;
-  pixelRatio: number;
-  transparent: boolean;
-  backgroundColor: string;
-}) {
-  const exportHost = document.createElement("div");
-  exportHost.style.position = "fixed";
-  exportHost.style.left = "-100000px";
-  exportHost.style.top = "0";
-  exportHost.style.width = `${width}px`;
-  exportHost.style.height = `${height}px`;
-  exportHost.style.pointerEvents = "none";
-  exportHost.setAttribute("aria-hidden", "true");
-  document.body.appendChild(exportHost);
-
-  const { init } = await import("echarts");
-  const exportChart = init(exportHost, undefined, {
-    renderer: "canvas",
-    width,
-    height,
-    devicePixelRatio: 1,
-  });
-
-  try {
-    exportChart.setOption(
-      {
-        ...option,
-        animation: false,
-        backgroundColor: transparent ? "rgba(0,0,0,0)" : backgroundColor,
-      },
-      true,
-    );
-    return exportChart.getDataURL({
-      type: "png",
-      pixelRatio,
-      backgroundColor: transparent ? undefined : backgroundColor,
-    });
-  } finally {
-    exportChart.dispose();
-    exportHost.remove();
-  }
 }
 
 function SettingsSection({

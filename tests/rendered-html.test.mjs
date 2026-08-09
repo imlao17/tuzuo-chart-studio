@@ -73,6 +73,7 @@ test("includes the complete chart studio implementation", async () => {
     authRegisterRoute,
     authLoginRoute,
     authVerifyRoute,
+    exportDownload,
     hostingConfig,
   ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -94,6 +95,10 @@ test("includes the complete chart studio implementation", async () => {
       new URL("../app/api/auth/verify/route.ts", import.meta.url),
       "utf8",
     ),
+    readFile(
+      new URL("../src/studio/export/download.ts", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
   ]);
 
@@ -105,7 +110,9 @@ test("includes the complete chart studio implementation", async () => {
   assert.equal(templateDefinitions.length, 30);
   assert.match(page, /renderer:\s*"svg"/);
   assert.match(page, /renderPngDataUrl/);
-  assert.match(page, /URL\.createObjectURL\(blob\)/);
+  assert.match(exportDownload, /URL\.createObjectURL\(blob\)/);
+  assert.match(exportDownload, /export function safeFilename/);
+  assert.match(exportDownload, /export async function renderPngDataUrl/);
   assert.match(page, /download=\{`\$\{safeFilename\(title\)\}/);
   assert.match(page, /tuzuo-custom-palettes/);
   assert.match(page, /editingPaletteId/);

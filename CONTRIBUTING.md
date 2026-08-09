@@ -31,4 +31,4 @@ npm test
 npm audit --omit=dev
 ```
 
-涉及账号、注册、登录、导出权限或部署配置的改动，还需要检查 `docs/deployment.md` 是否同步。
+涉及账号、注册、登录、导出权限或部署配置的改动，还需要检查 `docs/engineering/deployment.md` 是否同步。

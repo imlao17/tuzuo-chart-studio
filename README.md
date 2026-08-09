@@ -42,9 +42,9 @@ buildChartOption(config)          ← 薄分派器
 - `app/api/auth/*` — 注册 / 登录 / 登出 / 会话 / 邮箱验证 API
 - `db/schema.ts` — D1/Drizzle 用户、验证 token、会话表结构
 - `drizzle/` — 数据库迁移文件
-- `docs/deployment.md` — 本地部署、生产托管、账号与邮箱配置
-- `docs/project-stage-and-control.md` — 当前阶段、风险和接管建议
-- `docs/layout-redesign-plan.md` — 下一轮左右布局调整方案
+- `docs/engineering/deployment.md` — 本地部署、生产托管、账号与邮箱配置
+- `docs/product/project-stage-and-control.md` — 当前阶段、风险和接管建议
+- `docs/product/layout-redesign-plan.md` — 下一轮左右布局调整方案
 
 ## 快速开始
 
@@ -91,7 +91,7 @@ npm run db:generate
 
 如果直接使用 `wrangler d1 migrations apply DB --local/--remote`，需要先在 `wrangler.jsonc` 里声明 D1 数据库；当前 Sites 部署配置以 `.openai/hosting.json` 为准。
 
-完整部署说明见 `docs/deployment.md`。
+完整部署说明见 `docs/engineering/deployment.md`。
 
 ## 测试
 
