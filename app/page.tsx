@@ -84,6 +84,8 @@ const DEFAULT_MARGINS: Margins = {
 };
 const CANVAS_WIDTH_BOUNDS = { min: 320, max: 2400 };
 const CANVAS_HEIGHT_BOUNDS = { min: 240, max: 1800 };
+const REQUIRE_AUTH_FOR_EXPORT =
+  process.env.NEXT_PUBLIC_TUZUO_REQUIRE_AUTH === "true";
 
 type SavedPalette = {
   id: string;
@@ -1441,7 +1443,7 @@ export default function Home() {
   const [status, setStatus] = useState("");
   const [exporting, setExporting] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(REQUIRE_AUTH_FOR_EXPORT);
   const [authPanelOpen, setAuthPanelOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [authEmail, setAuthEmail] = useState("");
@@ -1926,6 +1928,8 @@ export default function Home() {
   }, [status]);
 
   useEffect(() => {
+    if (!REQUIRE_AUTH_FOR_EXPORT) return;
+
     let cancelled = false;
     let frame = 0;
 
@@ -2145,6 +2149,7 @@ export default function Home() {
   }
 
   function requireDownloadAuth() {
+    if (!REQUIRE_AUTH_FOR_EXPORT) return true;
     if (authLoading) {
       setStatus("正在确认登录状态，请稍候");
       return false;
@@ -2983,7 +2988,12 @@ export default function Home() {
 
         <div className="export-toolbar">
           <div className="toolbar-group auth-toolbar" aria-label="账号">
-            {authLoading ? (
+            {!REQUIRE_AUTH_FOR_EXPORT ? (
+              <span className="auth-state" title="本地模式可直接导出">
+                <LockOpen size={15} />
+                本地模式
+              </span>
+            ) : authLoading ? (
               <span className="auth-state">
                 <LoaderCircle className="spin" size={15} />
                 检查登录
@@ -3063,8 +3073,16 @@ export default function Home() {
               type="button"
               className="icon-button"
               onClick={copyPng}
-              title={authUser ? "复制 PNG" : "登录后复制 PNG"}
-              aria-label={authUser ? "复制 PNG" : "登录后复制 PNG"}
+              title={
+                !REQUIRE_AUTH_FOR_EXPORT || authUser
+                  ? "复制 PNG"
+                  : "登录后复制 PNG"
+              }
+              aria-label={
+                !REQUIRE_AUTH_FOR_EXPORT || authUser
+                  ? "复制 PNG"
+                  : "登录后复制 PNG"
+              }
               disabled={exporting || Boolean(dataError)}
               aria-hidden={Boolean(dataError)}
             >
@@ -3076,7 +3094,11 @@ export default function Home() {
               onClick={exportSvg}
               disabled={Boolean(dataError)}
               aria-hidden={Boolean(dataError)}
-              title={authUser ? "下载 SVG" : "登录后下载 SVG"}
+              title={
+                !REQUIRE_AUTH_FOR_EXPORT || authUser
+                  ? "下载 SVG"
+                  : "登录后下载 SVG"
+              }
             >
               <Download size={17} />
               SVG
@@ -3084,11 +3106,20 @@ export default function Home() {
             <a
               className="button button-primary"
               href={
-                authUser && pngDownloadReady ? pngDownload?.objectUrl : undefined
+                (!REQUIRE_AUTH_FOR_EXPORT || authUser) && pngDownloadReady
+                  ? pngDownload?.objectUrl
+                  : undefined
               }
               download={`${safeFilename(title)}@${pixelRatio}x.png`}
-              aria-disabled={!authUser || authLoading || !pngDownloadReady}
-              title={authUser ? "下载 PNG" : "登录后下载 PNG"}
+              aria-disabled={
+                (REQUIRE_AUTH_FOR_EXPORT && (!authUser || authLoading)) ||
+                !pngDownloadReady
+              }
+              title={
+                !REQUIRE_AUTH_FOR_EXPORT || authUser
+                  ? "下载 PNG"
+                  : "登录后下载 PNG"
+              }
               onClick={(event) => {
                 if (dataError) {
                   event.preventDefault();

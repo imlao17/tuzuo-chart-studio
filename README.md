@@ -41,6 +41,8 @@ buildChartOption(config)          ← 薄分派器
 - `app/auth-server.ts` — 邮箱注册、邮箱验证、登录会话、下载权限的服务端逻辑
 - `app/api/auth/*` — 注册 / 登录 / 登出 / 会话 / 邮箱验证 API
 - `db/schema.ts` — D1/Drizzle 用户、验证 token、会话表结构
+- `drizzle/` — 数据库迁移文件
+- `docs/deployment.md` — 本地部署、生产托管、账号与邮箱配置
 - `docs/project-stage-and-control.md` — 当前阶段、风险和接管建议
 - `docs/layout-redesign-plan.md` — 下一轮左右布局调整方案
 
@@ -56,9 +58,18 @@ npm test         # 构建 + HTML 回归测试 + 行为测试
 npm run lint
 ```
 
-## 上线账号体系
+默认是本地模式，不需要账号就可以保存项目文件、复制 PNG、导出 SVG 和下载 PNG。公开托管时，可以通过 `NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=true` 打开“登录后才能导出”。
 
-当前版本已经接入最小可上线账号闭环：邮箱注册、邮箱验证、登录会话、登出，以及下载权限拦截。未登录用户可以编辑和预览，只有保存 `.tuzuo.json` 项目文件、复制 PNG、导出 SVG、下载 PNG 时需要登录。
+## 部署与账号体系
+
+当前版本已经接入最小可上线账号闭环：邮箱注册、邮箱验证、登录会话、登出、登录/注册限流，以及可配置的下载权限拦截。
+
+两种运行方式：
+
+| 模式 | 配置 | 适合场景 |
+|---|---|---|
+| 本地模式 | `NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=false`（默认） | 自己用、团队内网、开源用户本地部署 |
+| 公开托管 | `NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=true` | 面向外部用户，要求登录后导出 |
 
 生产环境需要配置：
 
@@ -80,6 +91,8 @@ npm run db:generate
 
 如果直接使用 `wrangler d1 migrations apply DB --local/--remote`，需要先在 `wrangler.jsonc` 里声明 D1 数据库；当前 Sites 部署配置以 `.openai/hosting.json` 为准。
 
+完整部署说明见 `docs/deployment.md`。
+
 ## 测试
 
 两类测试，`npm test` 会依次运行：
@@ -90,3 +103,7 @@ npm run db:generate
 ## 技术栈
 
 vinext + Next.js 16 + React 19 + ECharts 6 + Tailwind 4 + Cloudflare D1 / Drizzle。
+
+## 开源
+
+本项目使用 MIT License。贡献约定见 `CONTRIBUTING.md`，安全问题报告见 `SECURITY.md`。

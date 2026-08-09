@@ -58,3 +58,17 @@ export const sessions = sqliteTable(
     index("sessions_expires_at_idx").on(table.expiresAt),
   ],
 );
+
+export const authRateLimits = sqliteTable(
+  "auth_rate_limits",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull(),
+    windowStart: integer("window_start").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("auth_rate_limits_window_start_idx").on(table.windowStart),
+    index("auth_rate_limits_updated_at_idx").on(table.updatedAt),
+  ],
+);

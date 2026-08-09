@@ -13,7 +13,7 @@
 
 - The white surface, thin gray borders, compact title strip, dense chart grid, and label placement match the Flourish reference.
 - All thumbnails are real ECharts previews rather than placeholders.
-- The implementation intentionally stops at the requested 20 common charts, leaving white space below the third row.
+- This entry is historical; the implementation later expanded beyond the first 20 common charts.
 - Search, current selection, and Chinese labels are intentional product additions.
 - Visual Verdict improved from 72 to 93 after tightening the header, grid, card height, and spacing.
 

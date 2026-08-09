@@ -9,7 +9,7 @@ export const runtime = "edge";
 
 export async function POST(request: Request) {
   try {
-    const result = await loginWithEmail(await request.json());
+    const result = await loginWithEmail(await request.json(), request);
     const response = NextResponse.json({ user: result.user });
     setSessionCookie(response, request, result.sessionToken);
     return response;

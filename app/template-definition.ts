@@ -602,14 +602,22 @@ const requireNumericColumn: DataValidator = {
 /** Requires at least two numeric columns (e.g. scatter X/Y, diverging L/R). */
 const requireTwoNumericColumns =
   (message: string): DataValidator => ({
-    validate: (ctx) =>
-      ctx.parsed.numericHeaders.length < 2 ? message : null,
+    validate: (ctx) => {
+      const selectedNumericColumns = ctx.seriesColumns.filter((header) =>
+        ctx.parsed.numericHeaders.includes(header),
+      );
+      return selectedNumericColumns.length < 2 ? message : null;
+    },
   });
 
 const requireFourNumericColumns =
   (message: string): DataValidator => ({
-    validate: (ctx) =>
-      ctx.parsed.numericHeaders.length < 4 ? message : null,
+    validate: (ctx) => {
+      const selectedNumericColumns = ctx.seriesColumns.filter((header) =>
+        ctx.parsed.numericHeaders.includes(header),
+      );
+      return selectedNumericColumns.length < 4 ? message : null;
+    },
   });
 
 const requireSankeyColumns: DataValidator = {

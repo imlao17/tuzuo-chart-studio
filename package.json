@@ -1,7 +1,15 @@
 {
   "name": "tuzuo-chart-studio",
   "version": "0.1.0",
-  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imlao17/tuzuo-chart-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/imlao17/tuzuo-chart-studio/issues"
+  },
+  "homepage": "https://github.com/imlao17/tuzuo-chart-studio#readme",
   "engines": {
     "node": ">=22.13.0"
   },
@@ -18,12 +26,12 @@
     "drizzle-orm": "0.45.2",
     "echarts": "^6.1.0",
     "lucide-react": "^1.27.0",
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/vite-plugin": "1.51.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -32,13 +40,18 @@
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
-    "react-server-dom-webpack": "19.2.6",
+    "eslint-config-next": "16.3.0",
+    "react-server-dom-webpack": "19.2.8",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
-    "vinext": "0.0.50",
-    "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "vinext": "0.0.45",
+    "vite": "8.2.1",
+    "wrangler": "4.120.0"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    }
   },
   "type": "module"
 }

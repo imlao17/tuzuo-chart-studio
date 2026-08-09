@@ -1,6 +1,7 @@
 import { and, eq, gt } from "drizzle-orm";
 import type { NextResponse } from "next/server";
 import {
+  authRateLimits,
   emailVerificationTokens,
   sessions,
   users,
@@ -13,6 +14,11 @@ const VERIFICATION_TTL_MS = 1000 * 60 * 60 * 24;
 const PASSWORD_ALGORITHM = "pbkdf2-sha256";
 const PASSWORD_ITERATIONS = 310000;
 const PASSWORD_KEY_BITS = 256;
+const AUTH_RATE_LIMIT_WINDOW_MS = 1000 * 60 * 15;
+const AUTH_RATE_LIMITS = {
+  login: 10,
+  register: 5,
+} as const;
 
 type UserRecord = typeof users.$inferSelect;
 
@@ -22,6 +28,8 @@ type RuntimeEnv = {
   APP_BASE_URL?: string;
   AUTH_DEV_SHOW_VERIFICATION_LINK?: string;
 };
+
+type AuthRateLimitAction = keyof typeof AUTH_RATE_LIMITS;
 
 export type PublicUser = {
   id: string;
@@ -68,6 +76,7 @@ export async function registerWithEmail(
   validatePassword(password);
 
   const db = await getAuthDb();
+  await enforceAuthRateLimit(db, "register", request, email);
   const now = Date.now();
   const [existingUser] = await db
     .select()
@@ -140,10 +149,13 @@ export async function registerWithEmail(
   };
 }
 
-export async function loginWithEmail(input: {
-  email?: unknown;
-  password?: unknown;
-}) {
+export async function loginWithEmail(
+  input: {
+    email?: unknown;
+    password?: unknown;
+  },
+  request: Request,
+) {
   const email = normalizeEmail(input.email);
   const password = String(input.password ?? "");
   validateEmail(email);
@@ -152,6 +164,7 @@ export async function loginWithEmail(input: {
   }
 
   const db = await getAuthDb();
+  await enforceAuthRateLimit(db, "login", request, email);
   const [user] = await db
     .select()
     .from(users)
@@ -288,9 +301,109 @@ export function clearSessionCookie(response: NextResponse, request: Request) {
 export async function getAppOrigin(request: Request, runtimeEnv?: RuntimeEnv) {
   const resolvedEnv = runtimeEnv ?? (await getRuntimeEnv());
   const configuredOrigin = resolvedEnv.APP_BASE_URL?.trim();
-  if (configuredOrigin) return configuredOrigin.replace(/\/+$/, "");
+  if (configuredOrigin) return normalizeConfiguredOrigin(configuredOrigin);
   const url = new URL(request.url);
-  return `${url.protocol}//${url.host}`;
+  if (isLocalOrigin(url) || shouldExposeVerificationLink(resolvedEnv)) {
+    return `${url.protocol}//${url.host}`;
+  }
+  throw new AuthError(
+    503,
+    "APP_BASE_URL_REQUIRED",
+    "生产环境需要配置 APP_BASE_URL 才能生成邮箱验证链接",
+  );
+}
+
+function normalizeConfiguredOrigin(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("Unsupported protocol");
+    }
+    return url.origin;
+  } catch {
+    throw new AuthError(
+      503,
+      "APP_BASE_URL_INVALID",
+      "APP_BASE_URL 需要是完整的 http 或 https 地址",
+    );
+  }
+}
+
+function isLocalOrigin(url: URL) {
+  return (
+    url.hostname === "localhost" ||
+    url.hostname === "127.0.0.1" ||
+    url.hostname === "0.0.0.0" ||
+    url.hostname === "::1"
+  );
+}
+
+async function enforceAuthRateLimit(
+  db: Awaited<ReturnType<typeof getAuthDb>>,
+  action: AuthRateLimitAction,
+  request: Request,
+  email: string,
+) {
+  const now = Date.now();
+  const limit = AUTH_RATE_LIMITS[action];
+  const windowStart = now - AUTH_RATE_LIMIT_WINDOW_MS;
+  const clientHash = await sha256Base64Url(getClientIp(request));
+  const emailHash = await sha256Base64Url(email);
+  const key = `${action}:${clientHash}:${emailHash}`;
+
+  const [record] = await db
+    .select()
+    .from(authRateLimits)
+    .where(eq(authRateLimits.key, key))
+    .limit(1);
+
+  if (record && record.windowStart > windowStart) {
+    if (record.count >= limit) {
+      throw new AuthError(
+        429,
+        "AUTH_RATE_LIMITED",
+        "尝试次数过多，请稍后再试",
+      );
+    }
+    await db
+      .update(authRateLimits)
+      .set({ count: record.count + 1, updatedAt: now })
+      .where(eq(authRateLimits.key, key));
+    return;
+  }
+
+  const nextRecord = {
+    key,
+    count: 1,
+    windowStart: now,
+    updatedAt: now,
+  };
+
+  if (record) {
+    await db
+      .update(authRateLimits)
+      .set(nextRecord)
+      .where(eq(authRateLimits.key, key));
+    return;
+  }
+
+  try {
+    await db.insert(authRateLimits).values(nextRecord);
+  } catch {
+    await db
+      .update(authRateLimits)
+      .set(nextRecord)
+      .where(eq(authRateLimits.key, key));
+  }
+}
+
+function getClientIp(request: Request) {
+  const forwarded =
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-real-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (forwarded) return forwarded;
+  return "unknown-client";
 }
 
 async function getAuthDb() {

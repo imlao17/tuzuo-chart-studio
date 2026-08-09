@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import "./globals.css";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host =
-    requestHeaders.get("x-forwarded-host") ??
-    requestHeaders.get("host") ??
-    "localhost:3000";
-  const protocol =
-    requestHeaders.get("x-forwarded-proto") ??
-    (host.startsWith("localhost") ? "http" : "https");
-  const origin = `${protocol}://${host}`;
+function metadataOrigin() {
+  const configuredOrigin = process.env.APP_BASE_URL?.trim();
+  if (!configuredOrigin) return "http://localhost:3000";
+  try {
+    return new URL(configuredOrigin).origin;
+  } catch {
+    return "http://localhost:3000";
+  }
+}
+
+export function generateMetadata(): Metadata {
+  const origin = metadataOrigin();
   const title = "图作 · 透明图表工具";
   const description = "导入数据，制作图表，并导出透明背景 PNG 或 SVG。";
 

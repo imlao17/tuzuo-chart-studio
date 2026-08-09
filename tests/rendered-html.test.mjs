@@ -42,8 +42,8 @@ test("server-renders the chart studio", async () => {
   assert.match(html, /数字格式/);
   assert.match(html, /标题样式/);
   assert.match(html, /副标题样式/);
-  assert.match(html, /检查登录/);
-  assert.match(html, /登录后下载 PNG/);
+  assert.match(html, /本地模式/);
+  assert.match(html, /下载 PNG/);
   assert.match(html, /PNG/);
   assert.match(html, /SVG/);
   assert.doesNotMatch(html, /codex-preview|Building your site|SkeletonPreview/);
@@ -127,6 +127,7 @@ test("includes the complete chart studio implementation", async () => {
   assert.match(page, /PanelRightClose/);
   assert.match(page, /authUser/);
   assert.match(page, /requireDownloadAuth/);
+  assert.match(page, /NEXT_PUBLIC_TUZUO_REQUIRE_AUTH/);
   assert.match(page, /\/api\/auth\/session/);
   assert.match(page, /登录 \/ 注册/);
   assert.match(page, /登录后可下载 SVG、PNG 和项目文件/);

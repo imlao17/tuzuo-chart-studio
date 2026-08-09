@@ -9,9 +9,10 @@ export const runtime = "edge";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const redirectUrl = new URL("/", await getAppOrigin(request));
+  let redirectUrl = new URL("/", requestUrl.origin);
 
   try {
+    redirectUrl = new URL("/", await getAppOrigin(request));
     await verifyEmailToken(requestUrl.searchParams.get("token") ?? "");
     redirectUrl.searchParams.set("verified", "1");
   } catch (error) {

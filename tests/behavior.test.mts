@@ -519,6 +519,21 @@ test("single numeric column passes generic templates but fails role-specific tem
   }
 });
 
+test("role-specific validators check selected numeric fields, not only table shape", () => {
+  const parsed = tableToParsed([
+    ["日期", "开盘", "收盘", "最低", "最高"],
+    ["一月", "100", "120", "95", "128"],
+    ["二月", "120", "115", "108", "130"],
+  ]);
+  const ctx: ValidationContext = {
+    parsed,
+    categoryColumn: "日期",
+    seriesColumns: ["开盘", "收盘"],
+  };
+
+  assert.match(firstError("candlestick", ctx) ?? "", /4 个数值列/);
+});
+
 test("advanced templates emit their intended ECharts series and coordinate options", () => {
   const expectedSeriesTypes = {
     dotPlot: "scatter",
