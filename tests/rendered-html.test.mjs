@@ -74,6 +74,12 @@ test("includes the complete chart studio implementation", async () => {
     authLoginRoute,
     authVerifyRoute,
     exportDownload,
+    textStyleControls,
+    authDialog,
+    exportToolbar,
+    authSessionHook,
+    customPalettesHook,
+    pngExportHook,
     hostingConfig,
   ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -99,6 +105,33 @@ test("includes the complete chart studio implementation", async () => {
       new URL("../src/studio/export/download.ts", import.meta.url),
       "utf8",
     ),
+    readFile(
+      new URL(
+        "../src/studio/components/text-style-controls.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/studio/components/auth-dialog.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/studio/components/export-toolbar.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/studio/hooks/use-auth-session.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/studio/hooks/use-custom-palettes.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/studio/hooks/use-png-export.ts", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
   ]);
 
@@ -109,15 +142,17 @@ test("includes the complete chart studio implementation", async () => {
 
   assert.equal(templateDefinitions.length, 30);
   assert.match(page, /renderer:\s*"svg"/);
-  assert.match(page, /renderPngDataUrl/);
+  assert.match(pngExportHook, /renderPngDataUrl/);
   assert.match(exportDownload, /URL\.createObjectURL\(blob\)/);
   assert.match(exportDownload, /export function safeFilename/);
   assert.match(exportDownload, /export async function renderPngDataUrl/);
-  assert.match(page, /download=\{`\$\{safeFilename\(title\)\}/);
-  assert.match(page, /tuzuo-custom-palettes/);
-  assert.match(page, /editingPaletteId/);
-  assert.match(page, /editSavedPalette/);
+  assert.match(exportToolbar, /download=\{`\$\{safeFilename\(title\)\}/);
+  assert.match(customPalettesHook, /tuzuo-custom-palettes/);
+  assert.match(customPalettesHook, /editingPaletteId/);
+  assert.match(customPalettesHook, /editSavedPalette/);
   assert.match(page, /TextStyleControls/);
+  assert.match(textStyleControls, /Bold/);
+  assert.match(textStyleControls, /Italic/);
   assert.match(page, /titleStyle/);
   assert.match(page, /subtitleStyle/);
   assert.match(page, /xAxisTitleStyle/);
@@ -133,12 +168,13 @@ test("includes the complete chart studio implementation", async () => {
   assert.match(page, /PanelLeftClose/);
   assert.match(page, /PanelRightClose/);
   assert.match(page, /authUser/);
-  assert.match(page, /requireDownloadAuth/);
+  assert.match(authSessionHook, /requireDownloadAuth/);
   assert.match(page, /NEXT_PUBLIC_TUZUO_REQUIRE_AUTH/);
-  assert.match(page, /\/api\/auth\/session/);
-  assert.match(page, /登录 \/ 注册/);
-  assert.match(page, /登录后可下载 SVG、PNG 和项目文件/);
-  assert.match(page, /登录后才能下载/);
+  assert.match(authSessionHook, /\/api\/auth\/session/);
+  assert.match(authDialog, /登录图作账号/);
+  assert.match(authDialog, /注册图作账号/);
+  assert.match(authDialog, /登录后可下载 SVG、PNG 和项目文件/);
+  assert.match(authSessionHook, /登录后才能下载/);
   assert.match(styles, /\.brand-logo/);
   assert.match(styles, /\.studio-grid\.left-collapsed/);
   assert.match(styles, /\.toolbar-group/);

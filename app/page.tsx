@@ -8,22 +8,14 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
-  Bold,
   Check,
   ChevronDown,
-  Clipboard,
   Columns3,
-  Download,
   FileUp,
-  ImageDown,
   LayoutGrid,
   LineChart,
-  LogIn,
-  LogOut,
-  LoaderCircle,
   Lock,
   LockOpen,
-  Mail,
   Palette,
   PanelLeftClose,
   PanelLeftOpen,
@@ -40,14 +32,11 @@ import {
   Sparkles,
   Table2,
   Trash2,
-  Italic,
-  User,
   X,
 } from "lucide-react";
 import {
   ChangeEvent,
   CSSProperties,
-  FormEvent,
   ReactNode,
   useEffect,
   useMemo,
@@ -77,10 +66,18 @@ import {
 } from "./template-definition";
 import {
   downloadBlob,
-  renderPngDataUrl,
   safeFilename,
 } from "../src/studio/export/download";
+import { AuthDialog } from "../src/studio/components/auth-dialog";
+import { ExportToolbar } from "../src/studio/components/export-toolbar";
+import { TextStyleControls } from "../src/studio/components/text-style-controls";
+import { useAuthSession } from "../src/studio/hooks/use-auth-session";
+import { useCustomPalettes } from "../src/studio/hooks/use-custom-palettes";
+import { usePngExport } from "../src/studio/hooks/use-png-export";
 import { parseColorOverrides } from "../src/studio/palette/color-overrides";
+import type {
+  TextStyleState,
+} from "../src/studio/types";
 
 const DEFAULT_MARGINS: Margins = {
   top: 28,
@@ -92,34 +89,6 @@ const CANVAS_WIDTH_BOUNDS = { min: 320, max: 2400 };
 const CANVAS_HEIGHT_BOUNDS = { min: 240, max: 1800 };
 const REQUIRE_AUTH_FOR_EXPORT =
   process.env.NEXT_PUBLIC_TUZUO_REQUIRE_AUTH === "true";
-
-type SavedPalette = {
-  id: string;
-  name: string;
-  colors: string[];
-};
-
-type TextStyleState = {
-  fontSize: number;
-  color: string;
-  bold: boolean;
-  italic: boolean;
-};
-
-type AuthMode = "login" | "register";
-
-type AuthUser = {
-  id: string;
-  email: string;
-  role: "user" | "admin";
-  emailVerified: boolean;
-};
-
-type AuthResponse = {
-  user?: AuthUser | null;
-  message?: string;
-  verificationUrl?: string | null;
-};
 
 // Field role bindings: single-column roles map to a string, the multi-column
 // `value` role maps to a string[] (selection order = render order). Missing
@@ -420,7 +389,6 @@ const LABEL_POSITION_OPTIONS: Array<{ value: LabelPosition; label: string }> = [
   { value: "insideTop", label: "内部上方" },
   { value: "insideBottom", label: "内部下方" },
 ];
-const TEXT_STYLE_SIZE_OPTIONS = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
 const LEGEND_POSITION_VALUES = ["top", "bottom", "left", "right"] as const;
 const LEGEND_ALIGN_VALUES = ["start", "center", "end"] as const;
 const LEGEND_HORIZONTAL_ALIGN_OPTIONS: Array<{
@@ -961,82 +929,6 @@ function Toggle({
   );
 }
 
-function TextStyleControls({
-  label,
-  style,
-  fallbackColor,
-  onChange,
-}: {
-  label: string;
-  style: TextStyleState;
-  fallbackColor: string;
-  onChange: (next: TextStyleState) => void;
-}) {
-  const resolvedColor = style.color || fallbackColor;
-  const updateStyle = (patch: Partial<TextStyleState>) =>
-    onChange({ ...style, ...patch });
-
-  return (
-    <div className="text-style-control">
-      <span className="settings-caption">{label}</span>
-      <div className="text-style-row">
-        <label className="text-size-select">
-          <span className="sr-only">{label}字号</span>
-          <select
-            value={style.fontSize}
-            onChange={(event) =>
-              updateStyle({ fontSize: Number(event.target.value) })
-            }
-            aria-label={`${label}字号`}
-          >
-            {TEXT_STYLE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}px
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          className={style.bold ? "style-toggle active" : "style-toggle"}
-          onClick={() => updateStyle({ bold: !style.bold })}
-          aria-pressed={style.bold}
-          aria-label={`${label}粗体`}
-          title="粗体"
-        >
-          <Bold size={14} />
-        </button>
-        <button
-          type="button"
-          className={style.italic ? "style-toggle active" : "style-toggle"}
-          onClick={() => updateStyle({ italic: !style.italic })}
-          aria-pressed={style.italic}
-          aria-label={`${label}斜体`}
-          title="斜体"
-        >
-          <Italic size={14} />
-        </button>
-        <button
-          type="button"
-          className="text-style-reset"
-          onClick={() => updateStyle({ color: "" })}
-        >
-          跟随
-        </button>
-        <span className="color-input-wrap text-color-input">
-          <input
-            type="color"
-            value={resolvedColor}
-            onChange={(event) => updateStyle({ color: event.target.value })}
-            aria-label={`${label}颜色`}
-          />
-          <span>{resolvedColor.toUpperCase()}</span>
-        </span>
-      </div>
-    </div>
-  );
-}
-
 function TemplateThumbnail({ type }: { type: ChartType }) {
   const elementRef = useRef<HTMLDivElement | null>(null);
 
@@ -1187,15 +1079,10 @@ export default function Home() {
   const [paletteColors, setPaletteColors] = useState<string[]>([
     ...DEFAULT_PROJECT.paletteColors,
   ]);
-  const [customPalettes, setCustomPalettes] = useState<SavedPalette[]>([]);
-  const [editingPaletteId, setEditingPaletteId] = useState<string | null>(null);
-  const [palettesLoaded, setPalettesLoaded] = useState(false);
   // Guards the auto-save/restore effect so the initial render's defaults
   // aren't written to localStorage before the saved project is restored.
   const [projectLoaded, setProjectLoaded] = useState(false);
   const projectStorageWarningRef = useRef(false);
-  const paletteStorageWarningRef = useRef(false);
-  const [paletteName, setPaletteName] = useState("我的配色");
   const [colorOverridesText, setColorOverridesText] = useState(
     DEFAULT_PROJECT.colorOverridesText,
   );
@@ -1352,24 +1239,57 @@ export default function Home() {
   const [pixelRatio, setPixelRatio] = useState(2);
   const [previewScale, setPreviewScale] = useState(1);
   const [status, setStatus] = useState("");
-  const [exporting, setExporting] = useState(false);
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(REQUIRE_AUTH_FOR_EXPORT);
-  const [authPanelOpen, setAuthPanelOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
-  const [authVerificationUrl, setAuthVerificationUrl] = useState<string | null>(
-    null,
-  );
-  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const {
+    customPalettes,
+    editingPaletteId,
+    setEditingPaletteId,
+    paletteName,
+    setPaletteName,
+    selectSavedPalette,
+    editSavedPalette,
+    movePaletteColor,
+    addPaletteColor,
+    removePaletteColor,
+    saveCurrentPalette,
+    deleteSavedPalette,
+  } = useCustomPalettes({
+    paletteColors,
+    setPaletteColors,
+    themeId,
+    setThemeId,
+    setStatus,
+    defaultColors: THEMES[0].colors,
+  });
+  const {
+    authUser,
+    authLoading,
+    authPanelOpen,
+    setAuthPanelOpen,
+    authMode,
+    authEmail,
+    setAuthEmail,
+    authPassword,
+    setAuthPassword,
+    authMessage,
+    authVerificationUrl,
+    authSubmitting,
+    openAuthPanel,
+    requireDownloadAuth,
+    submitAuthForm,
+    logout,
+  } = useAuthSession({
+    requireAuthForExport: REQUIRE_AUTH_FOR_EXPORT,
+    setStatus,
+  });
 
   const chartElementRef = useRef<HTMLDivElement | null>(null);
   const previewHostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ECharts | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
+  const applyProjectRef = useRef<
+    ((project: ProjectState, message?: string) => void) | null
+  >(null);
 
   const parsed = useMemo(() => tableToParsed(tableData), [tableData]);
   const colorOverrides = useMemo(
@@ -1681,13 +1601,6 @@ export default function Home() {
       yAxisTitle,
     ],
   );
-  const [pngDownload, setPngDownload] = useState<{
-    option: typeof option;
-    pixelRatio: number;
-    objectUrl: string;
-    blob: Blob;
-  } | null>(null);
-
   // Run the current template's validators against the resolved field bindings.
   // The first non-null message wins and is shown as a preview overlay; while a
   // data error is present the chart is cleared and PNG export is skipped, so
@@ -1719,11 +1632,17 @@ export default function Home() {
   const supportsLegendControl = templateDefinition.capabilities.legend;
   const markOpacityLabel =
     chartType === "sankey" ? "连线不透明度" : "图形不透明度";
-
-  const pngDownloadReady =
-    !dataError &&
-    pngDownload?.option === option &&
-    pngDownload.pixelRatio === pixelRatio;
+  const { pngDownload, pngDownloadReady, exporting, copyPng } = usePngExport({
+    option,
+    width,
+    height,
+    pixelRatio,
+    transparent,
+    backgroundColor,
+    dataError,
+    requireDownloadAuth,
+    setStatus,
+  });
   const initialChartStateRef = useRef({ height, option, width });
 
   useEffect(() => {
@@ -1766,56 +1685,6 @@ export default function Home() {
   }, [dataError, height, option, width, workspaceMode]);
 
   useEffect(() => {
-    // While data validation fails there is no valid chart to export: skip PNG
-    // generation entirely. pngDownloadReady already factors in dataError, so
-    // the export buttons show their not-ready state without needing to clear
-    // the (now-stale) pngDownload state here.
-    if (dataError) return;
-    let objectUrl = "";
-    let cancelled = false;
-    const timeout = window.setTimeout(async () => {
-      try {
-        const dataUrl = await renderPngDataUrl({
-          option,
-          width,
-          height,
-          pixelRatio,
-          transparent,
-          backgroundColor,
-        });
-        const response = await fetch(dataUrl);
-        const blob = await response.blob();
-        if (!blob.size) throw new Error("PNG 生成失败");
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setPngDownload({
-          option,
-          pixelRatio,
-          objectUrl,
-          blob,
-        });
-      } catch (error) {
-        if (cancelled) return;
-        console.error("PNG preparation failed", error);
-        setPngDownload(null);
-      }
-    }, 120);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [
-    backgroundColor,
-    dataError,
-    height,
-    option,
-    pixelRatio,
-    transparent,
-    width,
-  ]);
-
-  useEffect(() => {
     const host = previewHostRef.current;
     if (!host) return;
 
@@ -1839,66 +1708,15 @@ export default function Home() {
   }, [status]);
 
   useEffect(() => {
-    if (!REQUIRE_AUTH_FOR_EXPORT) return;
-
-    let cancelled = false;
-    let frame = 0;
-
-    async function loadSession() {
-      try {
-        const response = await fetch("/api/auth/session", {
-          credentials: "include",
-        });
-        if (!response.ok) throw new Error("Session request failed");
-        const body = (await response.json()) as AuthResponse;
-        if (!cancelled) setAuthUser(body.user ?? null);
-      } catch {
-        if (!cancelled) setAuthUser(null);
-      } finally {
-        if (!cancelled) setAuthLoading(false);
-      }
-    }
-
-    frame = window.requestAnimationFrame(() => {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("verified") === "1") {
-        setAuthMode("login");
-        setAuthPanelOpen(true);
-        setStatus("邮箱验证成功，请登录");
-        params.delete("verified");
-        const nextQuery = params.toString();
-        window.history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`,
-        );
-      } else if (params.get("auth_error")) {
-        setAuthMode("register");
-        setAuthPanelOpen(true);
-        setAuthMessage("验证链接已失效，请重新注册或获取新的验证邮件");
-        params.delete("auth_error");
-        const nextQuery = params.toString();
-        window.history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`,
-        );
-      }
-    });
-
-    loadSession();
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(frame);
-    };
-  }, []);
+    applyProjectRef.current = applyProject;
+  });
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
         const saved = window.localStorage.getItem(PROJECT_STORAGE_KEY);
         const restored = saved ? normalizeProject(JSON.parse(saved)) : null;
-        if (restored) applyProject(restored, "已恢复上次编辑");
+        if (restored) applyProjectRef.current?.(restored, "已恢复上次编辑");
       } catch {
         window.localStorage.removeItem(PROJECT_STORAGE_KEY);
       } finally {
@@ -1930,56 +1748,10 @@ export default function Home() {
     return () => window.clearTimeout(timeout);
   });
 
-  useEffect(() => {
-    let nextPalettes: SavedPalette[] = [];
-    try {
-      const saved = window.localStorage.getItem("tuzuo-custom-palettes");
-      if (saved) nextPalettes = JSON.parse(saved) as SavedPalette[];
-    } catch {
-      nextPalettes = [];
-    }
-    const frame = window.requestAnimationFrame(() => {
-      setCustomPalettes(nextPalettes);
-      setPalettesLoaded(true);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
-
-  useEffect(() => {
-    if (!palettesLoaded) return;
-    try {
-      window.localStorage.setItem(
-        "tuzuo-custom-palettes",
-        JSON.stringify(customPalettes),
-      );
-      paletteStorageWarningRef.current = false;
-    } catch {
-      if (!paletteStorageWarningRef.current) {
-        paletteStorageWarningRef.current = true;
-        setStatus("配色保存失败，请导出项目文件备份");
-      }
-    }
-  }, [customPalettes, palettesLoaded]);
-
   function selectTheme(nextTheme: (typeof THEMES)[number]) {
     setThemeId(nextTheme.id);
     setPaletteColors([...nextTheme.colors]);
     setEditingPaletteId(null);
-  }
-
-  function selectSavedPalette(palette: SavedPalette) {
-    setThemeId(palette.id);
-    setPaletteColors([...palette.colors]);
-    setPaletteName(palette.name);
-    setEditingPaletteId(null);
-  }
-
-  function editSavedPalette(palette: SavedPalette) {
-    setThemeId(palette.id);
-    setPaletteColors([...palette.colors]);
-    setPaletteName(palette.name);
-    setEditingPaletteId(palette.id);
-    setStatus(`正在编辑「${palette.name}」`);
   }
 
   function updatePaletteColor(index: number, color: string) {
@@ -1990,141 +1762,6 @@ export default function Home() {
         colorIndex === index ? color : candidate,
       ),
     );
-  }
-
-  function movePaletteColor(index: number, direction: -1 | 1) {
-    setThemeId("custom");
-    setPaletteColors((current) => {
-      const target = index + direction;
-      if (target < 0 || target >= current.length) return current;
-      const next = [...current];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
-  }
-
-  function addPaletteColor() {
-    setThemeId("custom");
-    setPaletteColors((current) => [
-      ...current,
-      THEMES[0].colors[current.length % THEMES[0].colors.length],
-    ]);
-  }
-
-  function removePaletteColor(index: number) {
-    if (paletteColors.length <= 2) return;
-    setThemeId("custom");
-    setPaletteColors((current) =>
-      current.filter((_, colorIndex) => colorIndex !== index),
-    );
-  }
-
-  function saveCurrentPalette() {
-    const name = paletteName.trim() || `自定义配色 ${customPalettes.length + 1}`;
-    const existingById = editingPaletteId
-      ? customPalettes.find((palette) => palette.id === editingPaletteId)
-      : undefined;
-    const existingByName = customPalettes.find(
-      (palette) => palette.name.toLowerCase() === name.toLowerCase(),
-    );
-    const existing = existingById ?? existingByName;
-    const saved: SavedPalette = {
-      id: existing?.id ?? `custom-${Date.now()}`,
-      name,
-      colors: [...paletteColors],
-    };
-    setCustomPalettes((current) =>
-      existing
-        ? current.map((palette) => (palette.id === existing.id ? saved : palette))
-        : [...current, saved],
-    );
-    setThemeId(saved.id);
-    setPaletteName(name);
-    setEditingPaletteId(saved.id);
-    setStatus(existing ? "自定义配色已更新" : "自定义配色已保存");
-  }
-
-  function deleteSavedPalette(id: string) {
-    setCustomPalettes((current) =>
-      current.filter((palette) => palette.id !== id),
-    );
-    if (editingPaletteId === id) setEditingPaletteId(null);
-    if (themeId === id) setThemeId("custom");
-  }
-
-  function openAuthPanel(mode: AuthMode) {
-    setAuthMode(mode);
-    setAuthPanelOpen(true);
-    setAuthMessage("");
-    setAuthVerificationUrl(null);
-  }
-
-  function requireDownloadAuth() {
-    if (!REQUIRE_AUTH_FOR_EXPORT) return true;
-    if (authLoading) {
-      setStatus("正在确认登录状态，请稍候");
-      return false;
-    }
-    if (!authUser) {
-      setAuthMode("login");
-      setAuthPanelOpen(true);
-      setAuthMessage("登录后才能下载 SVG、PNG 和项目文件");
-      setAuthVerificationUrl(null);
-      setStatus("登录后才能下载");
-      return false;
-    }
-    return true;
-  }
-
-  async function submitAuthForm(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (authSubmitting) return;
-
-    setAuthSubmitting(true);
-    setAuthMessage("");
-    setAuthVerificationUrl(null);
-
-    try {
-      const response = await fetch(`/api/auth/${authMode}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email: authEmail, password: authPassword }),
-      });
-      const body = (await response.json().catch(() => ({}))) as AuthResponse;
-      if (!response.ok) {
-        throw new Error(body.message || "账号请求失败");
-      }
-
-      if (authMode === "login") {
-        setAuthUser(body.user ?? null);
-        setAuthPanelOpen(false);
-        setAuthPassword("");
-        setStatus("已登录，可以下载");
-        return;
-      }
-
-      setAuthPassword("");
-      setAuthMessage(body.message || "验证邮件已发送，请完成邮箱验证后再登录");
-      setAuthVerificationUrl(body.verificationUrl ?? null);
-      setStatus("验证邮件已发送");
-    } catch (error) {
-      setAuthMessage(error instanceof Error ? error.message : "账号请求失败");
-    } finally {
-      setAuthSubmitting(false);
-    }
-  }
-
-  async function logout() {
-    try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-    } finally {
-      setAuthUser(null);
-      setStatus("已退出登录");
-    }
   }
 
   function collectProject(): ProjectState {
@@ -2563,33 +2200,6 @@ export default function Home() {
     setStatus("SVG 已导出");
   }
 
-  async function copyPng() {
-    if (!requireDownloadAuth()) return;
-    setExporting(true);
-    try {
-      const blob =
-        pngDownloadReady && pngDownload
-          ? pngDownload.blob
-          : await fetch(
-              await renderPngDataUrl({
-                option,
-                width,
-                height,
-                pixelRatio,
-                transparent,
-                backgroundColor,
-              }),
-            ).then((response) => response.blob());
-      if (!blob.size) throw new Error("PNG 生成失败");
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      setStatus("PNG 已复制");
-    } catch {
-      setStatus("当前浏览器不支持复制图片");
-    } finally {
-      setExporting(false);
-    }
-  }
-
   function resetAll() {
     applyProject(cloneProject(DEFAULT_PROJECT));
     setPixelRatio(2);
@@ -2897,166 +2507,41 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="export-toolbar">
-          <div className="toolbar-group auth-toolbar" aria-label="账号">
-            {!REQUIRE_AUTH_FOR_EXPORT ? (
-              <span className="auth-state" title="本地模式可直接导出">
-                <LockOpen size={15} />
-                本地模式
-              </span>
-            ) : authLoading ? (
-              <span className="auth-state">
-                <LoaderCircle className="spin" size={15} />
-                检查登录
-              </span>
-            ) : authUser ? (
-              <>
-                <span className="auth-email" title={authUser.email}>
-                  <User size={15} />
-                  {authUser.email}
-                </span>
-                <button
-                  type="button"
-                  className="icon-button toolbar-icon-button"
-                  onClick={logout}
-                  title="退出登录"
-                  aria-label="退出登录"
-                >
-                  <LogOut size={16} />
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="button button-secondary auth-login-button"
-                onClick={() => openAuthPanel("login")}
-              >
-                <LogIn size={16} />
-                登录 / 注册
-              </button>
-            )}
-          </div>
-          <div className="toolbar-group project-toolbar" aria-label="项目">
-            <button
-              type="button"
-              className="icon-button toolbar-icon-button"
-              onClick={() => projectInputRef.current?.click()}
-              title="打开图作项目"
-              aria-label="打开图作项目"
-            >
-              <FileUp size={16} />
-            </button>
-            <input
-              ref={projectInputRef}
-              className="sr-only"
-              type="file"
-              accept=".tuzuo.json,.json,application/json"
-              onChange={handleProjectFile}
-            />
-            <button
-              type="button"
-              className="icon-button toolbar-icon-button"
-              onClick={saveProjectFile}
-              title="保存图作项目"
-              aria-label="保存图作项目"
-            >
-              <Save size={16} />
-            </button>
-          </div>
-          <div className="toolbar-group ratio-toolbar">
-            <span className="toolbar-label">倍率</span>
-            <div className="ratio-control" aria-label="PNG 导出倍率">
-              {[1, 2, 4].map((ratio) => (
-                <button
-                  key={ratio}
-                  type="button"
-                  className={pixelRatio === ratio ? "active" : ""}
-                  onClick={() => setPixelRatio(ratio)}
-                  aria-pressed={pixelRatio === ratio}
-                >
-                  {ratio}×
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="toolbar-group export-actions" aria-label="导出">
-            <button
-              type="button"
-              className="icon-button"
-              onClick={copyPng}
-              title={
-                !REQUIRE_AUTH_FOR_EXPORT || authUser
-                  ? "复制 PNG"
-                  : "登录后复制 PNG"
-              }
-              aria-label={
-                !REQUIRE_AUTH_FOR_EXPORT || authUser
-                  ? "复制 PNG"
-                  : "登录后复制 PNG"
-              }
-              disabled={exporting || Boolean(dataError)}
-              aria-hidden={Boolean(dataError)}
-            >
-              <Clipboard size={17} />
-            </button>
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={exportSvg}
-              disabled={Boolean(dataError)}
-              aria-hidden={Boolean(dataError)}
-              title={
-                !REQUIRE_AUTH_FOR_EXPORT || authUser
-                  ? "下载 SVG"
-                  : "登录后下载 SVG"
-              }
-            >
-              <Download size={17} />
-              SVG
-            </button>
-            <a
-              className="button button-primary"
-              href={
-                (!REQUIRE_AUTH_FOR_EXPORT || authUser) && pngDownloadReady
-                  ? pngDownload?.objectUrl
-                  : undefined
-              }
-              download={`${safeFilename(title)}@${pixelRatio}x.png`}
-              aria-disabled={
-                (REQUIRE_AUTH_FOR_EXPORT && (!authUser || authLoading)) ||
-                !pngDownloadReady
-              }
-              title={
-                !REQUIRE_AUTH_FOR_EXPORT || authUser
-                  ? "下载 PNG"
-                  : "登录后下载 PNG"
-              }
-              onClick={(event) => {
-                if (dataError) {
-                  event.preventDefault();
-                  return;
-                }
-                if (!requireDownloadAuth()) {
-                  event.preventDefault();
-                  return;
-                }
-                if (!pngDownloadReady) {
-                  event.preventDefault();
-                  setStatus("PNG 正在准备，请稍候");
-                  return;
-                }
-                setStatus("PNG 已开始下载");
-              }}
-            >
-              {!pngDownloadReady ? (
-                <LoaderCircle className="spin" size={17} />
-              ) : (
-                <ImageDown size={17} />
-              )}
-              PNG
-            </a>
-          </div>
-        </div>
+        <ExportToolbar
+          requireAuthForExport={REQUIRE_AUTH_FOR_EXPORT}
+          authLoading={authLoading}
+          authUser={authUser}
+          exporting={exporting}
+          dataError={dataError}
+          pixelRatio={pixelRatio}
+          pngDownloadReady={pngDownloadReady}
+          pngDownloadObjectUrl={pngDownload?.objectUrl}
+          title={title}
+          projectInputRef={projectInputRef}
+          onOpenAuth={() => openAuthPanel("login")}
+          onLogout={logout}
+          onProjectFileChange={handleProjectFile}
+          onSaveProject={saveProjectFile}
+          onPixelRatioChange={setPixelRatio}
+          onCopyPng={copyPng}
+          onExportSvg={exportSvg}
+          onPngDownloadClick={(event) => {
+            if (dataError) {
+              event.preventDefault();
+              return;
+            }
+            if (!requireDownloadAuth()) {
+              event.preventDefault();
+              return;
+            }
+            if (!pngDownloadReady) {
+              event.preventDefault();
+              setStatus("PNG 正在准备，请稍候");
+              return;
+            }
+            setStatus("PNG 已开始下载");
+          }}
+        />
       </header>
 
       <div className={studioGridClassName}>
@@ -4327,118 +3812,19 @@ export default function Home() {
       />
 
       {authPanelOpen && (
-        <div
-          className="auth-overlay"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) setAuthPanelOpen(false);
-          }}
-        >
-          <section
-            className="auth-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="auth-dialog-title"
-          >
-            <div className="auth-dialog-header">
-              <div className="auth-title-block">
-                <span className="auth-title-icon" aria-hidden="true">
-                  <Mail size={16} />
-                </span>
-                <div>
-                  <h2 id="auth-dialog-title">
-                    {authMode === "login" ? "登录图作账号" : "注册图作账号"}
-                  </h2>
-                  <p>登录后可下载 SVG、PNG 和项目文件</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={() => setAuthPanelOpen(false)}
-                aria-label="关闭账号面板"
-                title="关闭"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="auth-mode-switch" role="tablist" aria-label="账号操作">
-              <button
-                type="button"
-                className={authMode === "login" ? "active" : ""}
-                onClick={() => openAuthPanel("login")}
-                role="tab"
-                aria-selected={authMode === "login"}
-              >
-                登录
-              </button>
-              <button
-                type="button"
-                className={authMode === "register" ? "active" : ""}
-                onClick={() => openAuthPanel("register")}
-                role="tab"
-                aria-selected={authMode === "register"}
-              >
-                注册
-              </button>
-            </div>
-
-            <form className="auth-form" onSubmit={submitAuthForm}>
-              <label className="field">
-                <span>邮箱</span>
-                <input
-                  type="email"
-                  value={authEmail}
-                  onChange={(event) => setAuthEmail(event.target.value)}
-                  autoComplete="email"
-                  placeholder="name@example.com"
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>密码</span>
-                <input
-                  type="password"
-                  value={authPassword}
-                  onChange={(event) => setAuthPassword(event.target.value)}
-                  autoComplete={
-                    authMode === "login" ? "current-password" : "new-password"
-                  }
-                  minLength={8}
-                  required
-                />
-              </label>
-
-              {authMode === "register" && (
-                <p className="auth-note">注册后需要完成邮箱验证，再登录下载。</p>
-              )}
-
-              {authMessage && (
-                <div className="auth-message" role="status">
-                  <span>{authMessage}</span>
-                  {authVerificationUrl && (
-                    <a
-                      href={authVerificationUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      打开验证链接
-                    </a>
-                  )}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="button button-primary auth-submit-button"
-                disabled={authSubmitting}
-              >
-                {authSubmitting && <LoaderCircle className="spin" size={16} />}
-                {authMode === "login" ? "登录" : "发送验证邮件"}
-              </button>
-            </form>
-          </section>
-        </div>
+        <AuthDialog
+          mode={authMode}
+          email={authEmail}
+          password={authPassword}
+          message={authMessage}
+          verificationUrl={authVerificationUrl}
+          submitting={authSubmitting}
+          onClose={() => setAuthPanelOpen(false)}
+          onModeChange={openAuthPanel}
+          onEmailChange={setAuthEmail}
+          onPasswordChange={setAuthPassword}
+          onSubmit={submitAuthForm}
+        />
       )}
 
       {status && (
