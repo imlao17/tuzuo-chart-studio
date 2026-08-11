@@ -9,6 +9,7 @@ import {
   LockOpen,
   LogIn,
   LogOut,
+  MoreHorizontal,
   Save,
   User,
 } from "lucide-react";
@@ -56,16 +57,14 @@ export function ExportToolbar({
   onPngDownloadClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
   const canExport = !requireAuthForExport || Boolean(authUser);
+  const closeMenu = (element: HTMLElement) =>
+    element.closest("details")?.removeAttribute("open");
 
   return (
     <div className="export-toolbar">
-      <div className="toolbar-group auth-toolbar" aria-label="账号">
-        {!requireAuthForExport ? (
-          <span className="auth-state" title="本地模式可直接导出">
-            <LockOpen size={15} />
-            本地模式
-          </span>
-        ) : authLoading ? (
+      {requireAuthForExport && (
+        <div className="toolbar-group auth-toolbar" aria-label="账号">
+          {authLoading ? (
           <span className="auth-state">
             <LoaderCircle className="spin" size={15} />
             检查登录
@@ -95,8 +94,9 @@ export function ExportToolbar({
             <LogIn size={16} />
             登录 / 注册
           </button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
       <div className="toolbar-group project-toolbar" aria-label="项目">
         <button
           type="button"
@@ -124,26 +124,10 @@ export function ExportToolbar({
           <Save size={16} />
         </button>
       </div>
-      <div className="toolbar-group ratio-toolbar">
-        <span className="toolbar-label">倍率</span>
-        <div className="ratio-control" aria-label="PNG 导出倍率">
-          {[1, 2, 4].map((ratio) => (
-            <button
-              key={ratio}
-              type="button"
-              className={pixelRatio === ratio ? "active" : ""}
-              onClick={() => onPixelRatioChange(ratio)}
-              aria-pressed={pixelRatio === ratio}
-            >
-              {ratio}×
-            </button>
-          ))}
-        </div>
-      </div>
       <div className="toolbar-group export-actions" aria-label="导出">
         <button
           type="button"
-          className="icon-button"
+          className="icon-button copy-action"
           onClick={onCopyPng}
           title={canExport ? "复制 PNG" : "登录后复制 PNG"}
           aria-label={canExport ? "复制 PNG" : "登录后复制 PNG"}
@@ -154,7 +138,7 @@ export function ExportToolbar({
         </button>
         <button
           type="button"
-          className="button button-secondary"
+          className="button button-secondary svg-action"
           onClick={onExportSvg}
           disabled={Boolean(dataError)}
           aria-hidden={Boolean(dataError)}
@@ -181,6 +165,109 @@ export function ExportToolbar({
           )}
           PNG
         </a>
+        <details className="export-menu">
+          <summary className="icon-button" aria-label="更多导出与项目操作" title="更多操作">
+            <MoreHorizontal size={17} />
+          </summary>
+          <div className="export-menu-popover">
+            {!requireAuthForExport ? (
+              <div className="export-menu-state">
+                <LockOpen size={14} />
+                本地模式可直接导出
+              </div>
+            ) : authLoading ? (
+              <div className="export-menu-state">
+                <LoaderCircle className="spin" size={14} />
+                检查登录
+              </div>
+            ) : authUser ? (
+              <>
+                <div className="export-menu-state" title={authUser.email}>
+                  <User size={14} />
+                  <span>{authUser.email}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    onLogout();
+                    closeMenu(event.currentTarget);
+                  }}
+                >
+                  <LogOut size={15} />
+                  退出登录
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={(event) => {
+                  onOpenAuth();
+                  closeMenu(event.currentTarget);
+                }}
+              >
+                <LogIn size={15} />
+                登录 / 注册
+              </button>
+            )}
+            <span className="export-menu-label">PNG 倍率</span>
+            <div className="ratio-control" aria-label="PNG 导出倍率">
+              {[1, 2, 4].map((ratio) => (
+                <button
+                  key={ratio}
+                  type="button"
+                  className={pixelRatio === ratio ? "active" : ""}
+                  onClick={() => onPixelRatioChange(ratio)}
+                  aria-pressed={pixelRatio === ratio}
+                >
+                  {ratio}×
+                </button>
+              ))}
+            </div>
+            <div className="export-menu-divider" />
+            <button
+              type="button"
+              onClick={(event) => {
+                projectInputRef.current?.click();
+                closeMenu(event.currentTarget);
+              }}
+            >
+              <FileUp size={15} />
+              打开项目
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                onSaveProject();
+                closeMenu(event.currentTarget);
+              }}
+            >
+              <Save size={15} />
+              保存项目
+            </button>
+            <button
+              type="button"
+              disabled={exporting || Boolean(dataError)}
+              onClick={(event) => {
+                onCopyPng();
+                closeMenu(event.currentTarget);
+              }}
+            >
+              <Clipboard size={15} />
+              复制 PNG
+            </button>
+            <button
+              type="button"
+              disabled={Boolean(dataError)}
+              onClick={(event) => {
+                onExportSvg();
+                closeMenu(event.currentTarget);
+              }}
+            >
+              <Download size={15} />
+              下载 SVG
+            </button>
+          </div>
+        </details>
       </div>
     </div>
   );

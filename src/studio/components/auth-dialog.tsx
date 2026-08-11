@@ -3,6 +3,7 @@
 import { LoaderCircle, Mail, X } from "lucide-react";
 import type { FormEvent } from "react";
 import type { AuthMode } from "../types";
+import { useDialogFocus } from "../hooks/use-dialog-focus";
 
 export function AuthDialog({
   mode,
@@ -29,6 +30,8 @@ export function AuthDialog({
   onPasswordChange: (password: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const dialogRef = useDialogFocus<HTMLElement>({ open: true, onClose });
+
   return (
     <div
       className="auth-overlay"
@@ -37,10 +40,12 @@ export function AuthDialog({
       }}
     >
       <section
+        ref={dialogRef}
         className="auth-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-dialog-title"
+        tabIndex={-1}
       >
         <div className="auth-dialog-header">
           <div className="auth-title-block">

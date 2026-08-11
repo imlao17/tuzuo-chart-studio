@@ -32,6 +32,10 @@ import { buildPieOption } from "./renderers/pie";
 import { buildScatterOption } from "./renderers/scatter";
 import { buildStreamgraphOption } from "./renderers/streamgraph";
 import { buildWithRenderer, type RendererResult } from "./renderers/shared";
+import {
+  SETTINGS_SECTION_META,
+  type SettingsSectionId,
+} from "../src/studio/settings/registry";
 
 export type DataBindingRole =
   | "category"
@@ -70,14 +74,7 @@ export type DataValidator = {
   validate(ctx: ValidationContext): string | null;
 };
 
-export type SettingsGroupId =
-  | "colors"
-  | "marks"
-  | "labels"
-  | "xAxis"
-  | "yAxis"
-  | "legend"
-  | "numbers";
+export type SettingsGroupId = Exclude<SettingsSectionId, "data">;
 
 export type SettingsGroup = {
   id: SettingsGroupId;
@@ -134,41 +131,13 @@ export type TemplateDefinition = {
 // so that task 4 can switch the panel to be schema-driven without changing
 // user-visible labels.
 
-const GROUP_COLORS: SettingsGroup = {
-  id: "colors",
-  title: "配色",
-  keywords: "配色 主题 色板 颜色",
-};
-const GROUP_MARKS: SettingsGroup = {
-  id: "marks",
-  title: "线条、数据点与面积",
-  keywords: "线条 数据点 面积 线宽 点大小 平滑 柱宽 圆角 透明度",
-};
-const GROUP_LABELS: SettingsGroup = {
-  id: "labels",
-  title: "数据标签",
-  keywords: "数据标签 标签位置 标签颜色 标签对齐 字号",
-};
-const GROUP_X_AXIS: SettingsGroup = {
-  id: "xAxis",
-  title: "X 轴",
-  keywords: "X 轴 横轴 分类轴 标题 旋转",
-};
-const GROUP_Y_AXIS: SettingsGroup = {
-  id: "yAxis",
-  title: "Y 轴",
-  keywords: "Y 轴 纵轴 数值轴 标题 范围 网格",
-};
-const GROUP_LEGEND: SettingsGroup = {
-  id: "legend",
-  title: "图例与交互",
-  keywords: "图例 提示 交互 位置 对齐 居中 靠左 靠右 靠上 靠下 tooltip",
-};
-const GROUP_NUMBERS: SettingsGroup = {
-  id: "numbers",
-  title: "数字格式",
-  keywords: "数字格式 小数 前缀 后缀 千分位",
-};
+const GROUP_COLORS: SettingsGroup = SETTINGS_SECTION_META.colors;
+const GROUP_MARKS: SettingsGroup = SETTINGS_SECTION_META.marks;
+const GROUP_LABELS: SettingsGroup = SETTINGS_SECTION_META.labels;
+const GROUP_X_AXIS: SettingsGroup = SETTINGS_SECTION_META.xAxis;
+const GROUP_Y_AXIS: SettingsGroup = SETTINGS_SECTION_META.yAxis;
+const GROUP_LEGEND: SettingsGroup = SETTINGS_SECTION_META.legend;
+const GROUP_NUMBERS: SettingsGroup = SETTINGS_SECTION_META.numbers;
 const CARTESIAN_GROUPS: SettingsGroup[] = [
   GROUP_COLORS,
   GROUP_MARKS,

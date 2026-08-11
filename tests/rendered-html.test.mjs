@@ -55,9 +55,11 @@ test("keeps the chart canvas mounted while editing data", async () => {
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /workspaceMode !== "preview" \? "workspace-hidden"/);
+  assert.match(page, /className={`workspace-main \$\{/);
+  assert.match(page, /workspaceMode === "data" \? "data-panel-open" : ""/);
   assert.match(page, /workspaceMode !== "data" \? "workspace-hidden"/);
-  assert.match(page, /\[dataError, height, option, width, workspaceMode\]/);
+  assert.doesNotMatch(page, /workspaceMode !== "preview" \? "workspace-hidden"/);
+  assert.match(page, /className="canvas-panel"/);
   assert.match(styles, /\.workspace-hidden\s*\{[^}]*display:\s*none\s*!important/s);
 });
 
@@ -80,6 +82,11 @@ test("includes the complete chart studio implementation", async () => {
     authSessionHook,
     customPalettesHook,
     pngExportHook,
+    dialogFocusHook,
+    layoutPreferencesHook,
+    projectHistoryHook,
+    templateGallery,
+    settingsRegistry,
     hostingConfig,
   ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -132,6 +139,29 @@ test("includes the complete chart studio implementation", async () => {
       new URL("../src/studio/hooks/use-png-export.ts", import.meta.url),
       "utf8",
     ),
+    readFile(
+      new URL("../src/studio/hooks/use-dialog-focus.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/studio/hooks/use-studio-layout.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/studio/hooks/use-project-history.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/studio/components/template-gallery.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/studio/settings/registry.ts", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
   ]);
 
@@ -167,16 +197,48 @@ test("includes the complete chart studio implementation", async () => {
   assert.match(page, /rightPanelCollapsed/);
   assert.match(page, /PanelLeftClose/);
   assert.match(page, /PanelRightClose/);
+  assert.match(page, /Undo2/);
+  assert.match(page, /Redo2/);
+  assert.match(page, /撤销/);
+  assert.match(page, /重做/);
+  assert.match(page, /确认恢复示例/);
+  assert.match(page, /templateOpen \|\| authPanelOpen \|\| resetConfirmOpen/);
+  assert.match(page, /sampleProject/);
+  assert.match(page, /applyCheckpoint\(\s*sampleProject/s);
+  assert.match(page, /workspace-main/);
+  assert.match(page, /data-panel-open/);
+  assert.match(page, /画布缩放/);
+  assert.match(page, /适应窗口/);
+  assert.match(page, /inert=\{leftPanelCollapsed\}/);
+  assert.match(page, /inert=\{rightPanelCollapsed\}/);
+  assert.match(projectHistoryHook, /applyCheckpoint/);
+  assert.match(exportToolbar, /退出登录/);
+  assert.match(exportToolbar, /onLogout\(\)/);
+  assert.match(templateGallery, /IntersectionObserver/);
+  assert.match(templateGallery, /ssr:\s*true/);
+  assert.doesNotMatch(templateGallery, /ResizeObserver/);
+  assert.match(settingsRegistry, /settingsSectionMatches/);
+  assert.match(settingsRegistry, /图例与交互/);
   assert.match(page, /authUser/);
   assert.match(authSessionHook, /requireDownloadAuth/);
   assert.match(page, /NEXT_PUBLIC_TUZUO_REQUIRE_AUTH/);
   assert.match(authSessionHook, /\/api\/auth\/session/);
   assert.match(authDialog, /登录图作账号/);
   assert.match(authDialog, /注册图作账号/);
+  assert.match(authDialog, /useDialogFocus/);
+  assert.match(dialogFocusHook, /restoreFocus/);
+  assert.match(dialogFocusHook, /event\.key !== "Tab"/);
+  assert.match(layoutPreferencesHook, /tuzuo-studio-layout/);
+  assert.match(layoutPreferencesHook, /leftPanelWidth/);
+  assert.match(layoutPreferencesHook, /dataPanelHeight/);
   assert.match(authDialog, /登录后可下载 SVG、PNG 和项目文件/);
   assert.match(authSessionHook, /登录后才能下载/);
   assert.match(styles, /\.brand-logo/);
   assert.match(styles, /\.studio-grid\.left-collapsed/);
+  assert.match(styles, /\.workspace-main/);
+  assert.match(styles, /\.workspace-splitter/);
+  assert.match(styles, /\.mobile-panel-backdrop/);
+  assert.match(styles, /\.panel-resize-handle/);
   assert.match(styles, /\.toolbar-group/);
   assert.match(styles, /\.auth-dialog/);
   assert.match(styles, /\.auth-toolbar/);
@@ -184,7 +246,9 @@ test("includes the complete chart studio implementation", async () => {
   assert.match(styles, /--topbar-height:\s*58px/);
   assert.match(styles, /--control-height:\s*34px/);
   assert.match(styles, /--radius-control:\s*4px/);
-  assert.match(styles, /--text-ui:\s*12px/);
+  assert.match(styles, /--text-ui:\s*13px/);
+  assert.match(styles, /--text-small:\s*12px/);
+  assert.match(styles, /--text-caption:\s*11px/);
   assert.match(styles, /height:\s*var\(--control-height\)/);
   assert.match(styles, /box-shadow:\s*var\(--focus-ring\)/);
   assert.match(page, /parseDelimited/);

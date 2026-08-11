@@ -13,7 +13,6 @@ import {
   Columns3,
   FileUp,
   LayoutGrid,
-  LineChart,
   Lock,
   LockOpen,
   Palette,
@@ -22,9 +21,9 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Pencil,
-  PieChart,
   Plus,
   RefreshCcw,
+  Redo2,
   Save,
   Search,
   Settings2,
@@ -32,12 +31,14 @@ import {
   Sparkles,
   Table2,
   Trash2,
+  Undo2,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import {
   ChangeEvent,
   CSSProperties,
-  ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -45,9 +46,7 @@ import {
 } from "react";
 import {
   buildChartOption,
-  buildThumbnailOption,
   CHART_TEMPLATES,
-  ChartFamily,
   type ChartConfig,
   ChartType,
   INITIAL_TABLE,
@@ -69,12 +68,29 @@ import {
   safeFilename,
 } from "../src/studio/export/download";
 import { AuthDialog } from "../src/studio/components/auth-dialog";
+import { ConfirmDialog } from "../src/studio/components/confirm-dialog";
 import { ExportToolbar } from "../src/studio/components/export-toolbar";
+import {
+  SettingsSection,
+  Toggle,
+} from "../src/studio/components/settings-controls";
+import {
+  ChartFamilyIcon,
+  TemplateGallery,
+} from "../src/studio/components/template-gallery";
 import { TextStyleControls } from "../src/studio/components/text-style-controls";
 import { useAuthSession } from "../src/studio/hooks/use-auth-session";
 import { useCustomPalettes } from "../src/studio/hooks/use-custom-palettes";
 import { usePngExport } from "../src/studio/hooks/use-png-export";
+import { useProjectHistory } from "../src/studio/hooks/use-project-history";
+import { useStudioLayout } from "../src/studio/hooks/use-studio-layout";
 import { parseColorOverrides } from "../src/studio/palette/color-overrides";
+import {
+  DEFAULT_SETTINGS_OPEN,
+  SETTINGS_SECTION_META,
+  settingsSectionMatches,
+  type SettingsSectionId,
+} from "../src/studio/settings/registry";
 import type {
   TextStyleState,
 } from "../src/studio/types";
@@ -172,27 +188,6 @@ type ProjectState = {
   y2AxisTitle: string;
   comboAxisSync: boolean;
   streamTimeAxis: boolean;
-};
-
-type SettingsSectionId =
-  | "data"
-  | "colors"
-  | "marks"
-  | "labels"
-  | "xAxis"
-  | "yAxis"
-  | "legend"
-  | "numbers";
-
-const DEFAULT_SETTINGS_OPEN: Record<SettingsSectionId, boolean> = {
-  data: true,
-  colors: true,
-  marks: false,
-  labels: false,
-  xAxis: false,
-  yAxis: false,
-  legend: false,
-  numbers: false,
 };
 
 // Single source of truth for project defaults. collectProject / applyProject
@@ -852,204 +847,6 @@ function normalizeProject(input: unknown): ProjectState | null {
   };
 }
 
-function SettingsSection({
-  title,
-  icon,
-  open,
-  hidden,
-  onToggle,
-  children,
-}: {
-  title: string;
-  icon: ReactNode;
-  open: boolean;
-  hidden?: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}) {
-  if (hidden) return null;
-
-  return (
-    <section className="settings-section">
-      <button
-        type="button"
-        className="settings-section-trigger"
-        onClick={onToggle}
-        aria-expanded={open}
-      >
-        <span className="settings-section-title">
-          {icon}
-          {title}
-        </span>
-        <ChevronDown
-          size={15}
-          className={open ? "settings-chevron is-open" : "settings-chevron"}
-        />
-      </button>
-      {open && <div className="settings-section-body">{children}</div>}
-    </section>
-  );
-}
-
-function ChartFamilyIcon({
-  family,
-  size,
-}: {
-  family: ChartFamily;
-  size: number;
-}) {
-  if (family === "line") return <LineChart size={size} />;
-  if (family === "area") return <AreaChart size={size} />;
-  if (family === "pie") return <PieChart size={size} />;
-  if (family === "bar") return <BarChart3 size={size} />;
-  return <LayoutGrid size={size} />;
-}
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="toggle-row">
-      <span>{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span className="toggle-track" aria-hidden="true">
-        <span className="toggle-thumb" />
-      </span>
-    </label>
-  );
-}
-
-function TemplateThumbnail({ type }: { type: ChartType }) {
-  const elementRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    let chart: ECharts | null = null;
-    let observer: ResizeObserver | null = null;
-    let frame = 0;
-
-    async function mount() {
-      if (!elementRef.current) return;
-      const echarts = await import("echarts");
-      const initialize = () => {
-        if (cancelled || !elementRef.current) return;
-        if (
-          elementRef.current.clientWidth === 0 ||
-          elementRef.current.clientHeight === 0
-        ) {
-          frame = window.requestAnimationFrame(initialize);
-          return;
-        }
-        chart = echarts.init(elementRef.current, undefined, { renderer: "svg" });
-        chart.setOption(buildThumbnailOption(type), true);
-        observer = new ResizeObserver(() => chart?.resize());
-        observer.observe(elementRef.current);
-      };
-      frame = window.requestAnimationFrame(initialize);
-    }
-
-    mount();
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(frame);
-      observer?.disconnect();
-      chart?.dispose();
-    };
-  }, [type]);
-
-  return <div className="template-thumbnail" ref={elementRef} />;
-}
-
-function TemplateGallery({
-  open,
-  selected,
-  onClose,
-  onSelect,
-}: {
-  open: boolean;
-  selected: ChartType;
-  onClose: () => void;
-  onSelect: (type: ChartType) => void;
-}) {
-  const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, open]);
-
-  if (!open) return null;
-
-  const filtered = CHART_TEMPLATES.filter((template) =>
-    template.name.includes(query.trim()),
-  );
-
-  return (
-    <div className="template-overlay" role="dialog" aria-modal="true">
-      <div className="template-dialog">
-        <div className="template-gallery-header">
-          <h1>图表模板</h1>
-          <div className="gallery-actions">
-            <label className="template-search">
-              <Search size={16} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索图表"
-                autoFocus
-              />
-            </label>
-            <button
-              type="button"
-              className="icon-button"
-              onClick={onClose}
-              aria-label="关闭模板库"
-              title="关闭"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-        <div className="template-grid">
-          {filtered.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              className={`template-card ${
-                selected === template.id ? "selected" : ""
-              }`}
-              onClick={() => onSelect(template.id)}
-            >
-              <TemplateThumbnail type={template.id} />
-              <span className="template-name">{template.name}</span>
-              {selected === template.id && (
-                <span className="template-selected">
-                  <Check size={13} />
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        {!filtered.length && <div className="empty-search">没有匹配的图表</div>}
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
   const [tableData, setTableData] = useState<string[][]>(() =>
     DEFAULT_PROJECT.tableData.map((row) => [...row]),
@@ -1234,11 +1031,26 @@ export default function Home() {
   const [settingsQuery, setSettingsQuery] = useState("");
   const [settingsOpen, setSettingsOpen] =
     useState<Record<SettingsSectionId, boolean>>(DEFAULT_SETTINGS_OPEN);
-  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [pixelRatio, setPixelRatio] = useState(2);
-  const [previewScale, setPreviewScale] = useState(1);
+  const [fitPreviewScale, setFitPreviewScale] = useState(1);
+  const [previewScaleOverride, setPreviewScaleOverride] = useState<number | null>(
+    null,
+  );
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [status, setStatus] = useState("");
+  const [saveState, setSaveState] = useState("正在恢复");
+  const {
+    leftPanelCollapsed,
+    rightPanelCollapsed,
+    leftPanelWidth,
+    rightPanelWidth,
+    dataPanelHeight,
+    isNarrowViewport,
+    togglePanel,
+    closePanels,
+    startPanelResize,
+    startDataResize,
+  } = useStudioLayout();
   const {
     customPalettes,
     editingPaletteId,
@@ -1285,11 +1097,21 @@ export default function Home() {
   const chartElementRef = useRef<HTMLDivElement | null>(null);
   const previewHostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ECharts | null>(null);
+  const settingsPanelRef = useRef<HTMLElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
   const applyProjectRef = useRef<
     ((project: ProjectState, message?: string) => void) | null
   >(null);
+  const currentProject = collectProject();
+  const currentProjectFingerprint = JSON.stringify(currentProject);
+  const { canUndo, canRedo, undo, redo, applyCheckpoint } = useProjectHistory({
+    snapshot: currentProject,
+    fingerprint: currentProjectFingerprint,
+    enabled: projectLoaded,
+    applySnapshot: (project, message) =>
+      applyProjectRef.current?.(project, message),
+  });
 
   const parsed = useMemo(() => tableToParsed(tableData), [tableData]);
   const colorOverrides = useMemo(
@@ -1691,7 +1513,7 @@ export default function Home() {
     const updateScale = () => {
       const availableWidth = Math.max(300, host.clientWidth - 54);
       const availableHeight = Math.max(280, host.clientHeight - 56);
-      setPreviewScale(
+      setFitPreviewScale(
         Math.min(1, availableWidth / width, availableHeight / height),
       );
     };
@@ -1708,6 +1530,35 @@ export default function Home() {
   }, [status]);
 
   useEffect(() => {
+    if (!settingsQuery.trim()) return;
+    const frame = window.requestAnimationFrame(() => {
+      settingsPanelRef.current
+        ?.querySelector<HTMLElement>(".settings-section.is-search-match")
+        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [settingsQuery]);
+
+  useEffect(() => {
+    if (templateOpen || authPanelOpen || resetConfirmOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.matches("input, textarea, select, [contenteditable='true']")
+      ) {
+        return;
+      }
+      if (event.key.toLowerCase() !== "z") return;
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [authPanelOpen, redo, resetConfirmOpen, templateOpen, undo]);
+
+  useEffect(() => {
     applyProjectRef.current = applyProject;
   });
 
@@ -1721,6 +1572,7 @@ export default function Home() {
         window.localStorage.removeItem(PROJECT_STORAGE_KEY);
       } finally {
         setProjectLoaded(true);
+        setSaveState("已恢复");
       }
     });
     return () => window.cancelAnimationFrame(frame);
@@ -1729,16 +1581,19 @@ export default function Home() {
   useEffect(() => {
     if (!projectLoaded) return;
     const timeout = window.setTimeout(() => {
+      setSaveState("保存中");
       const payload: ProjectFile = {
         app: PROJECT_FILE_APP,
         version: PROJECT_FILE_VERSION,
         savedAt: new Date().toISOString(),
-        project: collectProject(),
+        project: JSON.parse(currentProjectFingerprint) as ProjectState,
       };
       try {
         window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(payload));
         projectStorageWarningRef.current = false;
+        setSaveState("已自动保存");
       } catch {
+        setSaveState("保存失败");
         if (!projectStorageWarningRef.current) {
           projectStorageWarningRef.current = true;
           setStatus("自动保存失败，请手动保存项目文件");
@@ -1746,7 +1601,7 @@ export default function Home() {
       }
     }, 250);
     return () => window.clearTimeout(timeout);
-  });
+  }, [currentProjectFingerprint, projectLoaded]);
 
   function selectTheme(nextTheme: (typeof THEMES)[number]) {
     setThemeId(nextTheme.id);
@@ -1963,11 +1818,6 @@ export default function Home() {
     setSettingsOpen((current) => ({ ...current, [id]: !current[id] }));
   }
 
-  function settingsSectionVisible(title: string, keywords: string) {
-    const query = settingsQuery.trim().toLowerCase();
-    return !query || `${title} ${keywords}`.toLowerCase().includes(query);
-  }
-
   // Whether a settings section is declared for the current template. Driven by
   // the registry's settingsGroups so the panel only shows sections that mean
   // something for the current chart (e.g. pie/donut hide X/Y axis sections).
@@ -1978,8 +1828,8 @@ export default function Home() {
 
   // Combined visibility for a section: hidden unless it both belongs to the
   // current template AND matches the settings search query.
-  function sectionShown(id: SettingsSectionId, title: string, keywords: string) {
-    return sectionInTemplate(id) && settingsSectionVisible(title, keywords);
+  function sectionShown(id: SettingsSectionId) {
+    return sectionInTemplate(id) && settingsSectionMatches(id, settingsQuery);
   }
 
   function selectTemplate(type: ChartType) {
@@ -2034,9 +1884,14 @@ export default function Home() {
       }
     }
 
-    setTableData(sampleData.table.map((row) => [...row]));
-    setFieldRoles(nextRoles);
-    setStatus("已加载示例数据");
+    const sampleProject = cloneProject(currentProject);
+    sampleProject.tableData = sampleData.table.map((row) => [...row]);
+    sampleProject.fieldRoles = cloneFieldRoles(nextRoles);
+    applyCheckpoint(
+      sampleProject,
+      JSON.stringify(sampleProject),
+      "已加载示例数据",
+    );
   }
 
   function toggleSeries(header: string) {
@@ -2201,9 +2056,9 @@ export default function Home() {
   }
 
   function resetAll() {
-    applyProject(cloneProject(DEFAULT_PROJECT));
+    const resetProject = cloneProject(DEFAULT_PROJECT);
+    applyCheckpoint(resetProject, JSON.stringify(resetProject), "已恢复示例");
     setPixelRatio(2);
-    setStatus("已恢复示例");
   }
 
   const dataFieldControls = (
@@ -2392,6 +2247,7 @@ export default function Home() {
     </>
   );
 
+  const previewScale = previewScaleOverride ?? fitPreviewScale;
   const previewStyle = {
     "--preview-width": `${width * previewScale}px`,
     "--preview-height": `${height * previewScale}px`,
@@ -2400,6 +2256,18 @@ export default function Home() {
     "--preview-scale": previewScale,
     "--solid-background": backgroundColor,
   } as CSSProperties;
+
+  const studioGridStyle = {
+    "--left-panel-width": `${leftPanelWidth}px`,
+    "--right-panel-width": `${rightPanelWidth}px`,
+    "--data-panel-height": `${dataPanelHeight}px`,
+  } as CSSProperties;
+
+  function changePreviewZoom(delta: number) {
+    setPreviewScaleOverride(
+      Math.min(2.5, Math.max(0.2, previewScale + delta)),
+    );
+  }
 
   function updateCanvasDimensionDraft(
     raw: string,
@@ -2451,12 +2319,15 @@ export default function Home() {
             </span>
             <span className="brand-name">图作</span>
             <span className="brand-subtitle">透明图表工具</span>
+            <span className="save-state" aria-live="polite">
+              {saveState}
+            </span>
           </div>
           <div className="panel-toggle-group" aria-label="侧栏显示">
             <button
               type="button"
               className="icon-button panel-toggle-button"
-              onClick={() => setLeftPanelCollapsed((current) => !current)}
+              onClick={() => togglePanel("left")}
               aria-pressed={!leftPanelCollapsed}
               aria-label={leftPanelCollapsed ? "展开左侧栏" : "收起左侧栏"}
               title={leftPanelCollapsed ? "展开左侧栏" : "收起左侧栏"}
@@ -2470,7 +2341,7 @@ export default function Home() {
             <button
               type="button"
               className="icon-button panel-toggle-button"
-              onClick={() => setRightPanelCollapsed((current) => !current)}
+              onClick={() => togglePanel("right")}
               aria-pressed={!rightPanelCollapsed}
               aria-label={rightPanelCollapsed ? "展开右侧栏" : "收起右侧栏"}
               title={rightPanelCollapsed ? "展开右侧栏" : "收起右侧栏"}
@@ -2484,27 +2355,49 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="workspace-tabs" role="tablist">
-          <button
-            type="button"
-            className={workspaceMode === "preview" ? "active" : ""}
-            onClick={() => setWorkspaceMode("preview")}
-            role="tab"
-            aria-selected={workspaceMode === "preview"}
-          >
-            <AreaChart size={16} />
-            预览
-          </button>
-          <button
-            type="button"
-            className={workspaceMode === "data" ? "active" : ""}
-            onClick={() => setWorkspaceMode("data")}
-            role="tab"
-            aria-selected={workspaceMode === "data"}
-          >
-            <Table2 size={16} />
-            数据
-          </button>
+        <div className="workspace-controls">
+          <div className="workspace-tabs" aria-label="工作区视图">
+            <button
+              type="button"
+              className={workspaceMode === "preview" ? "active" : ""}
+              onClick={() => setWorkspaceMode("preview")}
+              aria-pressed={workspaceMode === "preview"}
+            >
+              <AreaChart size={16} />
+              预览
+            </button>
+            <button
+              type="button"
+              className={workspaceMode === "data" ? "active" : ""}
+              onClick={() => setWorkspaceMode("data")}
+              aria-pressed={workspaceMode === "data"}
+            >
+              <Table2 size={16} />
+              数据
+            </button>
+          </div>
+          <div className="history-toolbar" aria-label="编辑历史">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={undo}
+              disabled={!canUndo}
+              aria-label="撤销"
+              title="撤销"
+            >
+              <Undo2 size={16} />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={redo}
+              disabled={!canRedo}
+              aria-label="重做"
+              title="重做"
+            >
+              <Redo2 size={16} />
+            </button>
+          </div>
         </div>
 
         <ExportToolbar
@@ -2544,10 +2437,20 @@ export default function Home() {
         />
       </header>
 
-      <div className={studioGridClassName}>
+      <div className={studioGridClassName} style={studioGridStyle}>
+        {isNarrowViewport &&
+          (!leftPanelCollapsed || !rightPanelCollapsed) && (
+            <button
+              type="button"
+              className="mobile-panel-backdrop"
+              onClick={closePanels}
+              aria-label="关闭侧栏"
+            />
+          )}
         <aside
           className={`panel panel-left ${leftPanelCollapsed ? "is-collapsed" : ""}`}
           aria-hidden={leftPanelCollapsed}
+          inert={leftPanelCollapsed}
         >
           <section className="panel-section">
             <div className="section-heading">
@@ -2768,20 +2671,63 @@ export default function Home() {
               </div>
             </div>
           </section>
+          <button
+            type="button"
+            className="panel-resize-handle panel-resize-handle-left"
+            onPointerDown={(event) => startPanelResize("left", event)}
+            aria-label="调整左侧栏宽度"
+            title="拖动调整左侧栏宽度"
+          />
         </aside>
 
-        <section
-          className={`canvas-panel ${
-            workspaceMode !== "preview" ? "workspace-hidden" : ""
+        <div
+          className={`workspace-main ${
+            workspaceMode === "data" ? "data-panel-open" : ""
           }`}
+        >
+        <section
+          className="canvas-panel"
           ref={previewHostRef}
-          aria-hidden={workspaceMode !== "preview"}
         >
             <div className="canvas-meta">
-              <span>
+              <span className="canvas-size-meta">
                 {width} × {height}
               </span>
-              <span>{Math.round(previewScale * 100)}%</span>
+              <div className="canvas-zoom-controls" aria-label="画布缩放">
+                <button
+                  type="button"
+                  onClick={() => changePreviewZoom(-0.1)}
+                  aria-label="缩小画布"
+                  title="缩小"
+                >
+                  <ZoomOut size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="canvas-zoom-value"
+                  onClick={() => setPreviewScaleOverride(null)}
+                  aria-label="适应窗口"
+                  title="适应窗口"
+                >
+                  {Math.round(previewScale * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewScaleOverride(1)}
+                  aria-label="按百分之百显示"
+                  title="100%"
+                >
+                  1:1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changePreviewZoom(0.1)}
+                  aria-label="放大画布"
+                  title="放大"
+                >
+                  <ZoomIn size={13} />
+                </button>
+              </div>
             </div>
             <div className="preview-stage" style={previewStyle}>
               <div
@@ -2810,6 +2756,15 @@ export default function Home() {
           }`}
           aria-hidden={workspaceMode !== "data"}
         >
+            <button
+              type="button"
+              className="workspace-splitter"
+              onPointerDown={startDataResize}
+              aria-label="调整数据面板高度"
+              title="拖动调整数据面板高度"
+            >
+              <span />
+            </button>
             <div className="data-toolbar">
               <div>
                 <h2>数据表</h2>
@@ -2937,11 +2892,21 @@ export default function Home() {
             </div>
             <p className="sheet-hint">可直接从 Excel 或表格软件复制后粘贴到任意单元格</p>
         </section>
+        </div>
 
         <aside
+          ref={settingsPanelRef}
           className={`panel panel-right ${rightPanelCollapsed ? "is-collapsed" : ""}`}
           aria-hidden={rightPanelCollapsed}
+          inert={rightPanelCollapsed}
         >
+          <button
+            type="button"
+            className="panel-resize-handle panel-resize-handle-right"
+            onPointerDown={(event) => startPanelResize("right", event)}
+            aria-label="调整右侧栏宽度"
+            title="拖动调整右侧栏宽度"
+          />
           <div className="settings-toolbar">
             <label className="settings-search">
               <Search size={14} />
@@ -2965,35 +2930,31 @@ export default function Home() {
             <button
               type="button"
               className="settings-reset-icon"
-              onClick={resetAll}
-              aria-label="恢复示例"
-              title="恢复示例"
+              onClick={() => setResetConfirmOpen(true)}
+              aria-label="恢复示例并重置当前项目"
+              title="恢复示例并重置当前项目"
             >
               <RefreshCcw size={15} />
             </button>
           </div>
 
           <SettingsSection
-            title="数据字段"
+            id="data"
+            query={settingsQuery}
             icon={<Table2 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.data}
-            hidden={
-              !sectionShown(
-                "data",
-                "数据字段",
-                "字段 系列 选择 绑定 数据 示例 表格",
-              )
-            }
+            hidden={!sectionShown("data")}
             onToggle={() => toggleSettingsSection("data")}
           >
             {dataFieldControls}
           </SettingsSection>
 
           <SettingsSection
-            title="配色"
+            id="colors"
+            query={settingsQuery}
             icon={<Palette size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.colors}
-            hidden={!sectionShown("colors", "配色", "颜色 调色板 自定义 品牌 系列")}
+            hidden={!sectionShown("colors")}
             onToggle={() => toggleSettingsSection("colors")}
           >
             <span className="settings-caption">预设方案</span>
@@ -3163,16 +3124,11 @@ export default function Home() {
           </SettingsSection>
 
           <SettingsSection
-            title="线条、数据点与面积"
+            id="marks"
+            query={settingsQuery}
             icon={<SlidersHorizontal size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.marks}
-            hidden={
-              !sectionShown(
-                "marks",
-                "线条、数据点与面积",
-                "柱宽 圆角 透明度 平滑 点大小 样式",
-              )
-            }
+            hidden={!sectionShown("marks")}
             onToggle={() => toggleSettingsSection("marks")}
           >
             {supportsLineWidthControl && (
@@ -3428,10 +3384,11 @@ export default function Home() {
           </SettingsSection>
 
           <SettingsSection
-            title="数据标签"
+            id="labels"
+            query={settingsQuery}
             icon={<Table2 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.labels}
-            hidden={!sectionShown("labels", "数据标签", "数值 位置 字号 显示 颜色 对齐 粗体 斜体 样式")}
+            hidden={!sectionShown("labels")}
             onToggle={() => toggleSettingsSection("labels")}
           >
             <Toggle
@@ -3546,10 +3503,11 @@ export default function Home() {
           </SettingsSection>
 
           <SettingsSection
-            title="X 轴"
+            id="xAxis"
+            query={settingsQuery}
             icon={<Columns3 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.xAxis}
-            hidden={!sectionShown("xAxis", "X 轴", "横轴 标题 标签 旋转 样式 粗体 斜体 颜色 字号")}
+            hidden={!sectionShown("xAxis")}
             onToggle={() => toggleSettingsSection("xAxis")}
           >
             <Toggle
@@ -3595,10 +3553,11 @@ export default function Home() {
           </SettingsSection>
 
           <SettingsSection
-            title="Y 轴"
+            id="yAxis"
+            query={settingsQuery}
             icon={<BarChart3 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.yAxis}
-            hidden={!sectionShown("yAxis", "Y 轴", "纵轴 范围 最小 最大 网格线 样式 粗体 斜体 颜色 字号")}
+            hidden={!sectionShown("yAxis")}
             onToggle={() => toggleSettingsSection("yAxis")}
           >
             <Toggle
@@ -3669,10 +3628,11 @@ export default function Home() {
           </SettingsSection>
 
           <SettingsSection
-            title="图例与交互"
+            id="legend"
+            query={settingsQuery}
             icon={<LayoutGrid size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.legend}
-            hidden={!sectionShown("legend", "图例与交互", "位置 对齐 居中 靠左 靠右 靠上 靠下 提示 悬停 筛选")}
+            hidden={!sectionShown("legend")}
             onToggle={() => toggleSettingsSection("legend")}
           >
             {supportsLegendControl && (
@@ -3726,10 +3686,11 @@ export default function Home() {
           </SettingsSection>
 
           <SettingsSection
-            title="数字格式"
+            id="numbers"
+            query={settingsQuery}
             icon={<Settings2 size={15} />}
             open={Boolean(settingsQuery) || settingsOpen.numbers}
-            hidden={!sectionShown("numbers", "数字格式", "小数 千分位 前缀 后缀 单位")}
+            hidden={!sectionShown("numbers")}
             onToggle={() => toggleSettingsSection("numbers")}
           >
             <label className="field settings-field">
@@ -3773,32 +3734,9 @@ export default function Home() {
           </SettingsSection>
 
           {settingsQuery &&
-            ![
-              sectionShown(
-                "data",
-                "数据字段",
-                "字段 系列 选择 绑定 数据 示例 表格",
-              ),
-              sectionShown("colors", "配色", "颜色 调色板 自定义 品牌 系列"),
-              sectionShown(
-                "marks",
-                "线条、数据点与面积",
-                "柱宽 圆角 透明度 平滑 点大小 样式",
-              ),
-              sectionShown(
-                "labels",
-                "数据标签",
-                "数值 位置 字号 显示 颜色 对齐",
-              ),
-              sectionShown("xAxis", "X 轴", "横轴 标题 标签 旋转"),
-              sectionShown("yAxis", "Y 轴", "纵轴 范围 最小 最大 网格线"),
-              sectionShown(
-                "legend",
-                "图例与交互",
-                "位置 对齐 居中 靠左 靠右 靠上 靠下 提示 悬停 筛选",
-              ),
-              sectionShown("numbers", "数字格式", "小数 千分位 前缀 后缀 单位"),
-            ].some(Boolean) && (
+            !(Object.keys(SETTINGS_SECTION_META) as SettingsSectionId[]).some(
+              sectionShown,
+            ) && (
               <div className="settings-empty">没有匹配的设置</div>
             )}
         </aside>
@@ -3826,6 +3764,15 @@ export default function Home() {
           onSubmit={submitAuthForm}
         />
       )}
+
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        title="确认恢复示例"
+        description="这会重置当前数据、标题、画布和全部样式。操作完成后仍可使用撤销恢复。"
+        confirmLabel="恢复示例"
+        onCancel={() => setResetConfirmOpen(false)}
+        onConfirm={resetAll}
+      />
 
       {status && (
         <div className="toast" role="status">
