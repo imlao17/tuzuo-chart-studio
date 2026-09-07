@@ -55,6 +55,9 @@ export type RendererResult = {
   parallelAxis?: EChartsOption["parallelAxis"];
   /** Calendar coordinate block (calendar heatmap). */
   calendar?: EChartsOption["calendar"];
+  /** Explicit grid override (multi-grid layouts, e.g. candle+volume). When
+   *  absent, the assembler computes the standard single cartesian grid. */
+  grid?: EChartsOption["grid"];
 };
 
 type ArrayElement<T> = T extends readonly (infer Item)[] ? Item : T;
@@ -492,13 +495,13 @@ function assembleOption(
   const grid =
     !capabilities.axes || hasSingleAxis
       ? undefined
-      : {
+      : (patched.grid ?? {
           top: gridTop,
           right: gridRight,
           bottom: gridBottom,
           left: gridLeft,
           containLabel: !compact,
-        };
+        });
 
   return {
     animation: !compact,

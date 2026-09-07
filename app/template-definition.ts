@@ -23,7 +23,9 @@ import {
   buildFunnelOption,
   buildGaugeOption,
   buildHeatmapOption,
+  buildCandleVolumeOption,
   buildMarimekkoOption,
+  buildOhlcBarOption,
   buildParallelOption,
   buildRadarOption,
   buildSankeyOption,
@@ -32,8 +34,11 @@ import {
   buildWaterfallOption,
 } from "./renderers/advanced";
 import {
+  buildArrowOption,
   buildBarOption,
   buildBulletOption,
+  buildCapsuleOption,
+  buildDumbbellOption,
   buildDensityHistogramOption,
   buildHistogramOption,
   buildLollipopOption,
@@ -41,6 +46,8 @@ import {
   buildProgressOption,
   buildRangeOption,
   buildRankingOption,
+  buildSplitAxisOption,
+  buildStackedDotOption,
 } from "./renderers/bar";
 import {
   buildDendrogramOption,
@@ -332,6 +339,30 @@ const BIND_VALUE_ACTUAL: DataBinding = {
 const BIND_VALUE_TARGET: DataBinding = {
   role: "value",
   label: "目标值",
+  required: true,
+  multiple: false,
+  hint: "额外数值列将被忽略",
+};
+
+const BIND_VALUE_START: DataBinding = {
+  role: "value",
+  label: "起点数值",
+  required: true,
+  multiple: false,
+  hint: "额外数值列将被忽略",
+};
+
+const BIND_VALUE_END: DataBinding = {
+  role: "value",
+  label: "终点数值",
+  required: true,
+  multiple: false,
+  hint: "额外数值列将被忽略",
+};
+
+const BIND_VALUE_VOLUME: DataBinding = {
+  role: "value",
+  label: "成交量",
   required: true,
   multiple: false,
   hint: "额外数值列将被忽略",
@@ -1197,6 +1228,93 @@ const SAMPLE_VIOLIN: SampleData = {
   seriesColumns: ["得分"],
 };
 
+// --- Batch-7 (Flourish parity) sample data ---------------------------------
+
+const SAMPLE_CAPSULE: SampleData = {
+  table: [
+    ["项目", "完成度 %"],
+    ["需求分析", "100"],
+    ["原型设计", "85"],
+    ["前端开发", "62"],
+    ["后端开发", "48"],
+    ["联调测试", "24"],
+    ["上线部署", "8"],
+  ],
+  categoryColumn: "项目",
+  seriesColumns: ["完成度 %"],
+};
+
+const SAMPLE_ARROW: SampleData = {
+  table: [
+    ["方案", "支持票数"],
+    ["方案 A", "412"],
+    ["方案 B", "366"],
+    ["方案 C", "298"],
+    ["方案 D", "203"],
+    ["方案 E", "121"],
+  ],
+  categoryColumn: "方案",
+  seriesColumns: ["支持票数"],
+};
+
+const SAMPLE_DUMBBELL: SampleData = {
+  table: [
+    ["科室", "改造前等待 分钟", "改造后等待 分钟"],
+    ["门诊 A", "52", "31"],
+    ["门诊 B", "44", "38"],
+    ["门诊 C", "61", "27"],
+    ["门诊 D", "38", "35"],
+    ["门诊 E", "47", "22"],
+    ["门诊 F", "58", "40"],
+  ],
+  categoryColumn: "科室",
+  seriesColumns: ["改造前等待 分钟", "改造后等待 分钟"],
+};
+
+const SAMPLE_STACKED_DOT: SampleData = {
+  table: [
+    ["候选人", "得票数"],
+    ["候选人 A", "12"],
+    ["候选人 B", "9"],
+    ["候选人 C", "6"],
+    ["候选人 D", "4"],
+  ],
+  categoryColumn: "候选人",
+  seriesColumns: ["得票数"],
+};
+
+const SAMPLE_CANDLE_VOLUME: SampleData = {
+  table: [
+    ["日期", "开盘", "收盘", "最低", "最高", "成交量"],
+    ["8/01", "102", "108", "99", "112", "5200"],
+    ["8/02", "108", "105", "101", "111", "4100"],
+    ["8/03", "105", "113", "104", "116", "6300"],
+    ["8/04", "113", "110", "107", "117", "3800"],
+    ["8/05", "110", "118", "109", "121", "7400"],
+    ["8/06", "118", "122", "115", "126", "8900"],
+    ["8/07", "122", "117", "113", "124", "5600"],
+    ["8/08", "117", "126", "116", "130", "9400"],
+  ],
+  categoryColumn: "日期",
+  seriesColumns: ["开盘", "收盘", "最低", "最高", "成交量"],
+};
+
+const SAMPLE_SPLIT_AXIS: SampleData = {
+  table: [
+    ["月份", "销售额 万"],
+    ["一月", "34"],
+    ["二月", "28"],
+    ["三月", "41"],
+    ["四月", "36"],
+    ["五月", "310"],
+    ["六月", "45"],
+    ["七月", "39"],
+    ["八月", "30"],
+  ],
+  categoryColumn: "月份",
+  seriesColumns: ["销售额 万"],
+};
+
 const SAMPLE_MARIMEKKO: SampleData = {
   table: [
     ["渠道", "新客", "复购"],
@@ -1245,6 +1363,16 @@ const requireFourNumericColumns =
         ctx.parsed.numericHeaders.includes(header),
       );
       return selectedNumericColumns.length < 4 ? message : null;
+    },
+  });
+
+const requireFiveNumericColumns =
+  (message: string): DataValidator => ({
+    validate: (ctx) => {
+      const selectedNumericColumns = ctx.seriesColumns.filter((header) =>
+        ctx.parsed.numericHeaders.includes(header),
+      );
+      return selectedNumericColumns.length < 5 ? message : null;
     },
   });
 
@@ -2101,6 +2229,97 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
     buildOption: buildSankeyOption,
     sampleData: SAMPLE_FLOW,
+  },
+
+  // --- Bar/column & OHLC variants (Flourish parity batch 7) ----------------
+  groupedBar: {
+    id: "groupedBar",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildBarOption,
+    sampleData: SAMPLE_QUARTERLY,
+  },
+  capsuleBar: {
+    id: "capsuleBar",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildCapsuleOption,
+    sampleData: SAMPLE_CAPSULE,
+  },
+  arrowBar: {
+    id: "arrowBar",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildArrowOption,
+    sampleData: SAMPLE_ARROW,
+  },
+  dumbbell: {
+    id: "dumbbell",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_START, BIND_VALUE_END],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("哑铃图需要 2 个数值列（起点和终点）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildDumbbellOption,
+    sampleData: SAMPLE_DUMBBELL,
+  },
+  stackedDot: {
+    id: "stackedDot",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildStackedDotOption,
+    sampleData: SAMPLE_STACKED_DOT,
+  },
+  ohlcBar: {
+    id: "ohlcBar",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_OHLC_MULTIPLE],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireFourNumericColumns("OHLC 条形图需要 4 个数值列（开盘、收盘、最低、最高）"),
+    ],
+    settingsGroups: [GROUP_COLORS, GROUP_X_AXIS, GROUP_Y_AXIS, GROUP_LEGEND, GROUP_NUMBERS],
+    capabilities: { ...CAP_CARTESIAN_NO_LEGEND, labels: false },
+    buildOption: buildOhlcBarOption,
+    sampleData: SAMPLE_CANDLESTICK,
+  },
+  candleVolume: {
+    id: "candleVolume",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_OHLC_MULTIPLE, BIND_VALUE_VOLUME],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireFiveNumericColumns("蜡烛+成交量组合图需要 5 个数值列（开盘、收盘、最低、最高、成交量）"),
+    ],
+    settingsGroups: [GROUP_COLORS, GROUP_X_AXIS, GROUP_Y_AXIS, GROUP_LEGEND, GROUP_NUMBERS],
+    capabilities: { ...CAP_CARTESIAN_NO_LEGEND, labels: false },
+    buildOption: buildCandleVolumeOption,
+    sampleData: SAMPLE_CANDLE_VOLUME,
+  },
+  splitAxisBar: {
+    id: "splitAxisBar",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildSplitAxisOption,
+    sampleData: SAMPLE_SPLIT_AXIS,
   },
 };
 

@@ -1186,3 +1186,172 @@ export function buildMarimekkoOption(ctx: RenderContext): RendererResult {
   void labelTextStyle;
   return { series, xAxis, yAxis };
 }
+
+// ---------------------------------------------------------------------------
+// Flourish parity batch 7: OHLC bar and candle+volume combo.
+// ---------------------------------------------------------------------------
+
+/** OHLC 条形图: classic open-high-low-close bars via a custom series. */
+export function buildOhlcBarOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { compact = false, theme, fontSize } = config;
+  const barWidth = config.barWidth ?? 48;
+  const open = dataSeries[0]?.data ?? [];
+  const close = dataSeries[1]?.data ?? [];
+  const low = dataSeries[2]?.data ?? [];
+  const high = dataSeries[3]?.data ?? [];
+  const upColor = colorFor(0, config);
+  const downColor = colorFor(1, config);
+
+  const xAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const yAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const series: SeriesOption[] = [
+    {
+      name: "OHLC",
+      type: "custom",
+      renderItem: ((params: { dataIndex: number }, api: {
+        value: (dim: number) => number;
+        coord: (point: [number, number]) => number[];
+      }) => {
+        const index = api.value(0);
+        const openValue = api.value(1);
+        const closeValue = api.value(2);
+        const lowValue = api.value(3);
+        const highValue = api.value(4);
+        const x = api.coord([index, highValue])[0];
+        const openPoint = api.coord([index, openValue]);
+        const closePoint = api.coord([index, closeValue]);
+        const lowPoint = api.coord([index, lowValue]);
+        const highPoint = api.coord([index, highValue]);
+        const half = Math.max(3, barWidth / 4);
+        const rising = closeValue >= openValue;
+        const color = rising ? upColor : downColor;
+        return {
+          type: "group",
+          children: [
+            {
+              type: "line",
+              shape: { x1: x, y1: highPoint[1], x2: x, y2: lowPoint[1] },
+              style: { stroke: color, lineWidth: 1.5 },
+            },
+            {
+              type: "line",
+              shape: { x1: x - half, y1: openPoint[1], x2: x, y2: openPoint[1] },
+              style: { stroke: color, lineWidth: 1.5 },
+            },
+            {
+              type: "line",
+              shape: { x1: x, y1: closePoint[1], x2: x + half, y2: closePoint[1] },
+              style: { stroke: color, lineWidth: 1.5 },
+            },
+          ],
+        };
+      }) as unknown as undefined,
+      data: open.map((_, index) => [
+        index,
+        Number.isFinite(open[index]) ? open[index] : 0,
+        Number.isFinite(close[index]) ? close[index] : 0,
+        Number.isFinite(low[index]) ? low[index] : 0,
+        Number.isFinite(high[index]) ? high[index] : 0,
+      ]),
+      label: { show: false },
+      emphasis: { focus: "self" },
+    } as unknown as SeriesOption,
+  ];
+  void compact;
+  return { series, xAxis, yAxis };
+}
+
+/** 蜡烛+成交量组合图: candlestick over a bar volume panel (two grids). */
+export function buildCandleVolumeOption(ctx: RenderContext): RendererResult {
+  const { config, categories, dataSeries } = ctx;
+  const { compact = false, theme, fontSize } = config;
+  const barWidth = config.barWidth ?? 48;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  // Pad to exactly four OHLC columns so partial selections render (validators
+  // surface the error, but the option builder must not throw).
+  const ohlc = [0, 1, 2, 3].map((columnIndex) => {
+    const source = dataSeries[columnIndex]?.data ?? [];
+    return source.map((value) => (Number.isFinite(value) ? value : 0));
+  });
+  // ECharts candlestick data layout: [open, close, low, high] per row.
+  const candleData = ohlc[0].map((_, rowIndex) => [
+    ohlc[0][rowIndex],
+    ohlc[1][rowIndex],
+    ohlc[2][rowIndex],
+    ohlc[3][rowIndex],
+  ]);
+  const volume = (dataSeries[4]?.data ?? []).map((value) => (Number.isFinite(value) ? value : 0));
+  const maxVolume = Math.max(1, ...volume);
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const categoryAxisBottom = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const categoryAxisTop = {
+    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    show: false,
+    axisLine: { show: false },
+    axisLabel: { show: false },
+  };
+  const valueAxisTop = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const valueAxisBottom = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    max: maxVolume * 3.2,
+    axisLabel: {
+      ...((buildValueAxis(ctx, theme.text, fontSize, compact) as { axisLabel?: Record<string, unknown> }).axisLabel ?? {}),
+      formatter: (value: number) => ctx.formatNumber(value),
+    },
+  };
+
+  const series: SeriesOption[] = [
+    {
+      name: "K 线",
+      type: "candlestick",
+      data: candleData,
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      barMaxWidth: compact ? 14 : barWidth,
+      itemStyle: {
+        color: colorFor(0, config),
+        color0: colorFor(1, config),
+        borderColor: colorFor(0, config),
+        borderColor0: colorFor(1, config),
+      },
+      emphasis: { focus: "series" },
+    },
+    {
+      name: dataSeries[4]?.name ?? "成交量",
+      type: "bar",
+      data: volume,
+      xAxisIndex: 1,
+      yAxisIndex: 1,
+      barMaxWidth: compact ? 14 : barWidth,
+      itemStyle: {
+        color: colorFor(2, config),
+        opacity: markOpacity,
+        borderRadius: [2, 2, 0, 0],
+      },
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "top",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const entry = params as { value: number | string };
+          return ctx.formatNumber(entry.value);
+        },
+      },
+      emphasis: { focus: "series" },
+    },
+  ];
+  const grid: RendererResult["grid"] = compact
+    ? [{ top: 6, left: 6, right: 6, bottom: 6, containLabel: false }]
+    : [
+        { top: config.margins.top + 74, left: config.margins.left, right: config.margins.right, height: "48%", containLabel: true },
+        { left: config.margins.left, right: config.margins.right, bottom: config.margins.bottom + 26, height: "18%", containLabel: true },
+      ];
+  return {
+    series,
+    grid,
+    xAxis: [categoryAxisTop, { ...categoryAxisBottom, data: categories }],
+    yAxis: [valueAxisTop, valueAxisBottom],
+  };
+}

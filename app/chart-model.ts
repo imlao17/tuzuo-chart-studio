@@ -76,7 +76,15 @@ export type ChartType =
   | "errorBar"
   | "correlationMatrix"
   | "violin"
-  | "marimekko";
+  | "marimekko"
+  | "groupedBar"
+  | "capsuleBar"
+  | "arrowBar"
+  | "dumbbell"
+  | "stackedDot"
+  | "ohlcBar"
+  | "candleVolume"
+  | "splitAxisBar";
 
 export type ChartFamily = "line" | "area" | "bar" | "pie" | "other";
 
@@ -436,6 +444,14 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "boxplot", name: "箱线图", family: "other" },
   { id: "candlestick", name: "蜡烛图", family: "other" },
   { id: "sankey", name: "桑基图", family: "other" },
+  { id: "groupedBar", name: "分组条形图", family: "bar" },
+  { id: "capsuleBar", name: "胶囊条形图", family: "bar" },
+  { id: "arrowBar", name: "箭头条形图", family: "bar" },
+  { id: "dumbbell", name: "哑铃图", family: "other" },
+  { id: "stackedDot", name: "堆叠点图", family: "other" },
+  { id: "ohlcBar", name: "OHLC 条形图", family: "other" },
+  { id: "candleVolume", name: "蜡烛+成交量组合图", family: "other" },
+  { id: "splitAxisBar", name: "断轴条形图", family: "bar" },
   { id: "parallelCoordinates", name: "平行坐标图", family: "other" },
   { id: "calendarHeatmap", name: "日历热力图", family: "other" },
   { id: "ecdf", name: "累计分布图", family: "other" },

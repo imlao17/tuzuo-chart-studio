@@ -27,7 +27,13 @@ import {
   type RendererResult,
 } from "./shared";
 
-const HORIZONTAL_TYPES = new Set(["bar", "stackedBar", "proportionalBar"]);
+const HORIZONTAL_TYPES = new Set([
+  "bar",
+  "stackedBar",
+  "proportionalBar",
+  // Flourish parity batch 7: grouped horizontal bars.
+  "groupedBar",
+]);
 const STACKED_TYPES = new Set([
   "stackedBar",
   "proportionalBar",
@@ -156,6 +162,13 @@ export function buildBarOption(ctx: RenderContext): RendererResult {
 // driven labels (showLabels must always flow through — the behavior suite
 // toggles it for every template), and compact-thumbnail awareness.
 // ---------------------------------------------------------------------------
+
+/** Minimal surface of the custom-series renderItem API used below. */
+type CustomApi2 = {
+  value: (dim: number) => number;
+  coord: (point: [number, number]) => number[];
+};
+type CustomParams2 = { dataIndex: number };
 
 /** Local tick formatter for bin edges: up to 2 decimals, no forced grouping. */
 function formatBinEdge(value: number) {
@@ -536,4 +549,282 @@ export function buildRankingOption(ctx: RenderContext): RendererResult {
     return `${entry.dataIndex + 1}. ${formatNumber(entry.value)}`;
   };
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Flourish parity batch 7: bar/column variants.
+// ---------------------------------------------------------------------------
+
+/** 胶囊条形图: horizontal bars whose ends are fully rounded. */
+export function buildCapsuleOption(ctx: RenderContext): RendererResult {
+  const result = buildProgressOption(ctx);
+  // Same descending-with-track layout, but every corner rounded to half the
+  // bar thickness so each bar reads as a capsule.
+  const { config } = ctx;
+  const barWidth = config.barWidth ?? 48;
+  const half = Math.max(2, Math.round(barWidth / 2));
+  const [barSeries] = result.series as Array<Record<string, unknown>>;
+  barSeries.itemStyle = {
+    ...(barSeries.itemStyle as Record<string, unknown>),
+    borderRadius: [half, half, half, half],
+  };
+  const background = barSeries.backgroundStyle as Record<string, unknown> | undefined;
+  if (background) background.borderRadius = [half, half, half, half];
+  return result;
+}
+
+/** 箭头条形图: bars tipped with an arrow marker at each value end. */
+export function buildArrowOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const barWidth = config.barWidth ?? 48;
+  const barRadius = config.barRadius ?? 3;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const pointSize = config.pointSize ?? 7;
+  const item = dataSeries[0] ?? { name: "数值", data: [] };
+  const color = colorFor(0, config, item.name);
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const series: SeriesOption[] = [
+    {
+      name: item.name,
+      type: "bar",
+      data: item.data,
+      barMaxWidth: compact ? 20 : Math.max(6, Math.round(barWidth * 0.45)),
+      itemStyle: { color, opacity: markOpacity, borderRadius: [0, barRadius, barRadius, 0] },
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "right",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const entry = params as { value: string | number };
+          return ctx.formatNumber(entry.value);
+        },
+      },
+      emphasis: { focus: "series" },
+    },
+    {
+      name: "箭头",
+      type: "scatter",
+      symbol: "arrow",
+      symbolRotate: 90,
+      symbolSize: compact ? 0 : Math.max(10, pointSize * 1.8),
+      itemStyle: { color },
+      data: item.data.map((value, rowIndex) => [value, rowIndex]),
+      label: { show: false },
+      tooltip: { show: false },
+      emphasis: { focus: "none" },
+    } as SeriesOption,
+  ];
+  return { series, xAxis: valueAxis, yAxis: categoryAxis };
+}
+
+/** 哑铃图: a connector line from start to end with a bead at each end. */
+export function buildDumbbellOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const pointSize = config.pointSize ?? 7;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const start = dataSeries[0] ?? { name: "起点", data: [] };
+  const end = dataSeries[1] ?? { name: "终点", data: [] };
+  const startColor = colorFor(0, config, start.name);
+  const endColor = colorFor(1, config, end.name);
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const series: SeriesOption[] = [
+    {
+      name: "连接线",
+      type: "custom",
+      silent: true,
+      z: 1,
+      data: start.data.map((value, index) => [index, value, end.data[index] ?? value]),
+      renderItem: ((params: CustomParams2, api: CustomApi2) => {
+        const index = api.value(0);
+        const left = api.coord([Math.min(api.value(1), api.value(2)), index]);
+        const right = api.coord([Math.max(api.value(1), api.value(2)), index]);
+        return {
+          type: "line",
+          shape: { x1: left[0], y1: left[1], x2: right[0], y2: right[1] },
+          style: { stroke: theme.grid, lineWidth: compact ? 2 : 4 },
+        };
+      }) as unknown as undefined,
+      label: { show: false },
+      tooltip: { show: false },
+      emphasis: { focus: "none" },
+    } as unknown as SeriesOption,
+    {
+      name: start.name,
+      type: "scatter",
+      symbolSize: compact ? 6 : pointSize + 4,
+      itemStyle: { color: startColor, opacity: markOpacity },
+      data: start.data.map((value, index) => [value, index]),
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "left",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const entry = params as { value: [number, number] };
+          return ctx.formatNumber(entry.value?.[0] ?? 0);
+        },
+      },
+      emphasis: { focus: "series" },
+    } as SeriesOption,
+    {
+      name: end.name,
+      type: "scatter",
+      symbolSize: compact ? 6 : pointSize + 4,
+      itemStyle: { color: endColor, opacity: markOpacity },
+      data: end.data.map((value, index) => [value, index]),
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "right",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const entry = params as { value: [number, number] };
+          return ctx.formatNumber(entry.value?.[0] ?? 0);
+        },
+      },
+      emphasis: { focus: "series" },
+    } as SeriesOption,
+  ];
+  return { series, xAxis: valueAxis, yAxis: categoryAxis };
+}
+
+/** 堆叠点图: each point is one unit, stacked per category (isotype dots). */
+export function buildStackedDotOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const pointSize = config.pointSize ?? 7;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const values = dataSeries[0]?.data ?? [];
+  const MAX_UNITS = 40;
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const data: [number, number][] = [];
+  values.forEach((value, rowIndex) => {
+    const units = Math.min(MAX_UNITS, Math.max(0, Math.round(Number.isFinite(value) ? value : 0)));
+    for (let unit = 1; unit <= units; unit += 1) {
+      data.push([rowIndex, unit]);
+    }
+  });
+
+  const valueAxis = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    max: Math.max(1, ...values.map((v) => Math.min(MAX_UNITS, Math.round(Number.isFinite(v) ? v : 0)))) + 1,
+    min: 0,
+    interval: 1,
+    axisLabel: { show: false },
+    splitLine: { show: false },
+  };
+  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const series: SeriesOption[] = [
+    {
+      name: dataSeries[0]?.name ?? "计数",
+      type: "scatter",
+      data,
+      symbol: "circle",
+      symbolSize: compact ? 3 : Math.max(5, pointSize),
+      itemStyle: { color: colorFor(0, config), opacity: markOpacity },
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "top",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const entry = params as { value: [number, number] };
+          return entry.value[1] === 1 ? `${entry.value[0] + 1}` : "";
+        },
+      },
+      emphasis: { focus: "self" },
+    } as SeriesOption,
+  ];
+  return { series, xAxis: categoryAxis, yAxis: valueAxis };
+}
+
+/** 断轴条形图: split-grid bars with a broken-axis gap for outliers. */
+export function buildSplitAxisOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const barWidth = config.barWidth ?? 48;
+  const barRadius = config.barRadius ?? 3;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const values = dataSeries[0]?.data ?? [];
+  const finite = values.filter(Number.isFinite);
+  const sorted = [...finite].sort((a, b) => a - b);
+  const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
+  const threshold = Math.max(median * 2.5, 1);
+
+  // Split: outliers into the top (zoomed) grid, the rest into the bottom grid.
+  const topData = values.map((value) => (Number.isFinite(value) && value > threshold ? value : null));
+  const bottomData = values.map((value) => (Number.isFinite(value) && value > threshold ? null : value));
+  const bottomMax = Math.max(threshold, ...bottomData.filter((v): v is number => v !== null && Number.isFinite(v)));
+
+  const categoryAxisBottom = {
+    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    position: "bottom" as const,
+  };
+  const categoryAxisTop = {
+    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    show: false,
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { show: false },
+    position: "top" as const,
+  };
+  const valueAxisBottom = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    max: bottomMax,
+    splitLine: { show: !compact && config.showGrid, lineStyle: { color: theme.grid, type: (config.gridLineType ?? "dashed") as "solid" | "dashed" | "dotted" } },
+  };
+  const valueAxisTop = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    min: bottomMax * 0.98,
+    splitLine: { show: false },
+  };
+
+  const series: SeriesOption[] = [
+    {
+      name: dataSeries[0]?.name ?? "数值",
+      type: "bar",
+      data: bottomData,
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      barMaxWidth: compact ? 20 : barWidth,
+      itemStyle: { color: colorFor(0, config), opacity: markOpacity, borderRadius: [barRadius, barRadius, 0, 0] },
+      label: { show: compact ? false : config.showLabels, position: "top", ...dataLabelTextStyle(config), formatter: (p: unknown) => {
+        const entry = p as { value: number | string };
+        return entry.value === null ? "" : ctx.formatNumber(entry.value);
+      } },
+      emphasis: { focus: "series" },
+    },
+    {
+      name: dataSeries[0]?.name ?? "数值",
+      type: "bar",
+      data: topData,
+      xAxisIndex: 1,
+      yAxisIndex: 1,
+      barMaxWidth: compact ? 20 : barWidth,
+      itemStyle: { color: colorFor(1, config), opacity: markOpacity, borderRadius: [barRadius, barRadius, 0, 0] },
+      label: { show: compact ? false : config.showLabels, position: "top", ...dataLabelTextStyle(config), formatter: (p: unknown) => {
+        const entry = p as { value: number | string };
+        return entry.value === null ? "" : ctx.formatNumber(entry.value);
+      } },
+      emphasis: { focus: "series" },
+    },
+  ];
+  const grid: RendererResult["grid"] = compact
+    ? [{ top: 6, left: 6, right: 6, bottom: 6, containLabel: false }]
+    : [
+        { top: config.margins.top + 74, left: config.margins.left, right: config.margins.right, height: "32%", containLabel: true },
+        { left: config.margins.left, right: config.margins.right, bottom: config.margins.bottom + 26, height: "34%", containLabel: true },
+      ];
+  return {
+    series,
+    grid,
+    xAxis: [categoryAxisTop, categoryAxisBottom],
+    yAxis: [valueAxisTop, valueAxisBottom],
+  };
 }

@@ -157,7 +157,7 @@ test("toggling showLabels changes the option for every label-bearing template", 
   // P1 gap); parallel/violin/marimekko have no per-point label surface (their
   // settings groups don't expose 数据标签), so they are exempt; every other
   // template wires showLabels through.
-  const exempt = new Set<ChartType>(["streamgraph", "parallelCoordinates", "violin", "marimekko"]);
+  const exempt = new Set<ChartType>(["streamgraph", "parallelCoordinates", "violin", "marimekko", "ohlcBar", "candleVolume"]);
   const labelled = ALL_TYPES.filter((t) => !exempt.has(t));
   for (const type of labelled) {
     const off = sig(renderSample(type, { showLabels: false }));
@@ -510,12 +510,14 @@ test("single numeric column passes generic templates but fails role-specific tem
   };
   for (const type of ALL_TYPES) {
     const err = firstError(type, ctx);
-    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart", "groupedScatter", "quadrant", "trendScatter", "correlationMatrix"].includes(type)) {
+    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart", "groupedScatter", "quadrant", "trendScatter", "correlationMatrix", "dumbbell"].includes(type)) {
       assert.ok(err && err.includes("2 个数值列"), `${type}: expected 2-column error, got ${err}`);
     } else if (["bandArea", "bubble", "errorBar"].includes(type)) {
       assert.ok(err && err.includes("3 个数值列"), `${type}: expected 3-column error, got ${err}`);
-    } else if (["candlestick"].includes(type)) {
+    } else if (type === "candlestick" || type === "ohlcBar") {
       assert.ok(err && err.includes("4 个数值列"), `${type}: expected OHLC error, got ${err}`);
+    } else if (type === "candleVolume") {
+      assert.ok(err && err.includes("5 个数值列"), `${type}: expected 5-column error, got ${err}`);
     } else if (["sankey", "networkGraph", "chord", "adjacencyMatrix", "alluvial"].includes(type)) {
       assert.ok(err && err.includes("2 个文本列"), `${type}: expected flow-column error, got ${err}`);
     } else {
@@ -1070,8 +1072,9 @@ test("P1-5: comboAxisSync applies a shared min/max to both axes", () => {
 
 test("P1-5: non-combo templates are unaffected by the patchAxes array support", () => {
   // Regression: every other template still returns a single (non-array) yAxis.
-  // combo, pareto and dualAxisLine are the dual-axis exceptions by design.
-  for (const type of ALL_TYPES.filter((t) => t !== "combo" && t !== "pareto" && t !== "dualAxisLine")) {
+  // combo, pareto, dualAxisLine, candleVolume and splitAxisBar are the
+  // multi-axis exceptions by design.
+  for (const type of ALL_TYPES.filter((t) => !["combo", "pareto", "dualAxisLine", "candleVolume", "splitAxisBar"].includes(t))) {
     const option = buildChartOption(baseConfig({ type }));
     assert.equal(Array.isArray(option.yAxis), false, `${type}: yAxis unexpectedly an array`);
   }
@@ -1796,4 +1799,102 @@ test("P100-6: marimekko carries variable-width stacked layout data", () => {
   assert.ok(Math.abs(total - 100) < 0.001, `row shares must sum to 100, got ${total}`);
   const xAxis = option.xAxis as { max?: number };
   assert.equal(xAxis.max, 100);
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 7 — bar/column variants.
+// ---------------------------------------------------------------------------
+
+test("P100-7: grouped bars render horizontally with one segment per series", () => {
+  const option = renderSample("groupedBar");
+  const series = seriesList(option) as Array<{ type?: string; stack?: string }>;
+  assert.equal(series.length, 3, "all sample series render");
+  for (const item of series) {
+    assert.equal(item.type, "bar");
+    assert.equal(item.stack, undefined, "grouped bars are unstacked");
+  }
+  assert.equal((option.yAxis as { type?: string }).type, "category", "horizontal layout");
+  assert.notEqual(sig(renderSample("groupedBar", { barWidth: 12 })), sig(renderSample("groupedBar", { barWidth: 80 })));
+});
+
+test("P100-7: capsule bars round every corner", () => {
+  const [bar] = seriesList(renderSample("capsuleBar")) as Array<{
+    itemStyle?: { borderRadius?: number[] };
+    showBackground?: boolean;
+  }>;
+  assert.deepEqual(bar.itemStyle?.borderRadius, [24, 24, 24, 24], "capsule radius = barWidth/2 on all corners");
+  assert.equal(bar.showBackground, true, "capsules keep the progress track");
+  assert.notEqual(sig(renderSample("capsuleBar", { barWidth: 20 })), sig(renderSample("capsuleBar", { barWidth: 70 })));
+});
+
+test("P100-7: arrow bars tip each value with an arrow marker", () => {
+  const option = renderSample("arrowBar");
+  const series = seriesList(option) as Array<{ type?: string; symbol?: string; symbolRotate?: number }>;
+  assert.equal(series[0]?.type, "bar");
+  assert.equal(series[1]?.type, "scatter");
+  assert.equal(series[1]?.symbol, "arrow");
+  assert.equal(series[1]?.symbolRotate, 90);
+  assert.notEqual(sig(renderSample("arrowBar", { showLabels: false })), sig(renderSample("arrowBar", { showLabels: true })));
+});
+
+test("P100-7: dumbbell connects start and end beads per row", () => {
+  const option = renderSample("dumbbell");
+  const series = seriesList(option) as Array<{ type?: string; renderItem?: unknown }>;
+  assert.equal(series[0]?.type, "custom", "connectors ride a custom series");
+  assert.equal(typeof series[0]?.renderItem, "function");
+  assert.equal(series[1]?.type, "scatter");
+  assert.equal(series[2]?.type, "scatter");
+  const rows = getTemplateDefinition("dumbbell").sampleData.table.length - 1;
+  const beads = series[1] as { data?: unknown[] };
+  assert.equal(beads.data?.length, rows);
+  assert.notEqual(sig(renderSample("dumbbell", { showLabels: false })), sig(renderSample("dumbbell", { showLabels: true })));
+});
+
+test("P100-7: stacked dots plot one point per unit", () => {
+  const option = renderSample("stackedDot");
+  const [dots] = seriesList(option) as Array<{ type?: string; data?: [number, number][] }>;
+  assert.equal(dots.type, "scatter");
+  const totalUnits = (dots.data ?? []).length;
+  const sampleValues = [12, 9, 6, 4];
+  assert.equal(totalUnits, sampleValues.reduce((sum, v) => sum + v, 0), "one point per vote");
+  // The base point of each stack carries the row label (category index).
+  const basePoints = (dots.data ?? []).filter(([, unit]) => unit === 1);
+  assert.equal(basePoints.length, sampleValues.length, "one labeled base point per category");
+  assert.notEqual(sig(renderSample("stackedDot", { pointSize: 3 })), sig(renderSample("stackedDot", { pointSize: 12 })));
+});
+
+test("P100-7: OHLC bars draw open/close ticks from a custom series", () => {
+  const option = renderSample("ohlcBar");
+  const [ohlc] = seriesList(option) as Array<{ type?: string; renderItem?: unknown; data?: number[][] }> & { data?: number[][] };
+  assert.equal(ohlc.type, "custom");
+  assert.equal(typeof ohlc.renderItem, "function");
+  const rows = getTemplateDefinition("ohlcBar").sampleData.table.length - 1;
+  assert.equal(ohlc.data?.length, rows);
+  assert.equal(ohlc.data?.[0]?.length, 5, "each row packs [index, open, close, low, high]");
+});
+
+test("P100-7: candle+volume splits across two grids with shared categories", () => {
+  const option = renderSample("candleVolume");
+  const series = seriesList(option) as Array<{ type?: string; xAxisIndex?: number; yAxisIndex?: number; data?: number[] }>;
+  assert.equal(series[0]?.type, "candlestick");
+  assert.equal(series[0]?.xAxisIndex, 0);
+  assert.equal(series[1]?.type, "bar");
+  assert.equal(series[1]?.yAxisIndex, 1, "volume rides the second value axis");
+  const grid = option.grid as unknown[];
+  assert.equal(grid.length, 2, "candlestick and volume occupy separate grids");
+  const xAxis = option.xAxis as unknown[];
+  assert.equal(xAxis.length, 2, "each grid has its own category axis");
+  assert.equal(series[1]?.data?.length, getTemplateDefinition("candleVolume").sampleData.table.length - 1);
+});
+
+test("P100-7: split-axis bars isolate outliers in an upper zoomed grid", () => {
+  const option = renderSample("splitAxisBar");
+  const series = seriesList(option) as Array<{ type?: string; xAxisIndex?: number; data?: Array<number | null> }>;
+  assert.equal(series[0]?.type, "bar");
+  assert.equal(series[1]?.xAxisIndex, 1, "outlier series rides the second grid");
+  const outliers = (series[1]?.data ?? []).filter((value) => value !== null);
+  assert.deepEqual(outliers, [310], "the single outlier moves to the upper grid");
+  const grid = option.grid as unknown[];
+  assert.equal(grid.length, 2, "split axis needs two grids");
+  assert.notEqual(sig(renderSample("splitAxisBar", { showLabels: false })), sig(renderSample("splitAxisBar", { showLabels: true })));
 });

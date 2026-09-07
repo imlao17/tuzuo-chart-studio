@@ -73,7 +73,7 @@
 | 4 | 散点/气泡扩展 | 5 | 已完成 | 2026-09-07 | 随本批提交（"Add 5 scatter/bubble chart templates…"） | bubble/trendScatter 为 scatter 的配置注入包装器；象限图中线取中位数（均值可配置项留待后续） |
 | 5 | 层级与网络 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 hierarchy/network chart templates…"） | 新建 `renderers/hierarchy.ts`、`renderers/network.ts`；冲积图复用 sankey 渲染路径（差异在多阶段示例数据）；弦图用 ECharts 6.1 内置 chord 系列 |
 | 6 | 统计与分布 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 statistical/distribution chart templates…"） | violin/marimekko 两个 P2 均已完成（custom 系列 renderItem）；shared.ts 增加 parallel/parallelAxis/calendar 通道；平行坐标/小提琴/马赛克无数据标签面，showLabels 通用测试已豁免 |
-| 7 | 条柱线补充变体 | 8 | 待开始 | — | — | 含 1 个 P2 |
+| 7 | 条柱线补充变体 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 bar/column variant chart templates…"） | splitAxisBar 这个 P2 已完成（双 grid 拆分离群值）；shared.ts 增加 grid 显式通道（candleVolume 双面板）；OHLC/蜡烛量无标签面已豁免 showLabels |
 | 8 | 环饼与箱线补充 | 4 | 待开始 | — | — | |
 | 9 | 卡片、表格与文字 | 5 | 待开始 | — | — | 词云需依赖决策 |
 | 10 | 时间与分面 | 3 | 待开始 | — | — | 小倍数是本批难点 |
@@ -164,13 +164,13 @@
 
 | # | 中文名 | id | ECharts 方案 | 数据绑定要点 | 状态 |
 |---|---|---|---|---|---|
-| 46 | 分组条形图 | `groupedBar` | bar 横向分组 | 分类 + 多数值列 | 待做 |
-| 47 | 胶囊条形图 | `capsuleBar` | bar，全圆角（高度/2 圆角） | 分类 + 1 数值列 | 待做 |
-| 48 | 箭头条形图 | `arrowBar` | pictorialBar（三角箭头）+ bar | 分类 + 1 数值列 | 待做 |
-| 49 | 哑铃图 | `dumbbell` | scatter + line（两点连线） | 分类 + 2 数值列（起点、终点） | 待做 |
-| 50 | 堆叠点图 | `stackedDot` | scatter，按值堆叠圆点（每点=1 单位） | 分类 + 1 数值列（整数计数语义） | 待做 |
-| 51 | OHLC 条形图 | `ohlcBar` | custom renderItem（传统开高低收细棒） | 4 数值列（开、收、低、高） | 待做 |
-| 52 | 蜡烛+成交量组合图 | `candleVolume` | candlestick + bar，双 grid/双轴 | 5 数值列（开、收、低、高、量） | 待做 |
+| 46 | 分组条形图 | `groupedBar` | bar 横向分组 | 分类 + 多数值列 | 完成 |
+| 47 | 胶囊条形图 | `capsuleBar` | bar，全圆角（高度/2 圆角） | 分类 + 1 数值列 | 完成 |
+| 48 | 箭头条形图 | `arrowBar` | pictorialBar（三角箭头）+ bar | 分类 + 1 数值列 | 完成 |
+| 49 | 哑铃图 | `dumbbell` | scatter + line（两点连线） | 分类 + 2 数值列（起点、终点） | 完成 |
+| 50 | 堆叠点图 | `stackedDot` | scatter，按值堆叠圆点（每点=1 单位） | 分类 + 1 数值列（整数计数语义） | 完成 |
+| 51 | OHLC 条形图 | `ohlcBar` | custom renderItem（传统开高低收细棒） | 4 数值列（开、收、低、高） | 完成 |
+| 52 | 蜡烛+成交量组合图 | `candleVolume` | candlestick + bar，双 grid/双轴 | 5 数值列（开、收、低、高、量） | 完成 |
 | 53 | 断轴条形图 | `splitAxisBar` | 双 grid 拼接 + 轴断裂标记 | 分类 + 1 数值列（个别离群值很大） | 待做（P2） |
 
 ### 批次 8 · 环饼与箱线补充（pie.ts / advanced.ts / heatmap）
