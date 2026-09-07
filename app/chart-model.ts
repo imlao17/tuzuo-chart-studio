@@ -36,6 +36,13 @@ export type ChartType =
   | "combo"
   | "donut"
   | "pie"
+  | "rose"
+  | "roseArea"
+  | "radialBar"
+  | "radialStackedBar"
+  | "progressRing"
+  | "polarLine"
+  | "polarArea"
   | "scatter"
   | "divergingBar"
   | "populationPyramid"
@@ -375,6 +382,13 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "combo", name: "柱线组合图", family: "other" },
   { id: "donut", name: "环形图", family: "pie" },
   { id: "pie", name: "饼图", family: "pie" },
+  { id: "rose", name: "玫瑰图", family: "pie" },
+  { id: "roseArea", name: "面积玫瑰图", family: "pie" },
+  { id: "radialBar", name: "径向条形图", family: "pie" },
+  { id: "radialStackedBar", name: "径向堆叠条形图", family: "pie" },
+  { id: "progressRing", name: "进度环形图", family: "pie" },
+  { id: "polarLine", name: "极坐标折线图", family: "pie" },
+  { id: "polarArea", name: "极坐标面积图", family: "pie" },
   { id: "scatter", name: "散点图", family: "other" },
   { id: "divergingBar", name: "发散条形图", family: "other" },
   { id: "populationPyramid", name: "人口金字塔", family: "other" },

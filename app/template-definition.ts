@@ -46,6 +46,12 @@ import {
   buildSlopeOption,
 } from "./renderers/line-area";
 import { buildPieOption } from "./renderers/pie";
+import {
+  buildPolarLineOption,
+  buildProgressRingOption,
+  buildRadialBarOption,
+  buildRoseOption,
+} from "./renderers/radial";
 import { buildScatterOption } from "./renderers/scatter";
 import { buildStreamgraphOption } from "./renderers/streamgraph";
 import { buildWithRenderer, type RendererResult } from "./renderers/shared";
@@ -839,6 +845,63 @@ const SAMPLE_BUMP: SampleData = {
   seriesColumns: ["品牌 A", "品牌 B", "品牌 C"],
 };
 
+// --- Batch-3 (Flourish parity) sample data ---------------------------------
+
+const SAMPLE_ROSE: SampleData = {
+  table: [
+    ["渠道", "销售额 万"],
+    ["直营门店", "128"],
+    ["电商平台", "96"],
+    ["分销商", "64"],
+    ["直播带货", "52"],
+    ["团购", "24"],
+  ],
+  categoryColumn: "渠道",
+  seriesColumns: ["销售额 万"],
+};
+
+const SAMPLE_RADIAL: SampleData = {
+  table: [
+    ["城市", "气温 ℃"],
+    ["北京", "24"],
+    ["上海", "28"],
+    ["广州", "31"],
+    ["成都", "22"],
+    ["西安", "26"],
+    ["哈尔滨", "15"],
+  ],
+  categoryColumn: "城市",
+  seriesColumns: ["气温 ℃"],
+};
+
+const SAMPLE_RADIAL_STACK: SampleData = {
+  table: [
+    ["月份", "线上", "线下"],
+    ["一月", "62", "48"],
+    ["二月", "58", "52"],
+    ["三月", "74", "55"],
+    ["四月", "80", "61"],
+    ["五月", "92", "66"],
+    ["六月", "105", "72"],
+  ],
+  categoryColumn: "月份",
+  seriesColumns: ["线上", "线下"],
+};
+
+const SAMPLE_POLAR_LINE: SampleData = {
+  table: [
+    ["月份", "今年", "去年"],
+    ["一月", "128", "104"],
+    ["二月", "146", "122"],
+    ["三月", "138", "118"],
+    ["四月", "172", "149"],
+    ["五月", "189", "160"],
+    ["六月", "218", "185"],
+  ],
+  categoryColumn: "月份",
+  seriesColumns: ["今年", "去年"],
+};
+
 // --- Shared validators -----------------------------------------------------
 // Each returns null (pass) or a human-readable error string. Validators read
 // only the ValidationContext (parsed table + resolved categoryColumn /
@@ -1108,6 +1171,78 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_PIE,
     buildOption: buildPieOption,
     sampleData: SAMPLE_SHARE,
+  },
+
+  // --- Radial / polar family (Flourish parity batch 3) ---------------------
+  rose: {
+    id: "rose",
+    family: "pie",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: PIE_GROUPS,
+    capabilities: CAP_PIE,
+    buildOption: buildRoseOption,
+    sampleData: SAMPLE_ROSE,
+  },
+  roseArea: {
+    id: "roseArea",
+    family: "pie",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: PIE_GROUPS,
+    capabilities: CAP_PIE,
+    buildOption: buildRoseOption,
+    sampleData: SAMPLE_ROSE,
+  },
+  radialBar: {
+    id: "radialBar",
+    family: "pie",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: PIE_GROUPS,
+    capabilities: CAP_PIE,
+    buildOption: buildRadialBarOption,
+    sampleData: SAMPLE_RADIAL,
+  },
+  radialStackedBar: {
+    id: "radialStackedBar",
+    family: "pie",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: PIE_GROUPS,
+    capabilities: CAP_PIE,
+    buildOption: buildRadialBarOption,
+    sampleData: SAMPLE_RADIAL_STACK,
+  },
+  progressRing: {
+    id: "progressRing",
+    family: "pie",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildProgressRingOption,
+    sampleData: SAMPLE_GAUGE,
+  },
+  polarLine: {
+    id: "polarLine",
+    family: "pie",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: PIE_GROUPS,
+    capabilities: CAP_PIE,
+    buildOption: buildPolarLineOption,
+    sampleData: SAMPLE_POLAR_LINE,
+  },
+  polarArea: {
+    id: "polarArea",
+    family: "pie",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: PIE_GROUPS,
+    capabilities: CAP_PIE,
+    buildOption: buildPolarLineOption,
+    sampleData: SAMPLE_POLAR_LINE,
   },
 
   // --- Line / area family (migrated) --------------------------------------

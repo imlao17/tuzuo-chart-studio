@@ -69,7 +69,7 @@
 |---|---|---|---|---|---|---|
 | 1 | 条形/柱状扩展 | 10 | 已完成 | 2026-09-07 | `6d28dc3` | 密度直方图与象形柱状图两个 P2 均已完成；象形柱状图的「每单位代表值」暂不可配置（单位符号固定 10px 高 + 2px 间距），后续批次可补 |
 | 2 | 折线/面积扩展 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 line/area chart templates…"） | 点线图/平滑面积图/阶梯面积图复用既有 line-area 路径；双轴折线/斜率/区间面积/脊线/凹凸为独立构造器 |
-| 3 | 径向/极坐标家族 | 7 | 待开始 | — | — | 新建 `renderers/radial.ts`，family 用 `pie` |
+| 3 | 径向/极坐标家族 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 radial/polar chart templates…"） | 新建 `renderers/radial.ts`；shared.ts 的 RendererResult 扩展了 polar/angleAxis/radiusAxis/graphic 通道（对既有模板零影响） |
 | 4 | 散点/气泡扩展 | 5 | 待开始 | — | — | |
 | 5 | 层级与网络 | 8 | 待开始 | — | — | 新建 `renderers/hierarchy.ts`、`renderers/network.ts` |
 | 6 | 统计与分布 | 7 | 待开始 | — | — | 含 2 个 P2 |
@@ -117,13 +117,13 @@
 
 | # | 中文名 | id | ECharts 方案 | 数据绑定要点 | 状态 |
 |---|---|---|---|---|---|
-| 19 | 玫瑰图 | `rose` | pie，`roseType: "radius"` | 分类 + 1 数值列 | 待做 |
-| 20 | 面积玫瑰图 | `roseArea` | pie，`roseType: "area"` | 同上 | 待做 |
-| 21 | 径向条形图 | `radialBar` | polar + 角度类目轴 + 径向数值轴 + bar | 分类 + 1 数值列 | 待做 |
-| 22 | 径向堆叠条形图 | `radialStackedBar` | 同上 + stack | 分类 + 多数值列 | 待做 |
-| 23 | 进度环形图 | `progressRing` | pie：背景环（满值灰色）+ 前景环 | 1 行 1 数值列（或首行），显示百分比标签 | 待做 |
-| 24 | 极坐标折线图 | `polarLine` | polar + line | 分类 + 多数值列（类目在角度轴） | 待做 |
-| 25 | 极坐标面积图 | `polarArea` | polar + line + areaStyle | 同上 | 待做 |
+| 19 | 玫瑰图 | `rose` | pie，`roseType: "radius"` | 分类 + 1 数值列 | 完成 |
+| 20 | 面积玫瑰图 | `roseArea` | pie，`roseType: "area"` | 同上 | 完成 |
+| 21 | 径向条形图 | `radialBar` | polar + 角度类目轴 + 径向数值轴 + bar | 分类 + 1 数值列 | 完成 |
+| 22 | 径向堆叠条形图 | `radialStackedBar` | 同上 + stack | 分类 + 多数值列 | 完成 |
+| 23 | 进度环形图 | `progressRing` | pie：背景环（满值灰色）+ 前景环 | 1 行 1 数值列（或首行），显示百分比标签 | 完成 |
+| 24 | 极坐标折线图 | `polarLine` | polar + line | 分类 + 多数值列（类目在角度轴） | 完成 |
+| 25 | 极坐标面积图 | `polarArea` | polar + line + areaStyle | 同上 | 完成 |
 
 ### 批次 4 · 散点/气泡扩展（scatter.ts）
 

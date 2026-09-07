@@ -1449,3 +1449,72 @@ test("P100-2: bump charts rank values on an inverted axis", () => {
   assert.match(series[0]?.label?.formatter?.({ value: 2 }) ?? "", /^#2$/);
   assert.notEqual(sig(renderSample("bump", { showLabels: false })), sig(renderSample("bump", { showLabels: true })));
 });
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 3 — radial/polar family.
+// ---------------------------------------------------------------------------
+
+test("P100-3: rose variants set their roseType and stay grid-free", () => {
+  const radius = renderSample("rose");
+  const area = renderSample("roseArea");
+  for (const [option, expected] of [[radius, "radius"], [area, "area"]] as const) {
+    const [pie] = seriesList(option) as Array<{ type?: string; roseType?: string }>;
+    assert.equal(pie.type, "pie");
+    assert.equal(pie.roseType, expected);
+    assert.equal(option.grid, undefined, "rose must not emit a cartesian grid");
+    assert.notEqual(sig(renderSample("roseArea", { showLabels: false })), sig(renderSample("roseArea", { showLabels: true })));
+  }
+});
+
+test("P100-3: radial bars ride a polar frame with category angle axis", () => {
+  for (const type of ["radialBar", "radialStackedBar"] as ChartType[]) {
+    const option = renderSample(type);
+    assert.ok(option.polar, `${type}: missing polar coordinate`);
+    const angleAxis = option.angleAxis as { type?: string; data?: string[] };
+    assert.equal(angleAxis.type, "category");
+    assert.ok((angleAxis.data?.length ?? 0) > 0);
+    assert.equal(option.grid, undefined, `${type}: must not emit a cartesian grid`);
+    const series = seriesList(option) as Array<{ type?: string; coordinateSystem?: string; stack?: string }>;
+    assert.equal(series[0]?.type, "bar");
+    assert.equal(series[0]?.coordinateSystem, "polar");
+  }
+  const stacked = seriesList(renderSample("radialStackedBar")) as Array<{ stack?: string }>;
+  assert.equal(stacked[0]?.stack, "total", "radial stacked bars share one stack");
+  assert.notEqual(sig(renderSample("radialBar", { barWidth: 60 })), sig(renderSample("radialBar", { barWidth: 20 })));
+});
+
+test("P100-3: progress ring draws a background ring, value arc, and center text", () => {
+  const option = renderSample("progressRing");
+  assert.equal(option.grid, undefined);
+  const series = seriesList(option) as Array<{
+    type?: string;
+    data?: Array<{ name?: string; value?: number; itemStyle?: { color?: string } }>;
+  }>;
+  assert.equal(series[0]?.type, "pie");
+  assert.equal(series[0]?.data?.[0]?.value, 100, "background ring is a full circle");
+  const arc = series[1]?.data ?? [];
+  assert.equal(arc[0]?.value, 76, "sample completion rate maps to the arc sweep");
+  assert.equal(arc[1]?.itemStyle?.color, "transparent", "remainder slice is invisible");
+  const graphic = (option.graphic ?? []) as Array<{ type?: string; style?: { text?: string } }>;
+  assert.ok(
+    graphic.some((el) => el.type === "text" && el.style?.text?.includes("76")),
+    `expected center percent text, got ${JSON.stringify(graphic)}`,
+  );
+  assert.notEqual(sig(renderSample("progressRing", { showLabels: false })), sig(renderSample("progressRing", { showLabels: true })));
+});
+
+test("P100-3: polar line hybrids plot on the polar frame", () => {
+  const line = renderSample("polarLine");
+  const area = renderSample("polarArea");
+  for (const option of [line, area]) {
+    assert.ok(option.polar);
+    assert.equal((option.angleAxis as { type?: string }).type, "category");
+    assert.equal(option.grid, undefined);
+    const series = seriesList(option) as Array<{ type?: string; coordinateSystem?: string }>;
+    assert.equal(series[0]?.type, "line");
+    assert.equal(series[0]?.coordinateSystem, "polar");
+  }
+  const areaSeries = seriesList(area) as Array<{ areaStyle?: Record<string, unknown> }>;
+  assert.ok(areaSeries[0]?.areaStyle, "polar area must fill");
+  assert.notEqual(sig(line), sig(renderSample("polarLine", { showLabels: false })));
+});

@@ -44,6 +44,12 @@ export type RendererResult = {
   radar?: EChartsOption["radar"];
   visualMap?: EChartsOption["visualMap"];
   tooltipTrigger?: "axis" | "item";
+  /** Polar coordinate block (Flourish parity batch 3). */
+  polar?: EChartsOption["polar"];
+  angleAxis?: EChartsOption["angleAxis"];
+  radiusAxis?: EChartsOption["radiusAxis"];
+  /** Free-form graphic layer (progress-ring center text, card templates). */
+  graphic?: EChartsOption["graphic"];
 };
 
 type ArrayElement<T> = T extends readonly (infer Item)[] ? Item : T;
@@ -550,6 +556,10 @@ function assembleOption(
       singleAxis: patched.singleAxis,
       radar: patched.radar,
       visualMap: patched.visualMap,
+      polar: patched.polar,
+      angleAxis: patched.angleAxis,
+      radiusAxis: patched.radiusAxis,
+      graphic: patched.graphic,
       xAxis: patched.xAxis,
       yAxis: patched.yAxis,
       series: patched.series,
