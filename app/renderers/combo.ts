@@ -122,3 +122,88 @@ export function buildComboOption(ctx: RenderContext): RendererResult {
 
   return { series, xAxis, yAxis };
 }
+
+/** 帕累托图: descending bars plus a cumulative-percentage line on a 0–100%
+ *  right axis. Flourish parity batch 1. */
+export function buildParetoOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries, categories } = ctx;
+  const { theme, fontSize, compact = false } = config;
+
+  const barWidth = config.barWidth ?? 48;
+  const barRadius = config.barRadius ?? 3;
+  const lineWidth = config.lineWidth ?? 3;
+  const pointSize = config.pointSize ?? 7;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const labelTextStyle = dataLabelTextStyle(config);
+  const textColor = theme.text;
+
+  // Pareto always ranks categories by value descending unless the user picked
+  // an explicit sort (which buildRenderContext has already applied).
+  let orderedCategories = categories;
+  let values = dataSeries[0]?.data ?? [];
+  if (!config.sortCategories?.bySeries && values.length) {
+    const indices = values.map((_, i) => i);
+    indices.sort((a, b) => {
+      const va = Number.isFinite(values[a]) ? values[a] : 0;
+      const vb = Number.isFinite(values[b]) ? values[b] : 0;
+      return vb - va;
+    });
+    orderedCategories = indices.map((i) => categories[i]);
+    values = indices.map((i) => values[i]);
+  }
+  const total = values.reduce((sum, v) => sum + (Number.isFinite(v) ? v : 0), 0);
+  let running = 0;
+  const cumulative = values.map((v) => {
+    running += Number.isFinite(v) ? v : 0;
+    return total ? (running / total) * 100 : 0;
+  });
+
+  const leftAxis = buildValueAxis(ctx, textColor, fontSize, compact);
+  const rightAxis = {
+    ...buildValueAxis(ctx, textColor, fontSize, compact),
+    min: 0,
+    max: 100,
+    axisLabel: {
+      ...(leftAxis as { axisLabel?: Record<string, unknown> }).axisLabel,
+      formatter: (value: number) => `${value}%`,
+    },
+  };
+  const xAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
+  const series: SeriesOption[] = [
+    {
+      name: dataSeries[0]?.name ?? "数值",
+      type: "bar",
+      data: values,
+      barMaxWidth: compact ? 20 : barWidth,
+      itemStyle: {
+        color: colorFor(0, config),
+        opacity: markOpacity,
+        borderRadius: [barRadius, barRadius, 0, 0],
+      },
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "top",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const entry = params as { value: string | number };
+          return ctx.formatNumber(entry.value);
+        },
+      },
+      emphasis: { focus: "series" },
+    },
+    {
+      name: "累计占比",
+      type: "line",
+      data: cumulative,
+      yAxisIndex: 1,
+      smooth: false,
+      symbol: compact || pointSize === 0 ? "none" : "circle",
+      symbolSize: compact ? 0 : pointSize,
+      itemStyle: { color: colorFor(1, config) },
+      lineStyle: { color: colorFor(1, config), width: compact ? 1.5 : lineWidth },
+      label: { show: false },
+      emphasis: { focus: "series" },
+    },
+  ];
+  return { series, xAxis: { ...xAxis, data: orderedCategories }, yAxis: [leftAxis, rightAxis] as RendererResult["yAxis"] };
+}

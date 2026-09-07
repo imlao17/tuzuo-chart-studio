@@ -15,6 +15,16 @@ export type ChartType =
   | "groupedColumn"
   | "stackedColumn"
   | "proportionalColumn"
+  | "histogram"
+  | "densityHistogram"
+  | "rangeBar"
+  | "rangeColumn"
+  | "bulletBar"
+  | "lollipop"
+  | "pictorialColumn"
+  | "progressBar"
+  | "rankingBar"
+  | "pareto"
   | "combo"
   | "donut"
   | "pie"
@@ -336,6 +346,16 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "groupedColumn", name: "分组柱状图", family: "bar" },
   { id: "stackedColumn", name: "堆叠柱状图", family: "bar" },
   { id: "proportionalColumn", name: "百分比柱状图", family: "bar" },
+  { id: "histogram", name: "直方图", family: "bar" },
+  { id: "densityHistogram", name: "密度直方图", family: "bar" },
+  { id: "rangeBar", name: "区间条形图", family: "bar" },
+  { id: "rangeColumn", name: "区间柱状图", family: "bar" },
+  { id: "bulletBar", name: "子弹图", family: "bar" },
+  { id: "lollipop", name: "滑珠图", family: "bar" },
+  { id: "pictorialColumn", name: "象形柱状图", family: "bar" },
+  { id: "progressBar", name: "进度条形图", family: "bar" },
+  { id: "rankingBar", name: "排名条形图", family: "bar" },
+  { id: "pareto", name: "帕累托图", family: "bar" },
   { id: "combo", name: "柱线组合图", family: "other" },
   { id: "donut", name: "环形图", family: "pie" },
   { id: "pie", name: "饼图", family: "pie" },

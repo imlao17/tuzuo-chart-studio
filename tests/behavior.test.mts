@@ -507,7 +507,7 @@ test("single numeric column passes generic templates but fails role-specific tem
   };
   for (const type of ALL_TYPES) {
     const err = firstError(type, ctx);
-    if (["scatter", "divergingBar", "populationPyramid"].includes(type)) {
+    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar"].includes(type)) {
       assert.ok(err && err.includes("2 个数值列"), `${type}: expected 2-column error, got ${err}`);
     } else if (type === "candlestick") {
       assert.ok(err && err.includes("4 个数值列"), `${type}: expected OHLC error, got ${err}`);
@@ -1065,7 +1065,8 @@ test("P1-5: comboAxisSync applies a shared min/max to both axes", () => {
 
 test("P1-5: non-combo templates are unaffected by the patchAxes array support", () => {
   // Regression: every other template still returns a single (non-array) yAxis.
-  for (const type of ALL_TYPES.filter((t) => t !== "combo")) {
+  // combo and pareto are the dual-axis exceptions by design.
+  for (const type of ALL_TYPES.filter((t) => t !== "combo" && t !== "pareto")) {
     const option = buildChartOption(baseConfig({ type }));
     assert.equal(Array.isArray(option.yAxis), false, `${type}: yAxis unexpectedly an array`);
   }
@@ -1123,4 +1124,211 @@ test("P1-6: streamTimeAxis falls back to value axis when categories are not date
   const series = seriesList(option)[0] as { data: [number, number, string][] };
   const xs = series.data.map((d) => d[0]);
   assert.ok(xs.every((x) => x < 1000), `expected small indices, got ${xs}`);
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 1 — bar/column extensions. Each new template
+// gets its signature structure plus a config-change and an edge assertion on
+// top of the generic loops above.
+// ---------------------------------------------------------------------------
+
+test("P100-1: role templates that need two numeric columns reject a single one", () => {
+  const ctx: ValidationContext = {
+    parsed: tableToParsed([
+      ["月份", "数值"],
+      ["一月", "10"],
+      ["二月", "20"],
+    ]),
+    categoryColumn: "月份",
+    seriesColumns: ["数值"],
+  };
+  const twoColumnTypes: ChartType[] = ["rangeBar", "rangeColumn", "bulletBar"];
+  for (const type of twoColumnTypes) {
+    const err = firstError(type, ctx);
+    assert.ok(err && err.includes("2 个数值列"), `${type}: expected 2-column error, got ${err}`);
+  }
+});
+
+test("P100-1: histogram bins a numeric column into interval bars", () => {
+  const option = renderSample("histogram");
+  const [bar] = seriesList(option) as Array<{ type?: string; barCategoryGap?: number; data: number[] }>;
+  assert.equal(bar.type, "bar");
+  assert.equal(bar.barCategoryGap, 0);
+  const xAxis = option.xAxis as { data?: string[] };
+  assert.ok((xAxis.data?.length ?? 0) >= 5, "expected at least 5 bins");
+  assert.ok(
+    xAxis.data?.every((label) => label.includes("–")),
+    `expected interval labels, got ${xAxis.data}`,
+  );
+  assert.equal(bar.data.length, xAxis.data?.length);
+  // Binning counts must total the sample row count.
+  assert.equal(
+    bar.data.reduce((sum, v) => sum + v, 0),
+    getTemplateDefinition("histogram").sampleData.table.length - 1,
+  );
+  // barWidth flows into the histogram bars (config-change redraw).
+  assert.notEqual(sig(renderSample("histogram", { barWidth: 12 })), sig(renderSample("histogram", { barWidth: 80 })));
+});
+
+test("P100-1: histogram collapses constant data into a single bin", () => {
+  const option = buildChartOption(
+    baseConfig({
+      type: "histogram",
+      parsed: tableToParsed([
+        ["样本", "数值"],
+        ["a", "5"],
+        ["b", "5"],
+        ["c", "5"],
+      ]),
+      categoryColumn: "样本",
+      seriesColumns: ["数值"],
+    }),
+  );
+  const xAxis = option.xAxis as { data?: string[] };
+  assert.equal(xAxis.data?.length, 1);
+});
+
+test("P100-1: density histogram overlays a smooth density line on the bars", () => {
+  const option = renderSample("densityHistogram");
+  const series = seriesList(option) as Array<{ type?: string; smooth?: boolean; data?: number[] }>;
+  assert.equal(series[0]?.type, "bar");
+  assert.equal(series[1]?.type, "line");
+  assert.equal(series[1]?.smooth, true);
+  assert.equal(series[1]?.data?.length, series[0]?.data?.length);
+  // The curve is scaled to counts, so it stays in the same magnitude range.
+  const maxCount = Math.max(...(series[0]?.data ?? [0]));
+  assert.ok(
+    (series[1]?.data ?? []).every((v) => v <= maxCount + 1),
+    "density curve should be scaled to count units",
+  );
+});
+
+test("P100-1: range bars draw a transparent base plus a visible floating segment", () => {
+  for (const type of ["rangeBar", "rangeColumn"] as ChartType[]) {
+    const option = renderSample(type);
+    const series = seriesList(option) as Array<{
+      type?: string;
+      stack?: string;
+      itemStyle?: { color?: string };
+      label?: { show?: boolean };
+    }>;
+    assert.equal(series[0]?.stack, "range", `${type}: base series must stack`);
+    assert.equal(series[0]?.itemStyle?.color, "transparent", `${type}: base must be transparent`);
+    assert.equal(series[1]?.stack, "range", `${type}: visible series must stack`);
+    assert.notEqual(series[1]?.itemStyle?.color, "transparent");
+    // Labels ride the visible series only (showLabels toggle still flips them).
+    assert.equal(series[0]?.label?.show, false);
+    assert.equal(series[1]?.label?.show, true);
+    assert.notEqual(
+      sig(renderSample(type, { showLabels: false })),
+      sig(renderSample(type, { showLabels: true })),
+    );
+  }
+  // rangeColumn is vertical: category axis on x.
+  const column = renderSample("rangeColumn");
+  assert.equal((column.xAxis as { type?: string }).type, "category");
+  const bar = renderSample("rangeBar");
+  assert.equal((bar.yAxis as { type?: string }).type, "category");
+});
+
+test("P100-1: bullet chart overlays a narrow target strip on the actual bar", () => {
+  const option = renderSample("bulletBar");
+  const series = seriesList(option) as Array<{
+    type?: string;
+    barGap?: string;
+    barMaxWidth?: number;
+    label?: { show?: boolean };
+  }>;
+  assert.equal(series[0]?.type, "bar");
+  assert.equal(series[1]?.type, "bar");
+  assert.equal(series[1]?.barGap, "-100%", "target strip must overlap the actual bar");
+  assert.ok((series[1]?.barMaxWidth ?? 0) < (series[0]?.barMaxWidth ?? 0), "target strip must be narrower");
+  assert.equal(series[0]?.label?.show, true);
+  assert.equal(series[1]?.label?.show, false);
+  // Target strip width tracks barWidth.
+  assert.notEqual(
+    sig(renderSample("bulletBar", { barWidth: 20 })),
+    sig(renderSample("bulletBar", { barWidth: 70 })),
+  );
+});
+
+test("P100-1: lollipop pairs a stem with a bead per series", () => {
+  const option = renderSample("lollipop");
+  const series = seriesList(option) as Array<{ type?: string; symbolSize?: number; barMaxWidth?: number }>;
+  assert.equal(series.length, 2, "one stem + one bead for the single sample column");
+  assert.equal(series[0]?.type, "bar");
+  assert.equal(series[1]?.type, "scatter");
+  assert.ok((series[1]?.symbolSize ?? 0) > 0);
+  // Stem width tracks barWidth; bead size tracks pointSize.
+  assert.notEqual(sig(renderSample("lollipop", { barWidth: 12 })), sig(renderSample("lollipop", { barWidth: 80 })));
+  assert.notEqual(sig(renderSample("lollipop", { pointSize: 3 })), sig(renderSample("lollipop", { pointSize: 16 })));
+});
+
+test("P100-1: pictorial column repeats unit glyphs clipped to each value", () => {
+  const option = renderSample("pictorialColumn");
+  const [pictorial] = seriesList(option) as Array<{
+    type?: string;
+    symbolRepeat?: boolean;
+    symbolClip?: boolean;
+    symbol?: string;
+  }>;
+  assert.equal(pictorial.type, "pictorialBar");
+  assert.equal(pictorial.symbolRepeat, true);
+  assert.equal(pictorial.symbolClip, true);
+  assert.notEqual(sig(renderSample("pictorialColumn", { showLabels: false })), sig(renderSample("pictorialColumn", { showLabels: true })));
+});
+
+test("P100-1: progress bars sort descending and cap the axis at 100 for rates", () => {
+  const option = renderSample("progressBar");
+  const [bar] = seriesList(option) as Array<{ type?: string; showBackground?: boolean; data: number[] }>;
+  assert.equal(bar.type, "bar");
+  assert.equal(bar.showBackground, true);
+  const sorted = [...bar.data].sort((a, b) => b - a);
+  assert.deepEqual(bar.data, sorted, "progress bars must render in descending order");
+  // Horizontal layout: the value axis (and its 100 cap) sits on xAxis.
+  const xAxis = option.xAxis as { max?: number };
+  assert.equal(xAxis.max, 100, "rate data ≤100 must scale to 100");
+  assert.notEqual(sig(renderSample("progressBar", { barWidth: 15 })), sig(renderSample("progressBar", { barWidth: 70 })));
+});
+
+test("P100-1: ranking bars prefix end labels with the rank", () => {
+  const option = renderSample("rankingBar");
+  const [bar] = seriesList(option) as Array<{
+    label?: { show?: boolean; formatter?: (params: { dataIndex: number; value: number }) => string };
+    data: number[];
+  }>;
+  assert.equal(bar.label?.show, true);
+  assert.ok(bar.label?.formatter, "ranking bars must install a rank formatter");
+  const rendered = bar.label?.formatter?.({ dataIndex: 0, value: bar.data[0] });
+  assert.match(rendered ?? "", /^1\./, `expected rank prefix, got ${rendered}`);
+  const sorted = [...bar.data].sort((a, b) => b - a);
+  assert.deepEqual(bar.data, sorted, "ranking bars must render in descending order");
+  assert.notEqual(sig(renderSample("rankingBar", { showLabels: false })), sig(renderSample("rankingBar", { showLabels: true })));
+});
+
+test("P100-1: pareto adds a cumulative percentage line on a 0-100% right axis", () => {
+  const option = renderSample("pareto");
+  const series = seriesList(option) as Array<{
+    type?: string;
+    yAxisIndex?: number;
+    data?: number[];
+  }>;
+  assert.equal(series[0]?.type, "bar");
+  assert.equal(series[1]?.type, "line");
+  assert.equal(series[1]?.yAxisIndex, 1);
+  // Cumulative line must end at 100 and never decrease.
+  const cumulative = series[1]?.data ?? [];
+  assert.ok(Math.abs(cumulative[cumulative.length - 1] - 100) < 0.001, `last cumulative value was ${cumulative[cumulative.length - 1]}`);
+  for (let i = 1; i < cumulative.length; i += 1) {
+    assert.ok(cumulative[i] >= cumulative[i - 1], "cumulative line must be monotonic");
+  }
+  const yAxis = option.yAxis as Array<{ max?: number; min?: number }>;
+  assert.equal(yAxis.length, 2, "pareto needs dual value axes");
+  assert.equal(yAxis[1]?.max, 100);
+  assert.equal(yAxis[1]?.min, 0);
+  // Bars must be sorted descending (pareto order).
+  const barData = series[0]?.data ?? [];
+  const sorted = [...barData].sort((a, b) => b - a);
+  assert.deepEqual(barData, sorted, "pareto bars must render in descending order");
+  assert.notEqual(sig(renderSample("pareto", { showLabels: false })), sig(renderSample("pareto", { showLabels: true })));
 });

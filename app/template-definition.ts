@@ -24,8 +24,18 @@ import {
   buildTreemapOption,
   buildWaterfallOption,
 } from "./renderers/advanced";
-import { buildBarOption } from "./renderers/bar";
-import { buildComboOption } from "./renderers/combo";
+import {
+  buildBarOption,
+  buildBulletOption,
+  buildDensityHistogramOption,
+  buildHistogramOption,
+  buildLollipopOption,
+  buildPictorialOption,
+  buildProgressOption,
+  buildRangeOption,
+  buildRankingOption,
+} from "./renderers/bar";
+import { buildComboOption, buildParetoOption } from "./renderers/combo";
 import { buildDivergingOption } from "./renderers/diverging";
 import { buildLineAreaOption } from "./renderers/line-area";
 import { buildPieOption } from "./renderers/pie";
@@ -249,6 +259,40 @@ const BIND_CATEGORY_SINGLE: DataBinding = {
 const BIND_VALUE_SINGLE: DataBinding = {
   role: "value",
   label: "数值字段",
+  required: true,
+  multiple: false,
+  hint: "额外数值列将被忽略",
+};
+
+// Batch-1 presets: templates that consume exactly two ordered numeric columns
+// (range bars, bullets) but don't fit the left/right diverging vocabulary.
+const BIND_VALUE_LOWER: DataBinding = {
+  role: "value",
+  label: "下限数值",
+  required: true,
+  multiple: false,
+  hint: "额外数值列将被忽略",
+};
+
+const BIND_VALUE_UPPER: DataBinding = {
+  role: "value",
+  label: "上限数值",
+  required: true,
+  multiple: false,
+  hint: "额外数值列将被忽略",
+};
+
+const BIND_VALUE_ACTUAL: DataBinding = {
+  role: "value",
+  label: "实际值",
+  required: true,
+  multiple: false,
+  hint: "额外数值列将被忽略",
+};
+
+const BIND_VALUE_TARGET: DataBinding = {
+  role: "value",
+  label: "目标值",
   required: true,
   multiple: false,
   hint: "额外数值列将被忽略",
@@ -550,6 +594,165 @@ const SAMPLE_FLOW: SampleData = {
   },
 };
 
+// --- Batch-1 (Flourish parity) sample data ---------------------------------
+// Each dataset is shaped so the template's signature form is visible in the
+// gallery thumbnail (bell-shaped scores for histograms, decreasing defect
+// counts for the Pareto, ≤100 rates for progress bars, ...).
+
+const SAMPLE_SCORES: SampleData = {
+  table: [
+    ["学生", "成绩"],
+    ["学生 A", "42"],
+    ["学生 B", "55"],
+    ["学生 C", "58"],
+    ["学生 D", "61"],
+    ["学生 E", "65"],
+    ["学生 F", "66"],
+    ["学生 G", "68"],
+    ["学生 H", "70"],
+    ["学生 I", "71"],
+    ["学生 J", "73"],
+    ["学生 K", "75"],
+    ["学生 L", "76"],
+    ["学生 M", "78"],
+    ["学生 N", "80"],
+    ["学生 O", "83"],
+    ["学生 P", "88"],
+    ["学生 Q", "94"],
+  ],
+  categoryColumn: "学生",
+  seriesColumns: ["成绩"],
+};
+
+const SAMPLE_HEIGHTS: SampleData = {
+  table: [
+    ["人员", "身高 cm"],
+    ["人员 A", "152"],
+    ["人员 B", "158"],
+    ["人员 C", "161"],
+    ["人员 D", "164"],
+    ["人员 E", "166"],
+    ["人员 F", "168"],
+    ["人员 G", "169"],
+    ["人员 H", "170"],
+    ["人员 I", "171"],
+    ["人员 J", "172"],
+    ["人员 K", "174"],
+    ["人员 L", "176"],
+    ["人员 M", "179"],
+    ["人员 N", "183"],
+    ["人员 O", "188"],
+  ],
+  categoryColumn: "人员",
+  seriesColumns: ["身高 cm"],
+};
+
+const SAMPLE_RANGE_TASK: SampleData = {
+  table: [
+    ["任务", "开始(天)", "结束(天)"],
+    ["需求确认", "0", "3"],
+    ["方案设计", "2", "6"],
+    ["开发", "5", "12"],
+    ["联调", "10", "14"],
+    ["验收", "13", "16"],
+  ],
+  categoryColumn: "任务",
+  seriesColumns: ["开始(天)", "结束(天)"],
+};
+
+const SAMPLE_RANGE_PRICE: SampleData = {
+  table: [
+    ["月份", "最低价", "最高价"],
+    ["一月", "102", "118"],
+    ["二月", "108", "121"],
+    ["三月", "99", "112"],
+    ["四月", "110", "126"],
+    ["五月", "115", "131"],
+    ["六月", "121", "138"],
+  ],
+  categoryColumn: "月份",
+  seriesColumns: ["最低价", "最高价"],
+};
+
+const SAMPLE_BULLET: SampleData = {
+  table: [
+    ["部门", "实际完成", "目标"],
+    ["华东", "86", "100"],
+    ["华南", "74", "90"],
+    ["华北", "92", "85"],
+    ["西南", "61", "80"],
+    ["东北", "55", "70"],
+  ],
+  categoryColumn: "部门",
+  seriesColumns: ["实际完成", "目标"],
+};
+
+const SAMPLE_LOLLIPOP: SampleData = {
+  table: [
+    ["页面", "耗时 ms"],
+    ["首页", "420"],
+    ["列表页", "680"],
+    ["详情页", "540"],
+    ["购物车", "310"],
+    ["结算页", "760"],
+    ["个人中心", "260"],
+  ],
+  categoryColumn: "页面",
+  seriesColumns: ["耗时 ms"],
+};
+
+const SAMPLE_PICTORIAL: SampleData = {
+  table: [
+    ["候选人", "得票(万)"],
+    ["候选人 A", "52"],
+    ["候选人 B", "38"],
+    ["候选人 C", "27"],
+    ["候选人 D", "12"],
+  ],
+  categoryColumn: "候选人",
+  seriesColumns: ["得票(万)"],
+};
+
+const SAMPLE_PROGRESS: SampleData = {
+  table: [
+    ["地区", "达成率 %"],
+    ["华东", "92"],
+    ["华南", "78"],
+    ["华北", "85"],
+    ["西南", "64"],
+    ["东北", "71"],
+    ["西北", "58"],
+  ],
+  categoryColumn: "地区",
+  seriesColumns: ["达成率 %"],
+};
+
+const SAMPLE_RANKING: SampleData = {
+  table: [
+    ["销售员", "销售额 万"],
+    ["周洁", "168"],
+    ["李成", "142"],
+    ["王一", "205"],
+    ["刘敏", "97"],
+    ["张弛", "130"],
+  ],
+  categoryColumn: "销售员",
+  seriesColumns: ["销售额 万"],
+};
+
+const SAMPLE_PARETO: SampleData = {
+  table: [
+    ["原因", "数量"],
+    ["物流延迟", "62"],
+    ["尺寸不符", "38"],
+    ["色差", "21"],
+    ["破损", "12"],
+    ["其他", "6"],
+  ],
+  categoryColumn: "原因",
+  seriesColumns: ["数量"],
+};
+
 // --- Shared validators -----------------------------------------------------
 // Each returns null (pass) or a human-readable error string. Validators read
 // only the ValidationContext (parsed table + resolved categoryColumn /
@@ -676,6 +879,117 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_CARTESIAN,
     buildOption: buildBarOption,
     sampleData: SAMPLE_QUARTERLY,
+  },
+
+  // --- Bar/column extensions (Flourish parity batch 1) --------------------
+  histogram: {
+    id: "histogram",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildHistogramOption,
+    sampleData: SAMPLE_SCORES,
+  },
+  densityHistogram: {
+    id: "densityHistogram",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildDensityHistogramOption,
+    sampleData: SAMPLE_HEIGHTS,
+  },
+  rangeBar: {
+    id: "rangeBar",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_LOWER, BIND_VALUE_UPPER],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("区间条形图需要 2 个数值列（下限和上限）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildRangeOption,
+    sampleData: SAMPLE_RANGE_TASK,
+  },
+  rangeColumn: {
+    id: "rangeColumn",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_LOWER, BIND_VALUE_UPPER],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("区间柱状图需要 2 个数值列（下限和上限）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildRangeOption,
+    sampleData: SAMPLE_RANGE_PRICE,
+  },
+  bulletBar: {
+    id: "bulletBar",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_ACTUAL, BIND_VALUE_TARGET],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("子弹图需要 2 个数值列（实际值和目标值）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildBulletOption,
+    sampleData: SAMPLE_BULLET,
+  },
+  lollipop: {
+    id: "lollipop",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildLollipopOption,
+    sampleData: SAMPLE_LOLLIPOP,
+  },
+  pictorialColumn: {
+    id: "pictorialColumn",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildPictorialOption,
+    sampleData: SAMPLE_PICTORIAL,
+  },
+  progressBar: {
+    id: "progressBar",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildProgressOption,
+    sampleData: SAMPLE_PROGRESS,
+  },
+  rankingBar: {
+    id: "rankingBar",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildRankingOption,
+    sampleData: SAMPLE_RANKING,
+  },
+  pareto: {
+    id: "pareto",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildParetoOption,
+    sampleData: SAMPLE_PARETO,
   },
 
   // --- Pie / donut family (migrated) --------------------------------------
