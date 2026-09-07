@@ -43,6 +43,7 @@ buildChartOption(config)          ← 薄分派器
 - `db/schema.ts` — D1/Drizzle 用户、验证 token、会话表结构
 - `drizzle/` — 数据库迁移文件
 - `docs/engineering/deployment.md` — 本地部署、生产托管、账号与邮箱配置
+- `docs/engineering/macos-desktop.md` — macOS 桌面版安装、打包与正式分发要求
 - `docs/product/project-stage-and-control.md` — 当前阶段、风险和接管建议
 - `docs/product/layout-redesign-plan.md` — 下一轮左右布局调整方案
 
@@ -59,6 +60,18 @@ npm run lint
 ```
 
 默认是本地模式，不需要账号就可以保存项目文件、复制 PNG、导出 SVG 和下载 PNG。公开托管时，可以通过 `NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=true` 打开“登录后才能导出”。
+
+## macOS 桌面版
+
+桌面版复用同一套 React 与 ECharts 编辑器，仅用 Electron 提供窗口和本机运行环境，不另写原生界面。当前安装包面向 Apple Silicon Mac：
+
+```bash
+npm run desktop:dev       # 本机打开桌面版
+npm run desktop:mac:dir   # 生成可直接检查的 .app
+npm run desktop:mac       # 生成未签名的内测 DMG 与 ZIP
+```
+
+安装、首次打开、签名与公证说明见 `docs/engineering/macos-desktop.md`。
 
 ## 部署与账号体系
 
@@ -95,14 +108,15 @@ npm run db:generate
 
 ## 测试
 
-两类测试，`npm test` 会依次运行：
+三类测试，`npm test` 会依次运行：
 
 - `tests/rendered-html.test.mjs` — SSR 渲染的 HTML 回归 + 源码 token 断言（`node --test`）
 - `tests/behavior.test.mts` — 行为回归（`tsx --test`），覆盖每个模板：配置变更是否真的改变 option、数据变更是否重绘、校验边界（空/负/文本/单列）、option 可导出性、示例数据渲染
+- `tests/desktop.test.mjs` — Electron 安全配置、本机页面与静态资源回归测试
 
 ## 技术栈
 
-vinext + Next.js 16 + React 19 + ECharts 6 + Tailwind 4 + Cloudflare D1 / Drizzle。
+vinext + Next.js 16 + React 19 + ECharts 6 + Tailwind 4 + Electron + Cloudflare D1 / Drizzle。
 
 ## 开源
 

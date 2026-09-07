@@ -1,0 +1,40 @@
+appId: com.lao17.tuzuo
+productName: 图作
+copyright: Copyright © 2026 老十七
+directories:
+  output: release
+  buildResources: desktop/resources
+files:
+  - "!node_modules/**/*"
+  - desktop/**/*.mjs
+  - dist/server/**/*
+  - dist/client/**/*
+  - package.json
+asar: true
+asarUnpack:
+  - dist/**/*
+npmRebuild: false
+mac:
+  category: public.app-category.graphics-design
+  icon: desktop/resources/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+  identity: null
+dmg:
+  title: "${productName} ${version}"
+  backgroundColor: "#f3f5f7"
+  iconSize: 92
+  contents:
+    - x: 150
+      y: 190
+      type: file
+    - x: 390
+      y: 190
+      type: link
+      path: /Applications

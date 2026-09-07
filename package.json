@@ -1,6 +1,9 @@
 {
   "name": "tuzuo-chart-studio",
   "version": "0.1.0",
+  "description": "本地优先的透明图表制作与高清导出工具",
+  "author": "老十七",
+  "main": "desktop/main.mjs",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,9 +20,13 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "desktop:dev": "NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=false npm run build && electron .",
+    "desktop:mac": "NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=false npm run build && electron-builder --mac",
+    "desktop:mac:dir": "NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=false npm run build && electron-builder --mac --dir",
+    "desktop:smoke": "npm run desktop:mac:dir && node --test tests/desktop-smoke.test.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && npm run build && node --test tests/rendered-html.test.mjs && npx tsx --test tests/behavior.test.mts",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "test": "npm run typecheck && npm run build && node --test tests/rendered-html.test.mjs tests/desktop.test.mjs && npx tsx --test tests/behavior.test.mts",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern release",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
@@ -39,6 +46,8 @@
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
+    "electron": "43.4.0",
+    "electron-builder": "26.15.3",
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.0",
     "react-server-dom-webpack": "19.2.8",
