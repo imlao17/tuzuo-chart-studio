@@ -612,3 +612,577 @@ export function buildSankeyOption(ctx: RenderContext): RendererResult {
     tooltipTrigger: "item",
   };
 }
+
+// ---------------------------------------------------------------------------
+// Flourish parity batch 6: statistical & distribution renderers.
+// ---------------------------------------------------------------------------
+
+/** Minimal shapes for custom-series renderItem callbacks (typed loosely in
+ *  echarts, so we declare the surface we actually use). */
+type CustomApi = {
+  value: (dim: number) => number;
+  coord: (point: [number, number]) => number[];
+  style: (extra?: Record<string, unknown>) => Record<string, unknown>;
+};
+type CustomParams = { dataIndex: number };
+
+function gaussianKde(values: number[], points: number[], std: number) {
+  const n = values.length;
+  if (!n || std <= 0) return points.map(() => 0);
+  return points.map(
+    (x) =>
+      values.reduce((sum, v) => {
+        const u = (v - x) / std;
+        return sum + Math.exp(-0.5 * u * u);
+      }, 0) /
+        (n * std * Math.sqrt(2 * Math.PI)),
+  );
+}
+
+/** 平行坐标图: each numeric column is a dimension; each row a polyline. */
+export function buildParallelOption(ctx: RenderContext): RendererResult {
+  const { config, categories, dataSeries } = ctx;
+  const { compact = false, theme, fontSize } = config;
+  const lineWidth = config.lineWidth ?? 3;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+
+  const parallel = {
+    top: compact ? "8%" : "18%",
+    left: compact ? "8%" : "12%",
+    right: compact ? "8%" : "12%",
+    bottom: compact ? "8%" : "14%",
+  };
+  const parallelAxis = dataSeries.map((series, dim) => {
+    const values = series.data.filter(Number.isFinite);
+    return {
+      dim,
+      name: compact ? "" : series.name,
+      min: values.length ? Math.min(...values) : 0,
+      max: values.length ? Math.max(...values) : 1,
+      nameTextStyle: { color: theme.text, fontSize },
+      axisLine: { show: !compact, lineStyle: { color: "#aeb6bf" } },
+      axisTick: { show: false },
+      axisLabel: { show: !compact, color: theme.text, fontSize },
+    };
+  });
+
+  const series: SeriesOption[] = [
+    {
+      name: "样本",
+      type: "parallel",
+      smooth: config.smooth,
+      lineStyle: {
+        width: compact ? 1.5 : lineWidth,
+        opacity: markOpacity,
+        color: colorFor(0, config),
+      },
+      data: categories.map((name, rowIndex) => ({
+        name,
+        value: dataSeries.map((series) =>
+          Number.isFinite(series.data[rowIndex]) ? series.data[rowIndex] : 0,
+        ),
+      })),
+      emphasis: { lineStyle: { width: (compact ? 1.5 : lineWidth) + 2 } },
+    },
+  ];
+  return { series, parallel, parallelAxis, tooltipTrigger: "item" };
+}
+
+/** 日历热力图: calendar coordinate + heatmap with per-day values. */
+export function buildCalendarHeatmapOption(ctx: RenderContext): RendererResult {
+  const { config, categories, dataSeries } = ctx;
+  const { compact = false, theme, fontSize } = config;
+  const values = (dataSeries[0]?.data ?? []).map((v) => (Number.isFinite(v) ? v : 0));
+  const maxValue = Math.max(1, ...values);
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  // Calendar range: the year (or year-month span) implied by the dates.
+  const dates = categories.map((date) => date.trim()).filter(Boolean);
+  const parsed = dates
+    .map((date) => new Date(date))
+    .filter((d) => !Number.isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+  const years = [...new Set(parsed.map((d) => d.getFullYear()).filter((year) => year > 1990))];
+  const range = years.length === 1 ? String(years[0]) : years.length > 1 ? [String(years[0]), String(years[years.length - 1])] : dates[0]?.slice(0, 4) || "2026";
+
+  const calendar = {
+    top: compact ? "10%" : "16%",
+    left: compact ? "10%" : "14%",
+    right: compact ? "6%" : "10%",
+    cellSize: (compact ? ["auto", 8] : ["auto", 20]) as (number | "auto")[],
+    range,
+    itemStyle: { color: "transparent", borderColor: theme.grid, borderWidth: 1 },
+    yearLabel: { show: !compact, color: theme.text, fontSize },
+    monthLabel: { show: !compact, color: theme.text, fontSize: Math.max(9, fontSize - 1) },
+    dayLabel: { show: !compact, color: theme.text, fontSize: Math.max(8, fontSize - 2), firstDay: 1 },
+    splitLine: { show: false },
+  };
+
+  const series: SeriesOption[] = [
+    {
+      name: dataSeries[0]?.name ?? "数值",
+      type: "heatmap",
+      coordinateSystem: "calendar",
+      data: dates.map((date, index) => [date, values[index] ?? 0]),
+      label: {
+        show: compact ? false : config.showLabels,
+        ...labelTextStyle,
+        fontSize: Math.max(8, fontSize - 3),
+        formatter: (params: unknown) => {
+          const entry = params as { value: [string, number] };
+          return ctx.formatNumber(entry.value[1]);
+        },
+      },
+      itemStyle: { borderRadius: compact ? 1 : 3 },
+    },
+  ];
+  return {
+    series,
+    calendar,
+    visualMap: {
+      min: 0,
+      max: maxValue,
+      calculable: false,
+      show: !compact,
+      orient: "horizontal" as const,
+      left: "center",
+      bottom: 0,
+      inRange: {
+        color: [config.backgroundColor === "#ffffff" ? "#f0f4fa" : config.backgroundColor, colorFor(0, config)],
+      },
+      textStyle: { color: theme.text, fontSize },
+    },
+    tooltipTrigger: "item",
+  };
+}
+
+/** 累计分布图: ECDF — step line of the sorted column's cumulative percent. */
+export function buildEcdfOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const lineWidth = config.lineWidth ?? 3;
+  const pointSize = config.pointSize ?? 7;
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const values = (dataSeries[0]?.data ?? []).filter(Number.isFinite).sort((a, b) => a - b);
+  const n = values.length;
+  const data = values.map((value, index) => [value, ((index + 1) / n) * 100]);
+
+  const xAxis = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    name: compact ? "" : dataSeries[0]?.name ?? "",
+  };
+  const yAxis = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    min: 0,
+    max: 100,
+  };
+  const series: SeriesOption[] = [
+    {
+      name: dataSeries[0]?.name ?? "累计占比",
+      type: "line",
+      data,
+      step: "end",
+      symbol: compact || pointSize === 0 ? "none" : "circle",
+      symbolSize: compact ? 0 : pointSize,
+      itemStyle: { color: colorFor(0, config) },
+      lineStyle: { color: colorFor(0, config), width: compact ? 1.5 : lineWidth },
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "top",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const entry = params as { value: [number, number] };
+          return `${Math.round(entry.value[1])}%`;
+        },
+      },
+      emphasis: { focus: "series" },
+    },
+  ];
+  return { series, xAxis, yAxis };
+}
+
+/** 误差线图: bars with custom-drawn whiskers for lower/upper error columns. */
+export function buildErrorBarOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const barWidth = config.barWidth ?? 48;
+  const barRadius = config.barRadius ?? 3;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const values = dataSeries[0]?.data ?? [];
+  const lower = dataSeries[1]?.data ?? [];
+  const upper = dataSeries[2]?.data ?? [];
+
+  const xAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const yAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const series: SeriesOption[] = [
+    {
+      name: dataSeries[0]?.name ?? "数值",
+      type: "bar",
+      data: values,
+      barMaxWidth: compact ? 20 : barWidth,
+      itemStyle: {
+        color: colorFor(0, config),
+        opacity: markOpacity,
+        borderRadius: [barRadius, barRadius, 0, 0],
+      },
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "top",
+        ...dataLabelTextStyle(config),
+        formatter: (params: unknown) => {
+          const entry = params as { value: string | number };
+          return ctx.formatNumber(entry.value);
+        },
+      },
+      emphasis: { focus: "series" },
+    },
+    {
+      name: "误差范围",
+      type: "custom",
+      silent: true,
+      z: 5,
+      data: values.map((_, index) => [
+        index,
+        Number.isFinite(values[index]) ? values[index] : 0,
+        Number.isFinite(lower[index]) ? Math.min(lower[index], values[index] || 0) : 0,
+        Number.isFinite(upper[index]) ? Math.max(upper[index], values[index] || 0) : 0,
+      ]),
+      renderItem: ((params: CustomParams, api: CustomApi) => {
+        const catIndex = api.value(0);
+        const high = api.coord([catIndex, api.value(3)]);
+        const low = api.coord([catIndex, api.value(2)]);
+        const x = high[0];
+        const cap = Math.max(4, 10);
+        const line = {
+          type: "line",
+          shape: { x1: x, y1: high[1], x2: x, y2: low[1] },
+          style: { stroke: theme.text, lineWidth: 1.5 },
+        };
+        return {
+          type: "group",
+          children: [
+            line,
+            {
+              type: "line",
+              shape: { x1: x - cap / 2, y1: high[1], x2: x + cap / 2, y2: high[1] },
+              style: { stroke: theme.text, lineWidth: 1.5 },
+            },
+            {
+              type: "line",
+              shape: { x1: x - cap / 2, y1: low[1], x2: x + cap / 2, y2: low[1] },
+              style: { stroke: theme.text, lineWidth: 1.5 },
+            },
+          ],
+        };
+      }) as unknown as undefined,
+    } as unknown as SeriesOption,
+  ];
+  return { series, xAxis, yAxis };
+}
+
+/** 相关性矩阵图: pairwise Pearson correlation rendered as a heatmap. */
+export function buildCorrelationMatrixOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { compact = false, theme, fontSize } = config;
+  const names = dataSeries.map((series) => series.name);
+  const columns = dataSeries.map((series) => series.data);
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const pearson = (a: number[], b: number[]) => {
+    const pairs = a
+      .map((value, index) => [value, b[index]] as [number, number])
+      .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+    const n = pairs.length;
+    if (n < 2) return 0;
+    const meanA = pairs.reduce((s, [x]) => s + x, 0) / n;
+    const meanB = pairs.reduce((s, [, y]) => s + y, 0) / n;
+    let cov = 0;
+    let varA = 0;
+    let varB = 0;
+    for (const [x, y] of pairs) {
+      cov += (x - meanA) * (y - meanB);
+      varA += (x - meanA) * (x - meanA);
+      varB += (y - meanB) * (y - meanB);
+    }
+    const denom = Math.sqrt(varA * varB);
+    return denom === 0 ? 0 : Math.max(-1, Math.min(1, cov / denom));
+  };
+
+  const data: [number, number, number][] = [];
+  for (let i = 0; i < names.length; i += 1) {
+    for (let j = 0; j < names.length; j += 1) {
+      data.push([j, i, pearson(columns[i], columns[j])]);
+    }
+  }
+
+  const categoryAxisStyle = {
+    axisLine: { show: !compact, lineStyle: { color: "#aeb6bf" } },
+    axisTick: { show: false },
+    axisLabel: { show: !compact, color: theme.text, fontSize, rotate: 30 },
+    splitLine: { show: false },
+  };
+  const xAxis = {
+    type: "category" as const,
+    data: names,
+    ...categoryAxisStyle,
+  };
+  const yAxis = {
+    type: "category" as const,
+    data: names,
+    ...categoryAxisStyle,
+    axisLabel: { ...categoryAxisStyle.axisLabel, rotate: 0 },
+  };
+  const series: SeriesOption[] = [
+    {
+      name: "相关系数",
+      type: "heatmap",
+      data,
+      label: {
+        show: compact ? false : config.showLabels,
+        ...labelTextStyle,
+        fontSize: Math.max(8, fontSize - 2),
+        formatter: (params: unknown) => {
+          const entry = params as { value: [number, number, number] };
+          return entry.value[2].toFixed(2);
+        },
+      },
+      itemStyle: {
+        borderColor: config.transparent ? "rgba(255,255,255,0.6)" : config.backgroundColor,
+        borderWidth: 1,
+        borderRadius: compact ? 1 : 3,
+      },
+    },
+  ];
+  return {
+    series,
+    xAxis,
+    yAxis,
+    visualMap: {
+      min: -1,
+      max: 1,
+      calculable: false,
+      show: !compact,
+      orient: "horizontal" as const,
+      left: "center",
+      bottom: 0,
+      inRange: { color: ["#2166ac", "#f7f7f7", "#b2182b"] },
+      textStyle: { color: theme.text, fontSize },
+    },
+    tooltipTrigger: "item",
+  };
+}
+
+/** 小提琴图: mirrored KDE polygons per category, drawn as a custom series. */
+export function buildViolinOption(ctx: RenderContext): RendererResult {
+  const { config, categories, dataSeries } = ctx;
+  const { compact = false, theme, fontSize } = config;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const values = dataSeries[0]?.data ?? [];
+
+  // Group values by category, first-seen order.
+  const groups: Array<{ name: string; values: number[] }> = [];
+  const indexOfGroup: Record<string, number> = {};
+  categories.forEach((name, rowIndex) => {
+    const value = values[rowIndex];
+    if (!Number.isFinite(value)) return;
+    if (!(name in indexOfGroup)) {
+      indexOfGroup[name] = groups.length;
+      groups.push({ name, values: [] });
+    }
+    groups[indexOfGroup[name]].values.push(value);
+  });
+
+  const SAMPLE_POINTS = 24;
+  const curves = groups.map((group) => {
+    const n = group.values.length;
+    const mean = group.values.reduce((s, v) => s + v, 0) / n;
+    const variance =
+      group.values.reduce((s, v) => s + (v - mean) * (v - mean), 0) / Math.max(1, n - 1);
+    const std = Math.max(1e-6, Math.sqrt(variance));
+    const h = 0.9 * std * Math.pow(n, -0.2);
+    const min = Math.min(...group.values);
+    const max = Math.max(...group.values);
+    const lo = min - h * 1.5;
+    const hi = max + h * 1.5;
+    const grid = Array.from({ length: SAMPLE_POINTS }, (_, i) => lo + ((hi - lo) * i) / (SAMPLE_POINTS - 1));
+    return { group, grid, density: gaussianKde(group.values, grid, h) };
+  });
+  const maxDensity = Math.max(1e-6, ...curves.flatMap((curve) => curve.density));
+
+  const xAxis = {
+    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    data: groups.map((group) => group.name),
+    min: -0.5,
+    max: Math.max(0.5, groups.length - 0.5),
+  };
+  const yAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+
+  const series: SeriesOption[] = [
+    {
+      name: "分布",
+      type: "custom",
+      renderItem: ((params: CustomParams, api: CustomApi) => {
+        const index = params.dataIndex;
+        const curve = curves[index];
+        if (!curve) return;
+        const center = api.coord([index, curve.grid[0]])[0];
+        // Fixed relative width per violin: 38% of the category slot.
+        const slotPixel = api.coord([index + 0.5, curve.grid[0]])[0] - api.coord([index - 0.5, curve.grid[0]])[0];
+        const width = slotPixel * 0.38;
+        const points: number[][] = [];
+        curve.grid.forEach((y, i) => {
+          const pixel = api.coord([index, y]);
+          const offset = (curve.density[i] / maxDensity) * width;
+          points.push([center + offset, pixel[1]]);
+        });
+        for (let i = curve.grid.length - 1; i >= 0; i -= 1) {
+          const pixel = api.coord([index, curve.grid[i]]);
+          const offset = (curve.density[i] / maxDensity) * width;
+          points.push([center - offset, pixel[1]]);
+        }
+        return {
+          type: "polygon",
+          shape: { points },
+          style: {
+            fill: colorFor(index, config, curve.group.name),
+            opacity: Math.max(0.25, markOpacity * 0.7),
+            stroke: colorFor(index, config, curve.group.name),
+          },
+        };
+      }) as unknown as undefined,
+      data: curves.map((curve, index) => [
+        index,
+        0,
+        ...curve.grid.map((y) => y),
+      ]),
+      itemStyle: { opacity: markOpacity },
+      label: { show: false },
+      emphasis: { focus: "self" },
+      tooltip: { show: false },
+    } as unknown as SeriesOption,
+    {
+      name: "数据点",
+      type: "scatter",
+      symbolSize: compact ? 0 : 5,
+      itemStyle: { color: theme.text, opacity: 0.45 },
+      data: (() => {
+        const points: [number, number][] = [];
+        curves.forEach((curve, groupIndex) => {
+          curve.group.values.forEach((value, offset) => {
+            // Deterministic jitter so coincident points stay visible.
+            const jitter = ((offset % 5) - 2) * 0.02;
+            points.push([groupIndex + jitter, value]);
+          });
+        });
+        return points;
+      })(),
+      label: { show: false },
+      emphasis: { focus: "self" },
+    } as SeriesOption,
+  ];
+  return { series, xAxis, yAxis };
+}
+
+/** 马赛克图（Marimekko）: variable-width stacked columns over 0–100%. */
+export function buildMarimekkoOption(ctx: RenderContext): RendererResult {
+  const { config, categories, dataSeries } = ctx;
+  const { compact = false, theme, fontSize } = config;
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const rowsTotal = categories.map((_, rowIndex) =>
+    dataSeries.reduce((sum, series) => sum + (Number.isFinite(series.data[rowIndex]) ? series.data[rowIndex] : 0), 0),
+  );
+  const grandTotal = rowsTotal.reduce((sum, value) => sum + value, 0) || 1;
+  // Row x-intervals (0-100) and within-row segment shares.
+  const intervals: Array<{ start: number; width: number; shares: number[] }> = [];
+  let cursor = 0;
+  categories.forEach((_, rowIndex) => {
+    const width = (rowsTotal[rowIndex] / grandTotal) * 100;
+    const shares = dataSeries.map((series) =>
+      rowsTotal[rowIndex] ? (series.data[rowIndex] / rowsTotal[rowIndex]) * 100 : 0,
+    );
+    intervals.push({ start: cursor, width, shares });
+    cursor += width;
+  });
+
+  const xAxis = {
+    type: "value" as const,
+    min: 0,
+    max: 100,
+    show: !compact,
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: {
+      show: !compact,
+      color: theme.text,
+      fontSize,
+      formatter: (value: number) => {
+        // Label each row at its interval midpoint.
+        for (let index = 0; index < intervals.length; index += 1) {
+          const { start, width } = intervals[index];
+          if (value >= start && value <= start + width) {
+            return categories[index] ?? "";
+          }
+        }
+        return "";
+      },
+    },
+    splitLine: { show: false },
+  };
+  const yAxis = {
+    type: "value" as const,
+    min: 0,
+    max: 100,
+    show: !compact,
+    axisLabel: { show: true, color: theme.text, fontSize, formatter: (value: number) => `${value}%` },
+    splitLine: config.showGrid
+      ? { show: true, lineStyle: { color: theme.grid, type: (config.gridLineType ?? "dashed") as "solid" | "dashed" | "dotted" } }
+      : { show: false },
+  };
+
+  const series: SeriesOption[] = [
+    {
+      name: "马赛克",
+      type: "custom",
+      renderItem: ((params: CustomParams, api: CustomApi) => {
+        const index = params.dataIndex;
+        const interval = intervals[index];
+        if (!interval) return;
+        const children: Array<Record<string, unknown>> = [];
+        let bottom = 0;
+        interval.shares.forEach((share, seriesIndex) => {
+          const topLeft = api.coord([interval.start, bottom + share]);
+          const bottomRight = api.coord([interval.start + interval.width, bottom]);
+          children.push({
+            type: "rect",
+            shape: {
+              x: topLeft[0],
+              y: topLeft[1],
+              width: Math.max(0, bottomRight[0] - topLeft[0]),
+              height: Math.max(0, bottomRight[1] - topLeft[1]),
+            },
+            style: {
+              fill: colorFor(seriesIndex, config, dataSeries[seriesIndex]?.name),
+              opacity: config.transparent ? 0.9 : 0.92,
+              stroke: config.transparent ? "rgba(255,255,255,0.82)" : config.backgroundColor,
+              lineWidth: 1,
+            },
+          });
+          bottom += share;
+        });
+        return { type: "group", children };
+      }) as unknown as undefined,
+      data: intervals.map((interval, index) => [
+        index,
+        interval.start,
+        interval.width,
+        ...interval.shares,
+      ]),
+      label: { show: false },
+      emphasis: { focus: "self" },
+    } as unknown as SeriesOption,
+  ];
+  void labelTextStyle;
+  return { series, xAxis, yAxis };
+}

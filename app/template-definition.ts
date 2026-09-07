@@ -14,14 +14,21 @@
 import type { ChartConfig, ChartFamily, ChartType } from "./chart-model";
 import {
   buildBoxplotOption,
+  buildCalendarHeatmapOption,
   buildCandlestickOption,
+  buildCorrelationMatrixOption,
   buildDotPlotOption,
+  buildEcdfOption,
+  buildErrorBarOption,
   buildFunnelOption,
   buildGaugeOption,
   buildHeatmapOption,
+  buildMarimekkoOption,
+  buildParallelOption,
   buildRadarOption,
   buildSankeyOption,
   buildTreemapOption,
+  buildViolinOption,
   buildWaterfallOption,
 } from "./renderers/advanced";
 import {
@@ -1081,6 +1088,127 @@ const SAMPLE_ALLUVIAL: SampleData = {
   },
 };
 
+// --- Batch-6 (Flourish parity) sample data ---------------------------------
+
+const SAMPLE_PARALLEL: SampleData = {
+  table: [
+    ["城市", "收入 万", "消费 万", "通勤 分钟", "幸福指数"],
+    ["城市 A", "32", "18", "42", "72"],
+    ["城市 B", "41", "26", "55", "64"],
+    ["城市 C", "27", "14", "28", "81"],
+    ["城市 D", "48", "31", "61", "58"],
+    ["城市 E", "22", "11", "24", "86"],
+    ["城市 F", "36", "21", "38", "74"],
+  ],
+  categoryColumn: "城市",
+  seriesColumns: ["收入 万", "消费 万", "通勤 分钟", "幸福指数"],
+};
+
+const SAMPLE_CALENDAR: SampleData = {
+  table: [
+    ["日期", "步数"],
+    ["2026-01-05", "8200"],
+    ["2026-01-08", "10400"],
+    ["2026-01-12", "6400"],
+    ["2026-01-15", "9800"],
+    ["2026-01-19", "12200"],
+    ["2026-01-22", "7600"],
+    ["2026-01-26", "8900"],
+    ["2026-01-29", "5400"],
+    ["2026-02-02", "11200"],
+    ["2026-02-05", "9100"],
+    ["2026-02-09", "13600"],
+    ["2026-02-12", "7800"],
+  ],
+  categoryColumn: "日期",
+  seriesColumns: ["步数"],
+};
+
+const SAMPLE_ECDF: SampleData = {
+  table: [
+    ["样本", "响应时间 ms"],
+    ["样本 1", "120"],
+    ["样本 2", "85"],
+    ["样本 3", "240"],
+    ["样本 4", "160"],
+    ["样本 5", "95"],
+    ["样本 6", "310"],
+    ["样本 7", "180"],
+    ["样本 8", "140"],
+    ["样本 9", "205"],
+    ["样本 10", "68"],
+  ],
+  categoryColumn: "样本",
+  seriesColumns: ["响应时间 ms"],
+};
+
+const SAMPLE_ERROR: SampleData = {
+  table: [
+    ["处理方式", "良率 %", "波动下", "波动上"],
+    ["工艺 A", "92", "88", "96"],
+    ["工艺 B", "86", "79", "94"],
+    ["工艺 C", "78", "70", "89"],
+    ["工艺 D", "95", "92", "97"],
+    ["工艺 E", "83", "75", "91"],
+  ],
+  categoryColumn: "处理方式",
+  seriesColumns: ["良率 %", "波动下", "波动上"],
+};
+
+const SAMPLE_CORR: SampleData = {
+  table: [
+    ["月份", "销售额", "广告费", "客流", "客单价"],
+    ["一月", "128", "12", "860", "149"],
+    ["二月", "146", "14", "920", "159"],
+    ["三月", "138", "13", "890", "155"],
+    ["四月", "172", "16", "1080", "159"],
+    ["五月", "189", "18", "1150", "164"],
+    ["六月", "218", "21", "1320", "165"],
+    ["七月", "205", "19", "1240", "165"],
+    ["八月", "232", "23", "1410", "165"],
+  ],
+  categoryColumn: "月份",
+  seriesColumns: ["销售额", "广告费", "客流", "客单价"],
+};
+
+const SAMPLE_VIOLIN: SampleData = {
+  table: [
+    ["组别", "得分"],
+    ["一组", "62"],
+    ["一组", "68"],
+    ["一组", "70"],
+    ["一组", "74"],
+    ["一组", "78"],
+    ["一组", "85"],
+    ["二组", "55"],
+    ["二组", "66"],
+    ["二组", "72"],
+    ["二组", "76"],
+    ["二组", "88"],
+    ["二组", "92"],
+    ["三组", "48"],
+    ["三组", "58"],
+    ["三组", "64"],
+    ["三组", "80"],
+    ["三组", "81"],
+    ["三组", "95"],
+  ],
+  categoryColumn: "组别",
+  seriesColumns: ["得分"],
+};
+
+const SAMPLE_MARIMEKKO: SampleData = {
+  table: [
+    ["渠道", "新客", "复购"],
+    ["电商平台", "320", "180"],
+    ["直营门店", "260", "220"],
+    ["分销商", "180", "90"],
+    ["直播带货", "140", "60"],
+  ],
+  categoryColumn: "渠道",
+  seriesColumns: ["新客", "复购"],
+};
+
 // --- Shared validators -----------------------------------------------------
 // Each returns null (pass) or a human-readable error string. Validators read
 // only the ValidationContext (parsed table + resolved categoryColumn /
@@ -1764,6 +1892,84 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
     buildOption: buildAlluvialOption,
     sampleData: SAMPLE_ALLUVIAL,
+  },
+
+  // --- Statistical & distribution (Flourish parity batch 6) ----------------
+  parallelCoordinates: {
+    id: "parallelCoordinates",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: [GROUP_COLORS, GROUP_LEGEND, GROUP_NUMBERS],
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildParallelOption,
+    sampleData: SAMPLE_PARALLEL,
+  },
+  calendarHeatmap: {
+    id: "calendarHeatmap",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildCalendarHeatmapOption,
+    sampleData: SAMPLE_CALENDAR,
+  },
+  ecdf: {
+    id: "ecdf",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildEcdfOption,
+    sampleData: SAMPLE_ECDF,
+  },
+  errorBar: {
+    id: "errorBar",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_ACTUAL, BIND_VALUE_LOWER, BIND_VALUE_UPPER],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireThreeNumericColumns("误差线图需要 3 个数值列（数值、下误差、上误差）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildErrorBarOption,
+    sampleData: SAMPLE_ERROR,
+  },
+  correlationMatrix: {
+    id: "correlationMatrix",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("相关性矩阵图需要 2 个数值列"),
+    ],
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildCorrelationMatrixOption,
+    sampleData: SAMPLE_CORR,
+  },
+  violin: {
+    id: "violin",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildViolinOption,
+    sampleData: SAMPLE_VIOLIN,
+  },
+  marimekko: {
+    id: "marimekko",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildMarimekkoOption,
+    sampleData: SAMPLE_MARIMEKKO,
   },
 
   // --- Diverging / population pyramid family (migrated) -------------------

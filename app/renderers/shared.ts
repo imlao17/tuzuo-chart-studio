@@ -50,6 +50,11 @@ export type RendererResult = {
   radiusAxis?: EChartsOption["radiusAxis"];
   /** Free-form graphic layer (progress-ring center text, card templates). */
   graphic?: EChartsOption["graphic"];
+  /** Parallel coordinates block (Flourish parity batch 6). */
+  parallel?: EChartsOption["parallel"];
+  parallelAxis?: EChartsOption["parallelAxis"];
+  /** Calendar coordinate block (calendar heatmap). */
+  calendar?: EChartsOption["calendar"];
 };
 
 type ArrayElement<T> = T extends readonly (infer Item)[] ? Item : T;
@@ -560,6 +565,9 @@ function assembleOption(
       angleAxis: patched.angleAxis,
       radiusAxis: patched.radiusAxis,
       graphic: patched.graphic,
+      parallel: patched.parallel,
+      parallelAxis: patched.parallelAxis,
+      calendar: patched.calendar,
       xAxis: patched.xAxis,
       yAxis: patched.yAxis,
       series: patched.series,

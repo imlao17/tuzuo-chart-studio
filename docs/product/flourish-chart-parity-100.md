@@ -72,7 +72,7 @@
 | 3 | 径向/极坐标家族 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 radial/polar chart templates…"） | 新建 `renderers/radial.ts`；shared.ts 的 RendererResult 扩展了 polar/angleAxis/radiusAxis/graphic 通道（对既有模板零影响） |
 | 4 | 散点/气泡扩展 | 5 | 已完成 | 2026-09-07 | 随本批提交（"Add 5 scatter/bubble chart templates…"） | bubble/trendScatter 为 scatter 的配置注入包装器；象限图中线取中位数（均值可配置项留待后续） |
 | 5 | 层级与网络 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 hierarchy/network chart templates…"） | 新建 `renderers/hierarchy.ts`、`renderers/network.ts`；冲积图复用 sankey 渲染路径（差异在多阶段示例数据）；弦图用 ECharts 6.1 内置 chord 系列 |
-| 6 | 统计与分布 | 7 | 待开始 | — | — | 含 2 个 P2 |
+| 6 | 统计与分布 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 statistical/distribution chart templates…"） | violin/marimekko 两个 P2 均已完成（custom 系列 renderItem）；shared.ts 增加 parallel/parallelAxis/calendar 通道；平行坐标/小提琴/马赛克无数据标签面，showLabels 通用测试已豁免 |
 | 7 | 条柱线补充变体 | 8 | 待开始 | — | — | 含 1 个 P2 |
 | 8 | 环饼与箱线补充 | 4 | 待开始 | — | — | |
 | 9 | 卡片、表格与文字 | 5 | 待开始 | — | — | 词云需依赖决策 |
@@ -152,11 +152,11 @@
 
 | # | 中文名 | id | ECharts 方案 | 数据绑定要点 | 状态 |
 |---|---|---|---|---|---|
-| 39 | 平行坐标图 | `parallelCoordinates` | parallel + parallelAxis | 多数值列（每列一维），分类列作高亮过滤可选 | 待做 |
-| 40 | 日历热力图 | `calendarHeatmap` | calendar 坐标 + heatmap | 日期列（可解析为日期的文本）+ 1 数值列 | 待做 |
-| 41 | 累计分布图 | `ecdf` | line（排序后累计百分比） | 1 数值列 | 待做 |
-| 42 | 误差线图 | `errorBar` | bar + custom renderItem 误差须 | 分类 + 3 数值列（值、下误差、上误差） | 待做 |
-| 43 | 相关性矩阵图 | `correlationMatrix` | heatmap，renderer 内计算数值列两两 Pearson 相关系数 | ≥2 数值列 | 待做 |
+| 39 | 平行坐标图 | `parallelCoordinates` | parallel + parallelAxis | 多数值列（每列一维），分类列作高亮过滤可选 | 完成 |
+| 40 | 日历热力图 | `calendarHeatmap` | calendar 坐标 + heatmap | 日期列（可解析为日期的文本）+ 1 数值列 | 完成 |
+| 41 | 累计分布图 | `ecdf` | line（排序后累计百分比） | 1 数值列 | 完成 |
+| 42 | 误差线图 | `errorBar` | bar + custom renderItem 误差须 | 分类 + 3 数值列（值、下误差、上误差） | 完成 |
+| 43 | 相关性矩阵图 | `correlationMatrix` | heatmap，renderer 内计算数值列两两 Pearson 相关系数 | ≥2 数值列 | 完成 |
 | 44 | 小提琴图 | `violin` | custom（KDE 密度镜像） | 分类 + 1 数值列（或每列一个提琴） | 待做（P2） |
 | 45 | 马赛克图 | `marimekko` | custom（变宽堆叠条） | 分类 + 多数值列 | 待做（P2） |
 

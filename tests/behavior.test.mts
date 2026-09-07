@@ -154,8 +154,11 @@ test("every template thumbnail builds from its sample data", () => {
 
 test("toggling showLabels changes the option for every label-bearing template", () => {
   // streamgraph's themeRiver series hardcodes label visibility off (a known
-  // P1 gap), so it is exempt; every other template wires showLabels through.
-  const labelled = ALL_TYPES.filter((t) => t !== "streamgraph");
+  // P1 gap); parallel/violin/marimekko have no per-point label surface (their
+  // settings groups don't expose 数据标签), so they are exempt; every other
+  // template wires showLabels through.
+  const exempt = new Set<ChartType>(["streamgraph", "parallelCoordinates", "violin", "marimekko"]);
+  const labelled = ALL_TYPES.filter((t) => !exempt.has(t));
   for (const type of labelled) {
     const off = sig(renderSample(type, { showLabels: false }));
     const on = sig(renderSample(type, { showLabels: true }));
@@ -507,11 +510,11 @@ test("single numeric column passes generic templates but fails role-specific tem
   };
   for (const type of ALL_TYPES) {
     const err = firstError(type, ctx);
-    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart", "groupedScatter", "quadrant", "trendScatter"].includes(type)) {
+    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart", "groupedScatter", "quadrant", "trendScatter", "correlationMatrix"].includes(type)) {
       assert.ok(err && err.includes("2 个数值列"), `${type}: expected 2-column error, got ${err}`);
-    } else if (type === "bandArea" || type === "bubble") {
+    } else if (["bandArea", "bubble", "errorBar"].includes(type)) {
       assert.ok(err && err.includes("3 个数值列"), `${type}: expected 3-column error, got ${err}`);
-    } else if (type === "candlestick") {
+    } else if (["candlestick"].includes(type)) {
       assert.ok(err && err.includes("4 个数值列"), `${type}: expected OHLC error, got ${err}`);
     } else if (["sankey", "networkGraph", "chord", "adjacencyMatrix", "alluvial"].includes(type)) {
       assert.ok(err && err.includes("2 个文本列"), `${type}: expected flow-column error, got ${err}`);
@@ -1681,4 +1684,116 @@ test("P100-5: alluvial rides the sankey path with its own flow shape", () => {
   assert.equal(flow.type, "sankey", "alluvial reuses the sankey renderer");
   assert.equal(flow.links?.length, 6, "sample has six stage transitions");
   assert.ok(flow.data?.length, "nodes present");
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 6 — statistical & distribution.
+// ---------------------------------------------------------------------------
+
+test("P100-6: parallel coordinates lay rows across numeric dimensions", () => {
+  const option = renderSample("parallelCoordinates");
+  assert.ok(option.parallel, "missing parallel coordinate");
+  const parallelAxis = option.parallelAxis as Array<{ dim?: number; name?: string }>;
+  const dims = getTemplateDefinition("parallelCoordinates").sampleData.seriesColumns.length;
+  assert.equal(parallelAxis.length, dims, "one axis per numeric column");
+  assert.equal(parallelAxis[3]?.dim, 3);
+  assert.equal(option.grid, undefined, "parallel must not emit a cartesian grid");
+  const [parallel] = seriesList(option) as Array<{ type?: string; data?: Array<{ name?: string; value?: number[] }> }>;
+  assert.equal(parallel.type, "parallel");
+  assert.equal(parallel.data?.length, 6, "one polyline per sample row");
+});
+
+test("P100-6: calendar heatmap plots dates on a calendar coordinate", () => {
+  const option = renderSample("calendarHeatmap");
+  const calendar = option.calendar as { range?: string | string[] };
+  assert.ok(calendar?.range, "missing calendar coordinate");
+  assert.equal(String(calendar.range), "2026", "range inferred from the sample dates");
+  assert.ok(option.visualMap, "calendar heatmap needs a value scale");
+  const [heat] = seriesList(option) as Array<{ type?: string; data?: [string, number][] }>;
+  assert.equal(heat.type, "heatmap");
+  assert.match(heat.data?.[0]?.[0] ?? "", /^\d{4}-\d{2}-\d{2}$/);
+  assert.notEqual(sig(renderSample("calendarHeatmap", { showLabels: false })), sig(renderSample("calendarHeatmap", { showLabels: true })));
+});
+
+test("P100-6: ECDF draws a monotonic step line up to 100%", () => {
+  const option = renderSample("ecdf");
+  const [line] = seriesList(option) as Array<{ type?: string; step?: string; data?: [number, number][] }>;
+  assert.equal(line.type, "line");
+  assert.equal(line.step, "end");
+  const rows = getTemplateDefinition("ecdf").sampleData.table.length - 1;
+  assert.equal(line.data?.length, rows);
+  assert.equal(line.data?.[rows - 1]?.[1], 100, "cumulative percent ends at 100");
+  const yAxis = option.yAxis as { max?: number };
+  assert.equal(yAxis.max, 100);
+  const sorted = (line.data ?? []).map(([v]) => v);
+  assert.deepEqual(sorted, [...sorted].sort((a, b) => a - b), "values must be sorted ascending");
+});
+
+test("P100-6: error bars pair a bar series with custom whiskers", () => {
+  const option = renderSample("errorBar");
+  const series = seriesList(option) as Array<{
+    type?: string;
+    data?: unknown[];
+    renderItem?: unknown;
+  }>;
+  assert.equal(series[0]?.type, "bar");
+  assert.equal(series[1]?.type, "custom", "whiskers ride a custom series");
+  assert.equal(typeof series[1]?.renderItem, "function");
+  // Each whisker row carries [index, value, lower, upper].
+  const whiskers = series[1]?.data as number[][];
+  assert.equal(whiskers.length, 5);
+  assert.equal(whiskers[0]?.length, 4);
+  assert.ok(whiskers[0]?.[3] >= whiskers[0]?.[1], "upper bound must reach above the value");
+  assert.notEqual(sig(renderSample("errorBar", { showLabels: false })), sig(renderSample("errorBar", { showLabels: true })));
+});
+
+test("P100-6: correlation matrix computes pairwise Pearson coefficients", () => {
+  const option = renderSample("correlationMatrix");
+  const [matrix] = seriesList(option) as Array<{ type?: string; data?: [number, number, number][] }>;
+  const columns = getTemplateDefinition("correlationMatrix").sampleData.seriesColumns.length;
+  assert.equal(matrix.type, "heatmap");
+  assert.equal(matrix.data?.length, columns * columns, "n x n correlation grid");
+  // Diagonal cells are perfect correlations of 1.
+  for (const [x, y, r] of matrix.data ?? []) {
+    if (x === y) assert.ok(Math.abs(r - 1) < 1e-9, `diagonal cell (${x},${y}) should be 1, got ${r}`);
+    assert.ok(r >= -1 && r <= 1, "coefficients stay in [-1, 1]");
+  }
+  const visualMap = option.visualMap as { min?: number; max?: number };
+  assert.equal(visualMap.min, -1);
+  assert.equal(visualMap.max, 1);
+  assert.notEqual(sig(renderSample("correlationMatrix", { showLabels: false })), sig(renderSample("correlationMatrix", { showLabels: true })));
+});
+
+test("P100-6: violin renders mirrored KDE polygons with raw data points", () => {
+  const option = renderSample("violin");
+  const series = seriesList(option) as Array<{
+    type?: string;
+    data?: unknown[];
+    renderItem?: unknown;
+  }>;
+  assert.equal(series[0]?.type, "custom");
+  assert.equal(typeof series[0]?.renderItem, "function");
+  assert.equal(series[1]?.type, "scatter", "raw points overlay the violins");
+  assert.equal(series[0]?.data?.length, 3, "one violin per category");
+  assert.notEqual(sig(option), sig(renderSample("violin", { markOpacity: 40 })));
+});
+
+test("P100-6: marimekko carries variable-width stacked layout data", () => {
+  const option = renderSample("marimekko");
+  const [mosaic] = seriesList(option) as Array<{
+    type?: string;
+    data?: number[][];
+    renderItem?: unknown;
+  }>;
+  assert.equal(mosaic.type, "custom");
+  assert.equal(typeof mosaic.renderItem, "function");
+  const rows = getTemplateDefinition("marimekko").sampleData.table.length - 1;
+  assert.equal(mosaic.data?.length, rows, "one composite row entry");
+  // Each entry: [rowIndex, xStart, width, ...segment shares summing to 100].
+  const first = mosaic.data?.[0] ?? [];
+  const shares = first.slice(3);
+  const total = shares.reduce((sum, v) => sum + v, 0);
+  assert.ok(Math.abs(total - 100) < 0.001, `row shares must sum to 100, got ${total}`);
+  const xAxis = option.xAxis as { max?: number };
+  assert.equal(xAxis.max, 100);
 });

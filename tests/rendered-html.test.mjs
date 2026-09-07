@@ -35,7 +35,7 @@ test("server-renders the chart studio", async () => {
   assert.match(html, /图作/);
   assert.match(html, /透明图表工具/);
   assert.match(html, /上传 CSV/);
-  assert.match(html, /68(?:<!-- -->)?\s*种图表/);
+  assert.match(html, /75(?:<!-- -->)?\s*种图表/);
   assert.match(html, /数据表/);
   assert.match(html, /搜索设置/);
   assert.match(html, /线条、数据点与面积/);
@@ -170,7 +170,7 @@ test("includes the complete chart studio implementation", async () => {
       .match(/export const CHART_TEMPLATES:[\s\S]*?\n\];/)?.[0]
       .match(/\{\s*id:/g) ?? [];
 
-  assert.equal(templateDefinitions.length, 68);
+  assert.equal(templateDefinitions.length, 75);
   assert.match(page, /renderer:\s*"svg"/);
   assert.match(pngExportHook, /renderPngDataUrl/);
   assert.match(exportDownload, /URL\.createObjectURL\(blob\)/);

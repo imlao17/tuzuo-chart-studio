@@ -69,7 +69,14 @@ export type ChartType =
   | "radar"
   | "boxplot"
   | "candlestick"
-  | "sankey";
+  | "sankey"
+  | "parallelCoordinates"
+  | "calendarHeatmap"
+  | "ecdf"
+  | "errorBar"
+  | "correlationMatrix"
+  | "violin"
+  | "marimekko";
 
 export type ChartFamily = "line" | "area" | "bar" | "pie" | "other";
 
@@ -429,6 +436,13 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "boxplot", name: "箱线图", family: "other" },
   { id: "candlestick", name: "蜡烛图", family: "other" },
   { id: "sankey", name: "桑基图", family: "other" },
+  { id: "parallelCoordinates", name: "平行坐标图", family: "other" },
+  { id: "calendarHeatmap", name: "日历热力图", family: "other" },
+  { id: "ecdf", name: "累计分布图", family: "other" },
+  { id: "errorBar", name: "误差线图", family: "other" },
+  { id: "correlationMatrix", name: "相关性矩阵图", family: "other" },
+  { id: "violin", name: "小提琴图", family: "other" },
+  { id: "marimekko", name: "马赛克图", family: "other" },
 ];
 
 export function toNumber(value: string) {
