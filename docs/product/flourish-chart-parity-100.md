@@ -75,7 +75,7 @@
 | 6 | 统计与分布 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 statistical/distribution chart templates…"） | violin/marimekko 两个 P2 均已完成（custom 系列 renderItem）；shared.ts 增加 parallel/parallelAxis/calendar 通道；平行坐标/小提琴/马赛克无数据标签面，showLabels 通用测试已豁免 |
 | 7 | 条柱线补充变体 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 bar/column variant chart templates…"） | splitAxisBar 这个 P2 已完成（双 grid 拆分离群值）；shared.ts 增加 grid 显式通道（candleVolume 双面板）；OHLC/蜡烛量无标签面已豁免 showLabels |
 | 8 | 环饼与箱线补充 | 4 | 已完成 | 2026-09-07 | 随本批提交（"Add 4 pie/boxplot extension chart templates…"） | 半环形图为 pie 渲染的 patch（180°–360° 扫掠）；多层环形每列一环 |
-| 9 | 卡片、表格与文字 | 5 | 待开始 | — | — | 词云需依赖决策 |
+| 9 | 卡片、表格与文字 | 5 | 已完成 | 2026-09-07 | 随本批提交（"Add 5 card/table/text chart templates…"） | **词云依赖决策：不引入 echarts-wordcloud**（canvas-only、破坏 SVG 导出、违反红线 4），改为 graphic 文本 + 阿基米德螺旋自绘确定性布局 |
 | 10 | 时间与分面 | 3 | 待开始 | — | — | 小倍数是本批难点 |
 | 11 | 地图家族 | 5 | 待开始 | — | — | **先做 GeoJSON 基础设施决策（见批次说明）** |
 
@@ -186,10 +186,10 @@
 
 | # | 中文名 | id | 方案 | 数据绑定要点 | 状态 |
 |---|---|---|---|---|---|
-| 58 | 大数字卡 | `kpiCard` | ECharts `graphic` 文本图层（居中大号数字 + 小标题） | 1 行：标签列 + 1 数值列 | 待做 |
-| 59 | 指标卡组 | `kpiCardRow` | graphic 多卡横排 | 标签列 + 多数值列（每列一卡） | 待做 |
-| 60 | 趋势迷你卡 | `sparklineCard` | graphic 数字 + 小号 line 系列 | 标签列 + 当前值列 + 若干趋势列 | 待做 |
-| 61 | 条形表格图 | `barTable` | 每行 = 类别名 + 迷你条 + 数值文本（graphic + bar 组合） | 分类 + 1 数值列 | 待做 |
+| 58 | 大数字卡 | `kpiCard` | ECharts `graphic` 文本图层（居中大号数字 + 小标题） | 1 行：标签列 + 1 数值列 | 完成 |
+| 59 | 指标卡组 | `kpiCardRow` | graphic 多卡横排 | 标签列 + 多数值列（每列一卡） | 完成 |
+| 60 | 趋势迷你卡 | `sparklineCard` | graphic 数字 + 小号 line 系列 | 标签列 + 当前值列 + 若干趋势列 | 完成 |
+| 61 | 条形表格图 | `barTable` | 每行 = 类别名 + 迷你条 + 数值文本（graphic + bar 组合） | 分类 + 1 数值列 | 完成 |
 | 62 | 词云 | `wordCloud` | 评估 `echarts-wordcloud` 依赖；若不可接受则标暂缓 | 文本列 + 权重数值列 | 待做（P2，依赖决策） |
 
 ### 批次 10 · 时间与分面（custom / 多 grid）

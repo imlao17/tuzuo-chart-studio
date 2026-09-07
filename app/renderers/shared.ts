@@ -48,8 +48,11 @@ export type RendererResult = {
   polar?: EChartsOption["polar"];
   angleAxis?: EChartsOption["angleAxis"];
   radiusAxis?: EChartsOption["radiusAxis"];
-  /** Free-form graphic layer (progress-ring center text, card templates). */
-  graphic?: EChartsOption["graphic"];
+  /** Free-form graphic layer (progress-ring center text, card templates).
+   *  Loose element shape: echarts' own graphic types are recursive unions
+   *  that don't survive element-array construction. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- echarts graphic elements are a recursive union; element objects pass through untouched.
+  graphic?: Array<Record<string, any>>;
   /** Parallel coordinates block (Flourish parity batch 6). */
   parallel?: EChartsOption["parallel"];
   parallelAxis?: EChartsOption["parallelAxis"];

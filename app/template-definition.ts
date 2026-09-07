@@ -65,6 +65,13 @@ import {
   buildChordOption,
   buildNetworkGraphOption,
 } from "./renderers/network";
+import {
+  buildBarTableOption,
+  buildKpiCardOption,
+  buildKpiCardRowOption,
+  buildSparklineCardOption,
+  buildWordCloudOption,
+} from "./renderers/cards";
 import { buildComboOption, buildParetoOption } from "./renderers/combo";
 import { buildDivergingOption } from "./renderers/diverging";
 import {
@@ -296,6 +303,19 @@ const CAP_NON_CARTESIAN_NO_LEGEND: Capabilities = {
   ...CAP_NON_CARTESIAN,
   legend: false,
 };
+
+// Graphic-driven templates (cards/wordcloud): no axes, legend, tooltip, or
+// data labels — only 配色 and 数字格式 apply.
+const CAP_GRAPHIC: Capabilities = {
+  axes: false,
+  legend: false,
+  tooltip: false,
+  labels: false,
+  animation: true,
+  svgExport: true,
+};
+
+const GRAPHIC_GROUPS: SettingsGroup[] = [GROUP_COLORS, GROUP_NUMBERS];
 
 // --- Shared data-binding presets (task 3 will specialize these per template) -
 
@@ -1335,6 +1355,68 @@ const SAMPLE_DENSITY: SampleData = {
   ],
   categoryColumn: "门店",
   seriesColumns: ["客流 千", "销售额 万"],
+};
+
+// --- Batch-9 (Flourish parity) sample data ---------------------------------
+
+const SAMPLE_KPI: SampleData = {
+  table: [
+    ["指标", "数值"],
+    ["本月销售额", "1280"],
+  ],
+  categoryColumn: "指标",
+  seriesColumns: ["数值"],
+};
+
+const SAMPLE_KPI_ROW: SampleData = {
+  table: [
+    ["门店", "一月", "二月", "三月", "四月"],
+    ["汇总", "128", "146", "172", "189"],
+  ],
+  categoryColumn: "门店",
+  seriesColumns: ["一月", "二月", "三月", "四月"],
+};
+
+const SAMPLE_SPARKLINE: SampleData = {
+  table: [
+    ["指标", "当前值", "一月", "二月", "三月", "四月", "五月", "六月"],
+    ["销售额 万", "218", "128", "146", "138", "172", "189", "218"],
+  ],
+  categoryColumn: "指标",
+  seriesColumns: ["当前值", "一月", "二月", "三月", "四月", "五月", "六月"],
+};
+
+const SAMPLE_BAR_TABLE: SampleData = {
+  table: [
+    ["项目", "预算 万"],
+    ["市场推广", "480"],
+    ["产品研发", "620"],
+    ["客户成功", "260"],
+    ["基础设施", "180"],
+    ["行政运营", "120"],
+  ],
+  categoryColumn: "项目",
+  seriesColumns: ["预算 万"],
+};
+
+const SAMPLE_WORDCLOUD: SampleData = {
+  table: [
+    ["关键词", "热度"],
+    ["数据可视化", "100"],
+    ["透明图表", "86"],
+    ["仪表盘", "72"],
+    ["柱状图", "64"],
+    ["折线图", "58"],
+    ["饼图", "52"],
+    ["桑基图", "38"],
+    ["热力图", "34"],
+    ["雷达图", "30"],
+    ["词云", "26"],
+    ["散点图", "22"],
+    ["箱线图", "18"],
+  ],
+  categoryColumn: "关键词",
+  seriesColumns: ["热度"],
 };
 
 const SAMPLE_SPLIT_AXIS: SampleData = {
@@ -2403,6 +2485,58 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_CARTESIAN_NO_LEGEND,
     buildOption: buildDensityHeatmapOption,
     sampleData: SAMPLE_DENSITY,
+  },
+
+  // --- Cards / table / text (Flourish parity batch 9) ----------------------
+  kpiCard: {
+    id: "kpiCard",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: GRAPHIC_GROUPS,
+    capabilities: CAP_GRAPHIC,
+    buildOption: buildKpiCardOption,
+    sampleData: SAMPLE_KPI,
+  },
+  kpiCardRow: {
+    id: "kpiCardRow",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: GRAPHIC_GROUPS,
+    capabilities: CAP_GRAPHIC,
+    buildOption: buildKpiCardRowOption,
+    sampleData: SAMPLE_KPI_ROW,
+  },
+  sparklineCard: {
+    id: "sparklineCard",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: GRAPHIC_GROUPS,
+    capabilities: CAP_GRAPHIC,
+    buildOption: buildSparklineCardOption,
+    sampleData: SAMPLE_SPARKLINE,
+  },
+  barTable: {
+    id: "barTable",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: GRAPHIC_GROUPS,
+    capabilities: CAP_GRAPHIC,
+    buildOption: buildBarTableOption,
+    sampleData: SAMPLE_BAR_TABLE,
+  },
+  wordCloud: {
+    id: "wordCloud",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: GRAPHIC_GROUPS,
+    capabilities: CAP_GRAPHIC,
+    buildOption: buildWordCloudOption,
+    sampleData: SAMPLE_WORDCLOUD,
   },
 };
 

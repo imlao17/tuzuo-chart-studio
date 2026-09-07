@@ -157,7 +157,7 @@ test("toggling showLabels changes the option for every label-bearing template", 
   // P1 gap); parallel/violin/marimekko have no per-point label surface (their
   // settings groups don't expose 数据标签), so they are exempt; every other
   // template wires showLabels through.
-  const exempt = new Set<ChartType>(["streamgraph", "parallelCoordinates", "violin", "marimekko", "ohlcBar", "candleVolume"]);
+  const exempt = new Set<ChartType>(["streamgraph", "parallelCoordinates", "violin", "marimekko", "ohlcBar", "candleVolume", "kpiCard", "kpiCardRow", "sparklineCard", "barTable", "wordCloud"]);
   const labelled = ALL_TYPES.filter((t) => !exempt.has(t));
   for (const type of labelled) {
     const off = sig(renderSample(type, { showLabels: false }));
@@ -1961,4 +1961,94 @@ test("P100-8: density heatmap bins x/y pairs into a count grid", () => {
   assert.equal(total, rows, "every row lands in exactly one bin");
   assert.ok(option.visualMap, "density grid needs a value scale");
   assert.notEqual(sig(renderSample("densityHeatmap", { showLabels: false })), sig(renderSample("densityHeatmap", { showLabels: true })));
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 9 — cards, table & text.
+// ---------------------------------------------------------------------------
+
+test("P100-9: KPI card renders a hero number and label on the graphic layer", () => {
+  const option = renderSample("kpiCard");
+  assert.equal(option.grid, undefined, "card templates are grid-free");
+  const graphic = (option.graphic ?? []) as Array<{ type?: string; style?: { text?: string } }>;
+  const texts = graphic.filter((element) => element.type === "text");
+  assert.ok(
+    texts.some((element) => element.style?.text?.includes("1,280") || element.style?.text?.includes("1280")),
+    `hero number expected, got ${JSON.stringify(texts.map((t) => t.style?.text))}`,
+  );
+  assert.ok(texts.some((element) => element.style?.text === "本月销售额"), "label text expected");
+  // Editing the value changes the rendered text (data-change redraw).
+  const { sampleData } = getTemplateDefinition("kpiCard");
+  const table = sampleData.table.map((row) => [...row]);
+  table[1][1] = "2560";
+  assert.notEqual(
+    sig(option),
+    sig(buildChartOption(baseConfig({
+      type: "kpiCard",
+      parsed: tableToParsed(table),
+      categoryColumn: sampleData.categoryColumn,
+      seriesColumns: sampleData.seriesColumns,
+    }))),
+  );
+});
+
+test("P100-9: KPI card row draws one value+label pair per column", () => {
+  const option = renderSample("kpiCardRow");
+  const graphic = (option.graphic ?? []) as Array<{
+    type?: string;
+    style?: { text?: string; font?: string };
+  }>;
+  const texts = graphic.filter((element) => element.type === "text");
+  assert.equal(texts.length, 8, "four columns x (value + label)");
+  assert.ok(texts.some((element) => element.style?.text === "146"), "February value present");
+  assert.ok(graphic.some((element) => element.type === "rect"), "separator rules present");
+  // Hero font sizes stay consistent across cards.
+  const valueFonts = new Set(texts.map((element) => element.style?.font?.split("px")[0]));
+  assert.ok(valueFonts.size >= 1);
+});
+
+test("P100-9: sparkline card pairs the hero number with trend polylines", () => {
+  const option = renderSample("sparklineCard");
+  const graphic = (option.graphic ?? []) as Array<{ type?: string; shape?: { points?: number[][] }; style?: { text?: string } }>;
+  assert.ok(graphic.some((element) => element.type === "text" && element.style?.text?.includes("218")), "hero value present");
+  const polylines = graphic.filter((element) => element.type === "polyline");
+  assert.equal(polylines.length, 1, "one sparkline across the trend columns");
+  assert.equal(polylines[0]?.shape?.points?.length, 6, "one point per trend column");
+});
+
+test("P100-9: bar table renders name, bar, and value per row", () => {
+  const option = renderSample("barTable");
+  const graphic = (option.graphic ?? []) as Array<{
+    type?: string;
+    shape?: { width?: number; height?: number };
+    style?: { text?: string };
+  }>;
+  const rows = getTemplateDefinition("barTable").sampleData.table.length - 1;
+  const bars = graphic.filter((element) => element.type === "rect");
+  assert.equal(bars.length, rows, "one bar per row");
+  const widths = bars.map((element) => element.shape?.width ?? 0);
+  const values = [480, 620, 260, 180, 120];
+  assert.equal(widths.indexOf(Math.max(...widths)), values.indexOf(Math.max(...values)), "widest bar belongs to the largest value");
+  assert.equal(widths.indexOf(Math.min(...widths)), values.indexOf(Math.min(...values)), "shortest bar belongs to the smallest value");
+  assert.ok(graphic.some((element) => element.type === "text" && element.style?.text === "市场推广"), "row names render");
+});
+
+test("P100-9: word cloud sizes words by weight without dependencies", () => {
+  const option = renderSample("wordCloud");
+  const graphic = (option.graphic ?? []) as Array<{
+    type?: string;
+    style?: { text?: string; font?: string };
+  }>;
+  const words = graphic.filter((element) => element.type === "text");
+  const rows = getTemplateDefinition("wordCloud").sampleData.table.length - 1;
+  assert.equal(words.length, rows, "every word renders");
+  const fontSizeOf = (element: { style?: { font?: string } }) =>
+    Number((element.style?.font ?? "0px").split("px")[0].replace("bold ", ""));
+  const sizes = words.map(fontSizeOf);
+  assert.equal(Math.max(...sizes), Math.max(...sizes), "sizes computed");
+  // Heaviest word (数据可视化, 100) uses the max size; lightest uses the min.
+  const heaviest = words.find((element) => element.style?.text === "数据可视化");
+  const lightest = words.find((element) => element.style?.text === "箱线图");
+  assert.ok(fontSizeOf(heaviest!) > fontSizeOf(lightest!), "weight must drive font size");
+  assert.equal(option.grid, undefined);
 });

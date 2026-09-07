@@ -88,7 +88,12 @@ export type ChartType =
   | "halfDonut"
   | "multiRing"
   | "boxplotHorizontal"
-  | "densityHeatmap";
+  | "densityHeatmap"
+  | "kpiCard"
+  | "kpiCardRow"
+  | "sparklineCard"
+  | "barTable"
+  | "wordCloud";
 
 export type ChartFamily = "line" | "area" | "bar" | "pie" | "other";
 
@@ -452,6 +457,11 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "densityHeatmap", name: "密度热力散点图", family: "other" },
   { id: "candlestick", name: "蜡烛图", family: "other" },
   { id: "sankey", name: "桑基图", family: "other" },
+  { id: "kpiCard", name: "大数字卡", family: "other" },
+  { id: "kpiCardRow", name: "指标卡组", family: "other" },
+  { id: "sparklineCard", name: "趋势迷你卡", family: "other" },
+  { id: "barTable", name: "条形表格图", family: "other" },
+  { id: "wordCloud", name: "词云", family: "other" },
   { id: "groupedBar", name: "分组条形图", family: "bar" },
   { id: "capsuleBar", name: "胶囊条形图", family: "bar" },
   { id: "arrowBar", name: "箭头条形图", family: "bar" },
