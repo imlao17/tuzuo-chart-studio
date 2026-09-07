@@ -1608,7 +1608,7 @@ export function buildTimelineOption(ctx: RenderContext): RendererResult {
 
 /** 小倍数分面图: one mini chart (grid) per numeric column, bar sub-shape. */
 export function buildSmallMultiplesOption(ctx: RenderContext): RendererResult {
-  const { config, categories, dataSeries } = ctx;
+  const { config, dataSeries } = ctx;
   const { compact = false, theme, fontSize } = config;
   const barWidth = config.barWidth ?? 48;
   const markOpacity = (config.markOpacity ?? 100) / 100;
