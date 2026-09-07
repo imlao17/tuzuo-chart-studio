@@ -507,8 +507,10 @@ test("single numeric column passes generic templates but fails role-specific tem
   };
   for (const type of ALL_TYPES) {
     const err = firstError(type, ctx);
-    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar"].includes(type)) {
+    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart"].includes(type)) {
       assert.ok(err && err.includes("2 个数值列"), `${type}: expected 2-column error, got ${err}`);
+    } else if (type === "bandArea") {
+      assert.ok(err && err.includes("3 个数值列"), `${type}: expected 3-column error, got ${err}`);
     } else if (type === "candlestick") {
       assert.ok(err && err.includes("4 个数值列"), `${type}: expected OHLC error, got ${err}`);
     } else if (type === "sankey") {
@@ -1065,8 +1067,8 @@ test("P1-5: comboAxisSync applies a shared min/max to both axes", () => {
 
 test("P1-5: non-combo templates are unaffected by the patchAxes array support", () => {
   // Regression: every other template still returns a single (non-array) yAxis.
-  // combo and pareto are the dual-axis exceptions by design.
-  for (const type of ALL_TYPES.filter((t) => t !== "combo" && t !== "pareto")) {
+  // combo, pareto and dualAxisLine are the dual-axis exceptions by design.
+  for (const type of ALL_TYPES.filter((t) => t !== "combo" && t !== "pareto" && t !== "dualAxisLine")) {
     const option = buildChartOption(baseConfig({ type }));
     assert.equal(Array.isArray(option.yAxis), false, `${type}: yAxis unexpectedly an array`);
   }
@@ -1331,4 +1333,119 @@ test("P100-1: pareto adds a cumulative percentage line on a 0-100% right axis", 
   const sorted = [...barData].sort((a, b) => b - a);
   assert.deepEqual(barData, sorted, "pareto bars must render in descending order");
   assert.notEqual(sig(renderSample("pareto", { showLabels: false })), sig(renderSample("pareto", { showLabels: true })));
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 2 — line/area extensions.
+// ---------------------------------------------------------------------------
+
+test("P100-2: point lines use oversized beads on thin lines", () => {
+  const [point] = seriesList(renderSample("pointLine")) as Array<{
+    symbolSize?: number;
+    lineStyle?: { width?: number };
+  }>;
+  const [plain] = seriesList(renderSample("line")) as Array<{
+    symbolSize?: number;
+    lineStyle?: { width?: number };
+  }>;
+  assert.ok((point.symbolSize ?? 0) >= 10, "point lines need prominent beads");
+  assert.equal(point.lineStyle?.width, 1.5);
+  assert.ok((point.symbolSize ?? 0) > (plain.symbolSize ?? 0), "point lines must differ from plain lines");
+  assert.notEqual(sig(renderSample("pointLine", { pointSize: 4 })), sig(renderSample("pointLine", { pointSize: 18 })));
+});
+
+test("P100-2: smooth and step area variants combine area fill with their line shape", () => {
+  const smooth = seriesList(renderSample("smoothArea")) as Array<{
+    smooth?: boolean;
+    areaStyle?: Record<string, unknown> | undefined;
+  }>;
+  assert.equal(smooth[0]?.smooth, true);
+  assert.ok(smooth[0]?.areaStyle, "smooth area must fill");
+
+  const step = seriesList(renderSample("stepArea")) as Array<{
+    step?: string;
+    areaStyle?: Record<string, unknown> | undefined;
+  }>;
+  assert.equal(step[0]?.step, "middle");
+  assert.ok(step[0]?.areaStyle, "step area must fill");
+
+  // The shared line/area path must keep plain lines area-free.
+  const plain = seriesList(renderSample("pointLine")) as Array<{ areaStyle?: unknown }>;
+  assert.equal(plain[0]?.areaStyle, undefined);
+});
+
+test("P100-2: dual axis line routes the first series left and the rest right", () => {
+  const option = renderSample("dualAxisLine");
+  const series = seriesList(option) as Array<{ yAxisIndex?: number }>;
+  assert.equal(series.length, 2, "sample has two series columns");
+  assert.equal(series[0]?.yAxisIndex, undefined, "first series stays on the default axis");
+  assert.equal(series[1]?.yAxisIndex, 1);
+  const yAxis = option.yAxis as unknown[];
+  assert.equal(yAxis.length, 2, "dual axis line needs two value axes");
+});
+
+test("P100-2: slope charts transpose rows into two-point lines across periods", () => {
+  const option = renderSample("slopeChart");
+  const sample = getTemplateDefinition("slopeChart").sampleData;
+  const series = seriesList(option) as Array<{ name?: string; data?: number[]; type?: string }>;
+  assert.equal(series.length, sample.table.length - 1, "one series per entity row");
+  for (const item of series) {
+    assert.equal(item.type, "line");
+    assert.equal(item.data?.length, 2, "each entity has exactly two period values");
+  }
+  const xAxis = option.xAxis as { data?: string[] };
+  assert.deepEqual(xAxis.data, sample.seriesColumns, "axis labels are the two period names");
+  // Config change: line width flows into slope segments.
+  assert.notEqual(sig(renderSample("slopeChart", { lineWidth: 1 })), sig(renderSample("slopeChart", { lineWidth: 9 })));
+});
+
+test("P100-2: band area shades between bounds with the mid line on top", () => {
+  const option = renderSample("bandArea");
+  const series = seriesList(option) as Array<{
+    type?: string;
+    stack?: string;
+    areaStyle?: { opacity?: number; color?: string };
+    label?: { show?: boolean };
+  }>;
+  assert.equal(series.length, 3);
+  assert.equal(series[0]?.stack, "band");
+  assert.equal(series[0]?.areaStyle?.opacity, 0, "base bound must be invisible");
+  assert.ok((series[1]?.areaStyle?.opacity ?? 0) > 0, "band fill must be visible");
+  assert.equal(series[2]?.label?.show, true, "labels ride the mid line");
+  assert.notEqual(sig(renderSample("bandArea", { showLabels: false })), sig(renderSample("bandArea", { showLabels: true })));
+});
+
+test("P100-2: ridgeline stacks each series on a synthetic offset base", () => {
+  const option = renderSample("ridgeline");
+  const series = seriesList(option) as Array<{
+    type?: string;
+    stack?: string;
+    data?: number[];
+    areaStyle?: { opacity?: number };
+  }>;
+  // Two series per column: transparent base + visible ridge.
+  const columns = getTemplateDefinition("ridgeline").sampleData.seriesColumns.length;
+  assert.equal(series.length, columns * 2);
+  assert.ok(series[1]?.areaStyle && (series[1].areaStyle.opacity ?? 0) > 0, "ridges must fill");
+  // Base offsets increase per column so ridges cascade.
+  const base0 = series[0]?.data ?? [];
+  const base2 = series[2]?.data ?? [];
+  assert.ok(base0.every((v) => v === 0), "first ridge starts at zero");
+  assert.ok(base2.every((v) => v > 0), "later ridges sit on a raised baseline");
+  assert.notEqual(sig(renderSample("ridgeline", { areaOpacity: 80 })), sig(renderSample("ridgeline", { areaOpacity: 20 })));
+});
+
+test("P100-2: bump charts rank values on an inverted axis", () => {
+  const option = renderSample("bump");
+  const yAxis = option.yAxis as { inverse?: boolean; min?: number; max?: number };
+  assert.equal(yAxis.inverse, true, "rank 1 must sit at the top");
+  const series = seriesList(option) as Array<{ data?: number[]; label?: { formatter?: (p: { value: number }) => string } }>;
+  const rowCount = getTemplateDefinition("bump").sampleData.table.length - 1;
+  for (const item of series) {
+    assert.ok((item.data ?? []).every((rank) => rank >= 1 && rank <= rowCount), `ranks must be 1..${rowCount}`);
+    // Best value per column must map to rank 1.
+    assert.equal(Math.min(...(item.data ?? [])), 1);
+  }
+  assert.match(series[0]?.label?.formatter?.({ value: 2 }) ?? "", /^#2$/);
+  assert.notEqual(sig(renderSample("bump", { showLabels: false })), sig(renderSample("bump", { showLabels: true })));
 });

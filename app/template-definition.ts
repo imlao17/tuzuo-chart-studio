@@ -37,7 +37,14 @@ import {
 } from "./renderers/bar";
 import { buildComboOption, buildParetoOption } from "./renderers/combo";
 import { buildDivergingOption } from "./renderers/diverging";
-import { buildLineAreaOption } from "./renderers/line-area";
+import {
+  buildBandAreaOption,
+  buildBumpOption,
+  buildDualAxisLineOption,
+  buildLineAreaOption,
+  buildRidgelineOption,
+  buildSlopeOption,
+} from "./renderers/line-area";
 import { buildPieOption } from "./renderers/pie";
 import { buildScatterOption } from "./renderers/scatter";
 import { buildStreamgraphOption } from "./renderers/streamgraph";
@@ -293,6 +300,14 @@ const BIND_VALUE_ACTUAL: DataBinding = {
 const BIND_VALUE_TARGET: DataBinding = {
   role: "value",
   label: "目标值",
+  required: true,
+  multiple: false,
+  hint: "额外数值列将被忽略",
+};
+
+const BIND_VALUE_MID: DataBinding = {
+  role: "value",
+  label: "中值",
   required: true,
   multiple: false,
   hint: "额外数值列将被忽略",
@@ -753,6 +768,77 @@ const SAMPLE_PARETO: SampleData = {
   seriesColumns: ["数量"],
 };
 
+// --- Batch-2 (Flourish parity) sample data ---------------------------------
+
+const SAMPLE_DUAL_AXIS: SampleData = {
+  table: [
+    ["月份", "销售额 万", "转化率 %"],
+    ["一月", "128", "3.2"],
+    ["二月", "146", "3.8"],
+    ["三月", "138", "3.5"],
+    ["四月", "172", "4.1"],
+    ["五月", "189", "4.6"],
+    ["六月", "218", "5.2"],
+  ],
+  categoryColumn: "月份",
+  seriesColumns: ["销售额 万", "转化率 %"],
+};
+
+const SAMPLE_SLOPE: SampleData = {
+  table: [
+    ["品牌", "2023", "2024"],
+    ["品牌 A", "42", "58"],
+    ["品牌 B", "35", "31"],
+    ["品牌 C", "28", "44"],
+    ["品牌 D", "22", "12"],
+    ["品牌 E", "18", "26"],
+  ],
+  categoryColumn: "品牌",
+  seriesColumns: ["2023", "2024"],
+};
+
+const SAMPLE_BAND: SampleData = {
+  table: [
+    ["日期", "最低温", "平均温", "最高温"],
+    ["周一", "18", "23", "29"],
+    ["周二", "17", "22", "27"],
+    ["周三", "19", "25", "31"],
+    ["周四", "21", "27", "33"],
+    ["周五", "20", "26", "32"],
+    ["周六", "22", "28", "35"],
+    ["周日", "21", "27", "34"],
+  ],
+  categoryColumn: "日期",
+  seriesColumns: ["最低温", "最高温", "平均温"],
+};
+
+const SAMPLE_RIDGE: SampleData = {
+  table: [
+    ["月份", "产品 A", "产品 B", "产品 C", "产品 D"],
+    ["一月", "18", "9", "14", "5"],
+    ["二月", "34", "20", "26", "11"],
+    ["三月", "52", "38", "31", "18"],
+    ["四月", "41", "55", "22", "26"],
+    ["五月", "25", "42", "35", "38"],
+    ["六月", "12", "24", "48", "30"],
+  ],
+  categoryColumn: "月份",
+  seriesColumns: ["产品 A", "产品 B", "产品 C", "产品 D"],
+};
+
+const SAMPLE_BUMP: SampleData = {
+  table: [
+    ["年份", "品牌 A", "品牌 B", "品牌 C"],
+    ["2020", "86", "72", "64"],
+    ["2021", "78", "80", "61"],
+    ["2022", "70", "75", "82"],
+    ["2023", "88", "66", "74"],
+    ["2024", "92", "70", "69"],
+  ],
+  categoryColumn: "年份",
+  seriesColumns: ["品牌 A", "品牌 B", "品牌 C"],
+};
+
 // --- Shared validators -----------------------------------------------------
 // Each returns null (pass) or a human-readable error string. Validators read
 // only the ValidationContext (parsed table + resolved categoryColumn /
@@ -789,6 +875,16 @@ const requireFourNumericColumns =
         ctx.parsed.numericHeaders.includes(header),
       );
       return selectedNumericColumns.length < 4 ? message : null;
+    },
+  });
+
+const requireThreeNumericColumns =
+  (message: string): DataValidator => ({
+    validate: (ctx) => {
+      const selectedNumericColumns = ctx.seriesColumns.filter((header) =>
+        ctx.parsed.numericHeaders.includes(header),
+      );
+      return selectedNumericColumns.length < 3 ? message : null;
     },
   });
 
@@ -1086,6 +1182,94 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_CARTESIAN,
     buildOption: buildStreamgraphOption,
     sampleData: SAMPLE_MONTHLY,
+  },
+
+  // --- Line/area extensions (Flourish parity batch 2) ----------------------
+  pointLine: {
+    id: "pointLine",
+    family: "line",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildLineAreaOption,
+    sampleData: SAMPLE_MONTHLY,
+  },
+  dualAxisLine: {
+    id: "dualAxisLine",
+    family: "line",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildDualAxisLineOption,
+    sampleData: SAMPLE_DUAL_AXIS,
+  },
+  slopeChart: {
+    id: "slopeChart",
+    family: "line",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_LOWER, BIND_VALUE_UPPER],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("斜率图需要 2 个数值列（两个时期）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildSlopeOption,
+    sampleData: SAMPLE_SLOPE,
+  },
+  bump: {
+    id: "bump",
+    family: "line",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildBumpOption,
+    sampleData: SAMPLE_BUMP,
+  },
+  smoothArea: {
+    id: "smoothArea",
+    family: "area",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildLineAreaOption,
+    sampleData: SAMPLE_MONTHLY,
+  },
+  stepArea: {
+    id: "stepArea",
+    family: "area",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildLineAreaOption,
+    sampleData: SAMPLE_MONTHLY,
+  },
+  bandArea: {
+    id: "bandArea",
+    family: "area",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_LOWER, BIND_VALUE_UPPER, BIND_VALUE_MID],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireThreeNumericColumns("区间面积图需要 3 个数值列（下限、上限、中值）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildBandAreaOption,
+    sampleData: SAMPLE_BAND,
+  },
+  ridgeline: {
+    id: "ridgeline",
+    family: "area",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildRidgelineOption,
+    sampleData: SAMPLE_RIDGE,
   },
 
   // --- Combo family (migrated) --------------------------------------------

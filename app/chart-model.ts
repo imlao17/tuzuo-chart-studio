@@ -5,9 +5,17 @@ export type ChartType =
   | "line"
   | "smoothLine"
   | "stepLine"
+  | "pointLine"
+  | "dualAxisLine"
+  | "slopeChart"
+  | "bump"
   | "area"
   | "stackedArea"
   | "proportionalArea"
+  | "smoothArea"
+  | "stepArea"
+  | "bandArea"
+  | "ridgeline"
   | "bar"
   | "stackedBar"
   | "proportionalBar"
@@ -336,9 +344,17 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "line", name: "折线图", family: "line" },
   { id: "smoothLine", name: "平滑折线图", family: "line" },
   { id: "stepLine", name: "阶梯折线图", family: "line" },
+  { id: "pointLine", name: "点线图", family: "line" },
+  { id: "dualAxisLine", name: "双轴折线图", family: "line" },
+  { id: "slopeChart", name: "斜率图", family: "line" },
+  { id: "bump", name: "凹凸图", family: "line" },
   { id: "area", name: "面积图", family: "area" },
   { id: "stackedArea", name: "堆叠面积图", family: "area" },
   { id: "proportionalArea", name: "百分比面积图", family: "area" },
+  { id: "smoothArea", name: "平滑面积图", family: "area" },
+  { id: "stepArea", name: "阶梯面积图", family: "area" },
+  { id: "bandArea", name: "区间面积图", family: "area" },
+  { id: "ridgeline", name: "脊线图", family: "area" },
   { id: "bar", name: "条形图", family: "bar" },
   { id: "stackedBar", name: "堆叠条形图", family: "bar" },
   { id: "proportionalBar", name: "百分比条形图", family: "bar" },
