@@ -17,7 +17,6 @@ import {
   dataLabelTextStyle,
   type RendererResult,
 } from "./shared";
-import { buildValueAxis } from "./shared";
 import { buildSankeyOption } from "./advanced";
 
 type Endpoint = { source: string; target: string; value: number };
@@ -125,8 +124,6 @@ export function buildChordOption(ctx: RenderContext): RendererResult {
   const { compact = false, theme } = config;
   const labelTextStyle = dataLabelTextStyle(config);
   const { nodeNames, endpoints, valueName } = resolveEndpoints(ctx);
-  const weights = nodeWeights(endpoints);
-  const maxWeight = Math.max(1, ...Object.values(weights));
 
   const series: SeriesOption[] = [
     {
