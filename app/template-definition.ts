@@ -35,6 +35,18 @@ import {
   buildRangeOption,
   buildRankingOption,
 } from "./renderers/bar";
+import {
+  buildDendrogramOption,
+  buildOrgChartOption,
+  buildRadialTreeOption,
+  buildSunburstOption,
+} from "./renderers/hierarchy";
+import {
+  buildAdjacencyMatrixOption,
+  buildAlluvialOption,
+  buildChordOption,
+  buildNetworkGraphOption,
+} from "./renderers/network";
 import { buildComboOption, buildParetoOption } from "./renderers/combo";
 import { buildDivergingOption } from "./renderers/diverging";
 import {
@@ -993,6 +1005,82 @@ const SAMPLE_BEESWARM: SampleData = {
   seriesColumns: ["分数"],
 };
 
+// --- Batch-5 (Flourish parity) sample data ---------------------------------
+
+const SAMPLE_HIERARCHY: SampleData = {
+  table: [
+    ["大区", "销售额 万", "利润 万"],
+    ["华东", "420", "96"],
+    ["华南", "356", "74"],
+    ["华北", "298", "58"],
+    ["西南", "180", "31"],
+    ["东北", "142", "22"],
+  ],
+  categoryColumn: "大区",
+  seriesColumns: ["销售额 万", "利润 万"],
+};
+
+const SAMPLE_NETWORK: SampleData = {
+  table: [
+    ["来源", "去向", "流量"],
+    ["官网", "注册", "340"],
+    ["广告", "注册", "280"],
+    ["社媒", "注册", "180"],
+    ["注册", "试用", "520"],
+    ["注册", "流失", "280"],
+    ["试用", "付费", "210"],
+    ["付费", "续费", "150"],
+    ["社媒", "官网", "90"],
+  ],
+  categoryColumn: "来源",
+  seriesColumns: ["流量"],
+  roleDefaults: {
+    source: "来源",
+    target: "去向",
+    value: "流量",
+  },
+};
+
+const SAMPLE_ADJACENCY: SampleData = {
+  table: [
+    ["出发地", "目的地", "班次数"],
+    ["北京", "上海", "36"],
+    ["北京", "广州", "18"],
+    ["上海", "广州", "22"],
+    ["上海", "成都", "14"],
+    ["广州", "成都", "9"],
+    ["成都", "北京", "11"],
+    ["西安", "北京", "8"],
+    ["西安", "上海", "6"],
+  ],
+  categoryColumn: "出发地",
+  seriesColumns: ["班次数"],
+  roleDefaults: {
+    source: "出发地",
+    target: "目的地",
+    value: "班次数",
+  },
+};
+
+const SAMPLE_ALLUVIAL: SampleData = {
+  table: [
+    ["阶段", "下一阶段", "人数"],
+    ["曝光", "点击", "1200"],
+    ["点击", "咨询", "480"],
+    ["曝光", "分享", "260"],
+    ["分享", "点击", "180"],
+    ["咨询", "成交", "210"],
+    ["点击", "流失", "720"],
+  ],
+  categoryColumn: "阶段",
+  seriesColumns: ["人数"],
+  roleDefaults: {
+    source: "阶段",
+    target: "下一阶段",
+    value: "人数",
+  },
+};
+
 // --- Shared validators -----------------------------------------------------
 // Each returns null (pass) or a human-readable error string. Validators read
 // only the ValidationContext (parsed table + resolved categoryColumn /
@@ -1594,6 +1682,88 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_CARTESIAN,
     buildOption: buildBeeswarmOption,
     sampleData: SAMPLE_BEESWARM,
+  },
+
+  // --- Hierarchy & network (Flourish parity batch 5) -----------------------
+  sunburst: {
+    id: "sunburst",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildSunburstOption,
+    sampleData: SAMPLE_HIERARCHY,
+  },
+  dendrogram: {
+    id: "dendrogram",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildDendrogramOption,
+    sampleData: SAMPLE_HIERARCHY,
+  },
+  radialTree: {
+    id: "radialTree",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildRadialTreeOption,
+    sampleData: SAMPLE_HIERARCHY,
+  },
+  orgChart: {
+    id: "orgChart",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildOrgChartOption,
+    sampleData: SAMPLE_HIERARCHY,
+  },
+  networkGraph: {
+    id: "networkGraph",
+    family: "other",
+    dataBindings: [BIND_SOURCE, BIND_TARGET, BIND_VALUE_SINGLE],
+    validators: [...BASE_VALIDATORS, requireSankeyColumns],
+    settingsGroups: NON_CARTESIAN_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildNetworkGraphOption,
+    sampleData: SAMPLE_NETWORK,
+  },
+  chord: {
+    id: "chord",
+    family: "other",
+    dataBindings: [BIND_SOURCE, BIND_TARGET, BIND_VALUE_SINGLE],
+    validators: [...BASE_VALIDATORS, requireSankeyColumns],
+    settingsGroups: NON_CARTESIAN_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildChordOption,
+    sampleData: SAMPLE_NETWORK,
+  },
+  adjacencyMatrix: {
+    id: "adjacencyMatrix",
+    family: "other",
+    dataBindings: [BIND_SOURCE, BIND_TARGET, BIND_VALUE_SINGLE],
+    validators: [...BASE_VALIDATORS, requireSankeyColumns],
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildAdjacencyMatrixOption,
+    sampleData: SAMPLE_ADJACENCY,
+  },
+  alluvial: {
+    id: "alluvial",
+    family: "other",
+    dataBindings: [BIND_SOURCE, BIND_TARGET, BIND_VALUE_SINGLE],
+    validators: [...BASE_VALIDATORS, requireSankeyColumns],
+    settingsGroups: NON_CARTESIAN_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildAlluvialOption,
+    sampleData: SAMPLE_ALLUVIAL,
   },
 
   // --- Diverging / population pyramid family (migrated) -------------------

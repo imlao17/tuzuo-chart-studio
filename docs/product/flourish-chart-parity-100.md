@@ -71,7 +71,7 @@
 | 2 | 折线/面积扩展 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 line/area chart templates…"） | 点线图/平滑面积图/阶梯面积图复用既有 line-area 路径；双轴折线/斜率/区间面积/脊线/凹凸为独立构造器 |
 | 3 | 径向/极坐标家族 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 radial/polar chart templates…"） | 新建 `renderers/radial.ts`；shared.ts 的 RendererResult 扩展了 polar/angleAxis/radiusAxis/graphic 通道（对既有模板零影响） |
 | 4 | 散点/气泡扩展 | 5 | 已完成 | 2026-09-07 | 随本批提交（"Add 5 scatter/bubble chart templates…"） | bubble/trendScatter 为 scatter 的配置注入包装器；象限图中线取中位数（均值可配置项留待后续） |
-| 5 | 层级与网络 | 8 | 待开始 | — | — | 新建 `renderers/hierarchy.ts`、`renderers/network.ts` |
+| 5 | 层级与网络 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 hierarchy/network chart templates…"） | 新建 `renderers/hierarchy.ts`、`renderers/network.ts`；冲积图复用 sankey 渲染路径（差异在多阶段示例数据）；弦图用 ECharts 6.1 内置 chord 系列 |
 | 6 | 统计与分布 | 7 | 待开始 | — | — | 含 2 个 P2 |
 | 7 | 条柱线补充变体 | 8 | 待开始 | — | — | 含 1 个 P2 |
 | 8 | 环饼与箱线补充 | 4 | 待开始 | — | — | |
@@ -139,14 +139,14 @@
 
 | # | 中文名 | id | ECharts 方案 | 数据绑定要点 | 状态 |
 |---|---|---|---|---|---|
-| 31 | 旭日图 | `sunburst` | sunburst（两层：分类为父、数值列为子） | 分类 + 多数值列 | 待做 |
-| 32 | 树状图 | `dendrogram` | tree，orient LR | 同旭日图的两层数据 | 待做 |
-| 33 | 径向树图 | `radialTree` | tree，layout radial | 同上 | 待做 |
-| 34 | 组织架构图 | `orgChart` | tree，orient TB | 同上 | 待做 |
-| 35 | 力导向网络图 | `networkGraph` | graph，layout force | 复用桑基绑定：来源、去向、数值 | 待做 |
-| 36 | 弦图 | `chord` | echarts 6.1 内置 chord 系列（若类型暴露不便则用 graph circular + 曲线边实现） | 同上 | 待做 |
-| 37 | 邻接矩阵图 | `adjacencyMatrix` | heatmap（来源×去向方阵） | 同上 | 待做 |
-| 38 | 冲积图 | `alluvial` | 复用 sankey 渲染器 | 同桑基；示例数据改为多阶段（A→B→C） | 待做 |
+| 31 | 旭日图 | `sunburst` | sunburst（两层：分类为父、数值列为子） | 分类 + 多数值列 | 完成 |
+| 32 | 树状图 | `dendrogram` | tree，orient LR | 同旭日图的两层数据 | 完成 |
+| 33 | 径向树图 | `radialTree` | tree，layout radial | 同上 | 完成 |
+| 34 | 组织架构图 | `orgChart` | tree，orient TB | 同上 | 完成 |
+| 35 | 力导向网络图 | `networkGraph` | graph，layout force | 复用桑基绑定：来源、去向、数值 | 完成 |
+| 36 | 弦图 | `chord` | echarts 6.1 内置 chord 系列（若类型暴露不便则用 graph circular + 曲线边实现） | 同上 | 完成 |
+| 37 | 邻接矩阵图 | `adjacencyMatrix` | heatmap（来源×去向方阵） | 同上 | 完成 |
+| 38 | 冲积图 | `alluvial` | 复用 sankey 渲染器 | 同桑基；示例数据改为多阶段（A→B→C） | 完成 |
 
 ### 批次 6 · 统计与分布（advanced.ts）
 

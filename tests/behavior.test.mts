@@ -513,7 +513,7 @@ test("single numeric column passes generic templates but fails role-specific tem
       assert.ok(err && err.includes("3 个数值列"), `${type}: expected 3-column error, got ${err}`);
     } else if (type === "candlestick") {
       assert.ok(err && err.includes("4 个数值列"), `${type}: expected OHLC error, got ${err}`);
-    } else if (type === "sankey") {
+    } else if (["sankey", "networkGraph", "chord", "adjacencyMatrix", "alluvial"].includes(type)) {
       assert.ok(err && err.includes("2 个文本列"), `${type}: expected flow-column error, got ${err}`);
     } else {
       assert.equal(err, null, `${type}: should accept a single numeric column`);
@@ -1596,4 +1596,89 @@ test("P100-4: beeswarm packs points without collisions", () => {
   const xs = (swarm.data ?? []).map(([x]) => x);
   assert.ok(xs.some((x) => Math.abs(x - Math.round(x)) > 0.01), "expected sideways packing offsets");
   assert.notEqual(sig(renderSample("beeswarm", { showLabels: false })), sig(renderSample("beeswarm", { showLabels: true })));
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 5 — hierarchy & network.
+// ---------------------------------------------------------------------------
+
+test("P100-5: sunburst nests categories over series columns", () => {
+  const option = renderSample("sunburst");
+  const [burst] = seriesList(option) as Array<{
+    type?: string;
+    data?: Array<{ name?: string; children?: Array<{ name?: string; value?: number }> }>;
+  }>;
+  assert.equal(burst.type, "sunburst");
+  const root = burst.data?.[0];
+  const sampleRows = getTemplateDefinition("sunburst").sampleData.table.length - 1;
+  assert.equal(root?.children?.length, sampleRows, "one parent per category row");
+  const firstLeafGroup = (root?.children?.[0] ?? {}) as { children?: Array<{ name?: string; value?: number }> };
+  assert.equal(firstLeafGroup.children?.length, 2, "one leaf per numeric column");
+  assert.equal(option.grid, undefined);
+  assert.notEqual(sig(renderSample("sunburst", { showLabels: false })), sig(renderSample("sunburst", { showLabels: true })));
+});
+
+test("P100-5: tree variants differ by orientation and layout", () => {
+  const dendrogram = seriesList(renderSample("dendrogram"))[0] as { type?: string; orient?: string; layout?: string };
+  const org = seriesList(renderSample("orgChart"))[0] as { type?: string; orient?: string; layout?: string };
+  const radial = seriesList(renderSample("radialTree"))[0] as { type?: string; orient?: string; layout?: string };
+  for (const tree of [dendrogram, org, radial]) assert.equal(tree.type, "tree");
+  assert.equal(dendrogram.orient, "LR");
+  assert.equal(dendrogram.layout, undefined);
+  assert.equal(org.orient, "TB");
+  assert.equal(radial.layout, "radial");
+  // All trees share the same node structure from the same sample.
+  for (const type of ["dendrogram", "orgChart", "radialTree"] as ChartType[]) {
+    const [tree] = seriesList(renderSample(type)) as Array<{ data?: Array<{ name?: string; children?: unknown[] }> }>;
+    assert.equal(tree.data?.[0]?.children?.length, 5, `${type}: root children are the categories`);
+  }
+});
+
+test("P100-5: network graph builds force layout from source-target pairs", () => {
+  const option = renderSample("networkGraph");
+  const [graph] = seriesList(option) as Array<{
+    type?: string;
+    layout?: string;
+    data?: Array<{ name?: string }>;
+    links?: Array<{ source?: string; target?: string }>;
+  }>;
+  assert.equal(graph.type, "graph");
+  assert.equal(graph.layout, "force");
+  assert.equal(graph.links?.length, 8, "one link per flow row");
+  assert.equal(graph.data?.length, 8, "nodes are the unique endpoint names");
+  assert.equal(option.grid, undefined);
+  assert.notEqual(sig(renderSample("networkGraph", { showLabels: false })), sig(renderSample("networkGraph", { showLabels: true })));
+});
+
+test("P100-5: chord shares the node/link model on a circular layout", () => {
+  const option = renderSample("chord");
+  const [chord] = seriesList(option) as Array<{
+    type?: string;
+    data?: unknown[];
+    links?: unknown[];
+  }>;
+  assert.equal(chord.type, "chord");
+  assert.equal(chord.data?.length, 8);
+  assert.equal(chord.links?.length, 8);
+  assert.notEqual(sig(renderSample("chord", { markOpacity: 30 })), sig(renderSample("chord", { markOpacity: 90 })));
+});
+
+test("P100-5: adjacency matrix renders a heatmap with a visual map", () => {
+  const option = renderSample("adjacencyMatrix");
+  const [matrix] = seriesList(option) as Array<{ type?: string; data?: [number, number, number][] }>;
+  assert.equal(matrix.type, "heatmap");
+  assert.equal(matrix.data?.length, 8, "one cell per flow");
+  assert.ok(option.visualMap, "matrix needs a value color scale");
+  const xAxis = option.xAxis as { data?: string[] };
+  const yAxis = option.yAxis as { data?: string[] };
+  assert.ok(xAxis.data?.length && yAxis.data?.length, "both axes list the node names");
+  assert.notEqual(sig(renderSample("adjacencyMatrix", { showLabels: false })), sig(renderSample("adjacencyMatrix", { showLabels: true })));
+});
+
+test("P100-5: alluvial rides the sankey path with its own flow shape", () => {
+  const option = renderSample("alluvial");
+  const [flow] = seriesList(option) as Array<{ type?: string; links?: unknown[]; data?: unknown[] }>;
+  assert.equal(flow.type, "sankey", "alluvial reuses the sankey renderer");
+  assert.equal(flow.links?.length, 6, "sample has six stage transitions");
+  assert.ok(flow.data?.length, "nodes present");
 });

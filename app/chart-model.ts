@@ -49,6 +49,14 @@ export type ChartType =
   | "quadrant"
   | "trendScatter"
   | "beeswarm"
+  | "sunburst"
+  | "dendrogram"
+  | "radialTree"
+  | "orgChart"
+  | "networkGraph"
+  | "chord"
+  | "adjacencyMatrix"
+  | "alluvial"
   | "divergingBar"
   | "populationPyramid"
   | "streamgraph"
@@ -400,6 +408,14 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "quadrant", name: "象限图", family: "other" },
   { id: "trendScatter", name: "回归散点图", family: "other" },
   { id: "beeswarm", name: "蜂群图", family: "other" },
+  { id: "sunburst", name: "旭日图", family: "other" },
+  { id: "dendrogram", name: "树状图", family: "other" },
+  { id: "radialTree", name: "径向树图", family: "other" },
+  { id: "orgChart", name: "组织架构图", family: "other" },
+  { id: "networkGraph", name: "力导向网络图", family: "other" },
+  { id: "chord", name: "弦图", family: "other" },
+  { id: "adjacencyMatrix", name: "邻接矩阵图", family: "other" },
+  { id: "alluvial", name: "冲积图", family: "other" },
   { id: "divergingBar", name: "发散条形图", family: "other" },
   { id: "populationPyramid", name: "人口金字塔", family: "other" },
   { id: "streamgraph", name: "河流图", family: "area" },
