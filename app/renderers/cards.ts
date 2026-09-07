@@ -25,6 +25,10 @@ const PLACEHOLDER_SERIES: SeriesOption[] = [
   {
     name: "图形",
     type: "scatter",
+    // Graphic-driven templates carry no coordinate system at all; without
+    // "none" ECharts assigns a default cartesian grid and throws
+    // `xAxis "0" not found` at render time.
+    coordinateSystem: "none",
     data: [],
     silent: true,
     label: { show: false },

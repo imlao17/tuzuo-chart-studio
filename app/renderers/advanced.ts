@@ -1470,6 +1470,10 @@ export function buildBoxplotHorizontalOption(ctx: RenderContext): RendererResult
   };
 }
 
+function formatBinBound(value: number) {
+  return Number(value.toFixed(2)).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+}
+
 /** 密度热力散点图: 2-D binning of x/y pairs rendered as a heatmap. */
 export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
@@ -1501,18 +1505,32 @@ export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
     return [xi, yi, count];
   });
   const labelTextStyle = dataLabelTextStyle(config);
+  // ECharts requires two CATEGORY axes for heatmap on cartesian, so bins are
+  // labeled as intervals and the cells carry bin indices.
+  const xLabels = Array.from({ length: BINS }, (_, index) =>
+    `${formatBinBound(xMin + index * xWidth)}–${formatBinBound(xMin + (index + 1) * xWidth)}`,
+  );
+  const yLabels = Array.from({ length: BINS }, (_, index) =>
+    `${formatBinBound(yMin + index * yWidth)}–${formatBinBound(yMin + (index + 1) * yWidth)}`,
+  );
 
   const xAxis = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
-    min: xMin,
-    max: xMax,
+    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    data: xLabels,
     name: compact ? "" : dataSeries[0]?.name ?? "",
   };
   const yAxis = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
-    min: yMin,
-    max: yMax,
+    type: "category" as const,
+    data: yLabels,
+    show: !compact,
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { show: !compact, color: theme.text, fontSize },
+    splitLine: { show: false },
     name: compact ? "" : dataSeries[1]?.name ?? "",
+    nameLocation: "middle" as const,
+    nameGap: 45,
+    nameTextStyle: { color: theme.text, fontSize },
   };
   const series: SeriesOption[] = [
     {

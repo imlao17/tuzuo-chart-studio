@@ -15,6 +15,7 @@ import {
   buildThumbnailOption,
   CHART_TEMPLATES,
   type ChartFamily,
+  TEMPLATE_CATEGORIES,
   type ChartType,
 } from "../../../app/chart-model";
 import { useDialogFocus } from "../hooks/use-dialog-focus";
@@ -99,12 +100,39 @@ export function TemplateGallery({
   onSelect: (type: ChartType) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<string>("全部");
   const dialogRef = useDialogFocus<HTMLDivElement>({ open, onClose });
 
   if (!open) return null;
 
-  const filtered = CHART_TEMPLATES.filter((template) =>
-    template.name.includes(query.trim()),
+  const needle = query.trim();
+  const counts = new Map<string, number>();
+  for (const template of CHART_TEMPLATES) {
+    counts.set(template.category, (counts.get(template.category) ?? 0) + 1);
+  }
+
+  const filtered = CHART_TEMPLATES.filter(
+    (template) =>
+      (category === "全部" || template.category === category) &&
+      (!needle ||
+        template.name.includes(needle) ||
+        template.category.includes(needle)),
+  );
+
+  // Group the filtered templates into sections, ordered by the canonical
+  // category order so the gallery always reads the same way.
+  const orderOf = (label: string) => {
+    const index = TEMPLATE_CATEGORIES.indexOf(label);
+    return index === -1 ? TEMPLATE_CATEGORIES.length : index;
+  };
+  const sections = new Map<string, typeof CHART_TEMPLATES>();
+  for (const template of filtered) {
+    const bucket = sections.get(template.category);
+    if (bucket) bucket.push(template);
+    else sections.set(template.category, [template]);
+  }
+  const orderedSections = [...sections.entries()].sort(
+    ([a], [b]) => orderOf(a) - orderOf(b),
   );
 
   return (
@@ -125,7 +153,7 @@ export function TemplateGallery({
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索图表"
+                placeholder="搜索图表或类目"
                 autoFocus
               />
             </label>
@@ -140,27 +168,56 @@ export function TemplateGallery({
             </button>
           </div>
         </div>
-        <div className="template-grid">
-          {filtered.map((template) => (
+        <div className="gallery-chips" role="tablist" aria-label="图表类目">
+          {["全部", ...TEMPLATE_CATEGORIES].map((label) => (
             <button
-              key={template.id}
+              key={label}
               type="button"
-              className={`template-card ${
-                selected === template.id ? "selected" : ""
-              }`}
-              onClick={() => onSelect(template.id)}
+              role="tab"
+              aria-selected={category === label}
+              className={`gallery-chip ${category === label ? "active" : ""}`}
+              onClick={() => setCategory(label)}
             >
-              <TemplateThumbnail type={template.id} />
-              <span className="template-name">{template.name}</span>
-              {selected === template.id && (
-                <span className="template-selected">
-                  <Check size={13} />
-                </span>
-              )}
+              {label}
+              <span className="chip-count">
+                {label === "全部"
+                  ? CHART_TEMPLATES.length
+                  : counts.get(label) ?? 0}
+              </span>
             </button>
           ))}
         </div>
-        {!filtered.length && <div className="empty-search">没有匹配的图表</div>}
+        <div className="template-body">
+          {orderedSections.map(([label, templates]) => (
+            <section key={label} className="template-section">
+              <h2 className="template-section-title">
+                {label}
+                <span className="section-count">{templates.length}</span>
+              </h2>
+              <div className="template-grid">
+                {templates.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    className={`template-card ${
+                      selected === template.id ? "selected" : ""
+                    }`}
+                    onClick={() => onSelect(template.id)}
+                  >
+                    <TemplateThumbnail type={template.id} />
+                    <span className="template-name">{template.name}</span>
+                    {selected === template.id && (
+                      <span className="template-selected">
+                        <Check size={13} />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+          {!filtered.length && <div className="empty-search">没有匹配的图表</div>}
+        </div>
       </div>
     </div>
   );

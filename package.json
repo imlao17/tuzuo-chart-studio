@@ -25,7 +25,7 @@
     "desktop:mac:dir": "NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=false npm run build && electron-builder --mac --dir",
     "desktop:smoke": "npm run desktop:mac:dir && node --test tests/desktop-smoke.test.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && npm run build && node --test tests/rendered-html.test.mjs tests/desktop.test.mjs && npx tsx --test tests/behavior.test.mts",
+    "test": "npm run typecheck && npm run build && node --test tests/rendered-html.test.mjs tests/desktop.test.mjs && npx tsx --test tests/behavior.test.mts tests/render-smoke.test.mts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern release",
     "db:generate": "drizzle-kit generate"
   },

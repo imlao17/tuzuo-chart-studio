@@ -218,7 +218,9 @@ export function buildSymbolMapOption(ctx: RenderContext): RendererResult {
   return { series, geo: geoFrame(ctx) };
 }
 
-/** 地点热力地图: geo background + heat-weighted points at centroids. */
+/** 地点热力地图: geo background + heat-sized gradient dots at centroids.
+ *  (ECharts' HeatmapLayer on geo is canvas-only and throws under the SVG
+ *  renderer this app uses, so heat is expressed as scaled translucent dots.) */
 export function buildGeoHeatmapOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
   const { compact = false } = config;
@@ -227,20 +229,25 @@ export function buildGeoHeatmapOption(ctx: RenderContext): RendererResult {
   const series: SeriesOption[] = [
     {
       name: dataSeries[0]?.name ?? "热度",
-      type: "heatmap",
+      type: "scatter",
       coordinateSystem: "geo",
       data: categories
         .map((name, index) => {
           const centroid = resolveCentroids(ctx, [name])[0];
           if (!centroid) return null;
+          const value = Number.isFinite(values[index]) ? values[index] : 0;
           return {
             name,
-            value: [...centroid, Number.isFinite(values[index]) ? values[index] : 0],
+            value: [...centroid, value],
+            symbolSize: compact ? 10 : 14 + (value / maxValue) * 26,
           };
         })
         .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
-      pointSize: compact ? 8 : 18,
-      blurSize: compact ? 12 : 28,
+      itemStyle: {
+        opacity: 0.55,
+        shadowBlur: compact ? 4 : 14,
+        shadowColor: "rgba(22, 99, 235, 0.35)",
+      },
       label: { show: false },
       emphasis: { focus: "self" },
     } as SeriesOption,
@@ -317,7 +324,9 @@ export function buildFlowMapOption(ctx: RenderContext): RendererResult {
         color: colorFor(0, config),
         curveness: 0.25,
       },
-      effect: { show: !compact, period: 5, trailLength: 0.2, symbolSize: 3 },
+      // Trail effects are canvas-only; the SVG renderer drops them with a
+      // console warning, so they stay off entirely.
+      effect: { show: false },
       label: { show: false },
       emphasis: { focus: "self" },
     } as SeriesOption,

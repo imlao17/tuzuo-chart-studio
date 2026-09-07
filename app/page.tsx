@@ -62,6 +62,8 @@ import {
 import {
   type DataBindingRole,
   getTemplateDefinition,
+  type TemplateDefinition,
+  type ValidationContext,
 } from "./template-definition";
 import {
   downloadBlob,
@@ -1866,16 +1868,39 @@ export default function Home() {
   }
 
   function selectTemplate(type: ChartType) {
+    // Keep the user's data when its shape satisfies the new template, but
+    // auto-load the template's sample data otherwise — a template switch must
+    // always land on a visible chart, never an empty error state.
+    const nextDef = getTemplateDefinition(type);
+    const context: ValidationContext = {
+      parsed,
+      categoryColumn,
+      seriesColumns,
+      sourceColumn,
+      targetColumn,
+    };
+    const incompatible = nextDef.validators.some(
+      (validator) => validator.validate(context) !== null,
+    );
+    if (incompatible) {
+      const name =
+        CHART_TEMPLATES.find((template) => template.id === type)?.name ?? type;
+      loadSampleFor(nextDef, `已载入「${name}」示例数据`);
+    }
     setChartType(type);
     setTemplateOpen(false);
     setWorkspaceMode("preview");
   }
 
   function loadSample() {
-    // Load the current template's semantically appropriate sample data into the
+    loadSampleFor(templateDefinition, "已加载示例数据");
+  }
+
+  function loadSampleFor(def: TemplateDefinition, label: string) {
+    // Load the target template's semantically appropriate sample data into the
     // editor. Replaces the table and role bindings, but leaves styling
     // (palette, canvas, margins) untouched.
-    const { sampleData } = templateDefinition;
+    const { sampleData } = def;
     const sampleHeaders = sampleData.table[0] ?? [];
     const sampleNumeric = sampleData.seriesColumns;
     const firstText =
@@ -1889,7 +1914,7 @@ export default function Home() {
       firstText;
     const nextRoles: FieldRoles = {};
 
-    for (const binding of templateDefinition.dataBindings) {
+    for (const binding of def.dataBindings) {
       const roleDefault = sampleData.roleDefaults?.[binding.role];
       const stringDefault =
         typeof roleDefault === "string" ? roleDefault : undefined;
@@ -1920,11 +1945,7 @@ export default function Home() {
     const sampleProject = cloneProject(currentProject);
     sampleProject.tableData = sampleData.table.map((row) => [...row]);
     sampleProject.fieldRoles = cloneFieldRoles(nextRoles);
-    applyCheckpoint(
-      sampleProject,
-      JSON.stringify(sampleProject),
-      "已加载示例数据",
-    );
+    applyCheckpoint(sampleProject, JSON.stringify(sampleProject), label);
   }
 
   function toggleSeries(header: string) {

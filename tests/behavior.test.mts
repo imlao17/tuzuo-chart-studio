@@ -2161,13 +2161,16 @@ test("P100-11: symbol map plots centroid bubbles on the geo frame", () => {
 test("P100-11: geo heatmap plots heat-weighted points", () => {
   const option = renderSample("geoHeatmap");
   assert.ok(option.geo);
+  // Heat is expressed as scaled translucent dots (HeatmapLayer on geo is
+  // canvas-only and crashes the SVG renderer).
   const [heat] = seriesList(option) as Array<{
     type?: string;
     coordinateSystem?: string;
-    data?: Array<{ value: [number, number, number] }>;
+    data?: Array<{ value: [number, number, number]; symbolSize?: number }>;
   }>;
-  assert.equal(heat.type, "heatmap");
+  assert.equal(heat.type, "scatter");
   assert.equal(heat.coordinateSystem, "geo");
+  assert.ok(heat.data?.length, "heat points present");
   assert.ok(option.visualMap, "geo heat needs a value scale");
 });
 
