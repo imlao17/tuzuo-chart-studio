@@ -84,7 +84,11 @@ export type ChartType =
   | "stackedDot"
   | "ohlcBar"
   | "candleVolume"
-  | "splitAxisBar";
+  | "splitAxisBar"
+  | "halfDonut"
+  | "multiRing"
+  | "boxplotHorizontal"
+  | "densityHeatmap";
 
 export type ChartFamily = "line" | "area" | "bar" | "pie" | "other";
 
@@ -409,6 +413,8 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "pareto", name: "帕累托图", family: "bar" },
   { id: "combo", name: "柱线组合图", family: "other" },
   { id: "donut", name: "环形图", family: "pie" },
+  { id: "halfDonut", name: "半环形图", family: "pie" },
+  { id: "multiRing", name: "多层环形图", family: "pie" },
   { id: "pie", name: "饼图", family: "pie" },
   { id: "rose", name: "玫瑰图", family: "pie" },
   { id: "roseArea", name: "面积玫瑰图", family: "pie" },
@@ -442,6 +448,8 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "gauge", name: "仪表盘", family: "other" },
   { id: "radar", name: "雷达图", family: "other" },
   { id: "boxplot", name: "箱线图", family: "other" },
+  { id: "boxplotHorizontal", name: "水平箱线图", family: "other" },
+  { id: "densityHeatmap", name: "密度热力散点图", family: "other" },
   { id: "candlestick", name: "蜡烛图", family: "other" },
   { id: "sankey", name: "桑基图", family: "other" },
   { id: "groupedBar", name: "分组条形图", family: "bar" },

@@ -6,6 +6,7 @@
  * path, so export behavior remains consistent.
  */
 import type { EChartsOption, SeriesOption } from "echarts";
+import { buildPieOption } from "./pie";
 import { columnIndex, toNumber } from "../chart-model";
 import type { RenderContext } from "../template-definition";
 import {
@@ -1353,5 +1354,204 @@ export function buildCandleVolumeOption(ctx: RenderContext): RendererResult {
     grid,
     xAxis: [categoryAxisTop, { ...categoryAxisBottom, data: categories }],
     yAxis: [valueAxisTop, valueAxisBottom],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Flourish parity batch 8: pie/donut & boxplot extensions.
+// ---------------------------------------------------------------------------
+
+/** 半环形图: donut swept over the top half circle. */
+export function buildHalfDonutOption(ctx: RenderContext): RendererResult {
+  const result = buildPieOption(ctx);
+  const [pie] = result.series as Array<Record<string, unknown>>;
+  pie.startAngle = 180;
+  pie.endAngle = 360;
+  // Donut-style band pulled toward the top so the flat edge sits at the bottom.
+  pie.center = ["50%", "72%"];
+  pie.radius = ["46%", "74%"];
+  return result;
+}
+
+/** 多层环形图: one concentric ring per numeric column. */
+export function buildMultiRingOption(ctx: RenderContext): RendererResult {
+  const { config, categories, dataSeries, formatNumber } = ctx;
+  const { backgroundColor, transparent, compact = false } = config;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const { width, height, margins, title, subtitle } = config;
+  const legendVisible = !compact && config.showLegend;
+  const titleBlock = compact ? 0 : title || subtitle ? 74 : 12;
+  const legendPosition = config.legendPosition ?? "top";
+  const innerTop =
+    margins.top +
+    titleBlock +
+    (legendVisible && legendPosition === "top" ? LEGEND_HORIZONTAL_SPACE : 0);
+  const innerBottom =
+    margins.bottom +
+    (legendVisible && legendPosition === "bottom" ? LEGEND_HORIZONTAL_SPACE : 0);
+  const innerLeft =
+    margins.left +
+    (legendVisible && legendPosition === "left" ? LEGEND_VERTICAL_SPACE : 0);
+  const innerRight =
+    margins.right +
+    (legendVisible && legendPosition === "right" ? LEGEND_VERTICAL_SPACE : 0);
+  const innerHeight = Math.max(80, height - innerTop - innerBottom);
+  const innerWidth = Math.max(80, width - innerLeft - innerRight);
+  const centerX = ((innerLeft + innerWidth / 2) / width) * 100;
+  const centerY = ((innerTop + innerHeight / 2) / height) * 100;
+  const radiusPx = Math.max(42, Math.min(innerWidth, innerHeight) * 0.4);
+
+  const labelTextStyle = dataLabelTextStyle(config);
+  const ringCount = Math.max(1, dataSeries.length);
+  const innerHole = 0.18;
+  const bandThickness = (1 - innerHole) / ringCount;
+
+  const series: SeriesOption[] = dataSeries.map((series, index) => {
+    const innerRadius = radiusPx * (innerHole + index * bandThickness);
+    const outerRadius = radiusPx * (innerHole + (index + 1) * bandThickness) - 2;
+    const color = colorFor(index, config, series.name);
+    return {
+      name: series.name,
+      type: "pie",
+      radius: [innerRadius, Math.max(innerRadius + 4, outerRadius)],
+      center: [`${centerX}%`, `${centerY}%`],
+      data: categories.map((name, rowIndex) => ({
+        name,
+        value: Number.isFinite(series.data[rowIndex]) ? series.data[rowIndex] : 0,
+        itemStyle: { color, opacity: markOpacity },
+      })),
+      itemStyle: {
+        borderColor: transparent ? "rgba(255,255,255,0.82)" : backgroundColor,
+        borderWidth: compact ? 1 : 2,
+        borderRadius: compact ? 1 : 2,
+      },
+      label: {
+        show: !compact && config.showLabels && index === dataSeries.length - 1,
+        position: "outside",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const item = params as { name: string; value: number };
+          return `${item.name} ${formatNumber(item.value)}`;
+        },
+      },
+      emphasis: { focus: "series" },
+    } as SeriesOption;
+  });
+  return { series };
+}
+
+/** 水平箱线图: the boxplot path with value/category axes swapped. */
+export function buildBoxplotHorizontalOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const textColor = theme.text;
+  const xAxis = buildValueAxis(ctx, textColor, fontSize, compact);
+  const yAxis = {
+    ...buildCategoryAxis(ctx, textColor, fontSize, compact),
+    data: dataSeries.map((series) => series.name),
+  };
+
+  return {
+    xAxis,
+    yAxis,
+    series: [
+      {
+        name: "分布",
+        type: "boxplot",
+        itemStyle: {
+          color: "rgba(255,255,255,0.68)",
+          borderColor: colorFor(0, config),
+          borderWidth: compact ? 1 : 2,
+        },
+        label: labelOption(ctx, "right"),
+        data: dataSeries.map((series) => boxStats(series.data)),
+      } as SeriesOption,
+    ],
+  };
+}
+
+/** 密度热力散点图: 2-D binning of x/y pairs rendered as a heatmap. */
+export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { compact = false, theme, fontSize } = config;
+  const xs = dataSeries[0]?.data ?? [];
+  const ys = dataSeries[1]?.data ?? [];
+  const BINS = 10;
+  const xValues = xs.filter(Number.isFinite);
+  const yValues = ys.filter(Number.isFinite);
+  const xMin = xValues.length ? Math.min(...xValues) : 0;
+  const xMax = xValues.length ? Math.max(...xValues) : 1;
+  const yMin = yValues.length ? Math.min(...yValues) : 0;
+  const yMax = yValues.length ? Math.max(...yValues) : 1;
+  const xWidth = xMax > xMin ? (xMax - xMin) / BINS : 1;
+  const yWidth = yMax > yMin ? (yMax - yMin) / BINS : 1;
+
+  const counts = new Map<string, number>();
+  xs.forEach((x, index) => {
+    const y = ys[index];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const xi = Math.min(BINS - 1, Math.floor((x - xMin) / xWidth));
+    const yi = Math.min(BINS - 1, Math.floor((y - yMin) / yWidth));
+    const key = `${xi}-${yi}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+  const maxCount = Math.max(1, ...counts.values());
+  const data = [...counts.entries()].map(([key, count]) => {
+    const [xi, yi] = key.split("-").map(Number);
+    return [xi, yi, count];
+  });
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const xAxis = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    min: xMin,
+    max: xMax,
+    name: compact ? "" : dataSeries[0]?.name ?? "",
+  };
+  const yAxis = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    min: yMin,
+    max: yMax,
+    name: compact ? "" : dataSeries[1]?.name ?? "",
+  };
+  const series: SeriesOption[] = [
+    {
+      name: "密度",
+      type: "heatmap",
+      data,
+      label: {
+        show: !compact && config.showLabels,
+        ...labelTextStyle,
+        fontSize: Math.max(8, fontSize - 2),
+        formatter: (params: unknown) => {
+          const entry = params as { value: [number, number, number] };
+          return entry.value[2] > 0 ? String(entry.value[2]) : "";
+        },
+      },
+      itemStyle: {
+        borderColor: config.transparent ? "rgba(255,255,255,0.6)" : config.backgroundColor,
+        borderWidth: 1,
+        borderRadius: compact ? 1 : 3,
+      },
+    },
+  ];
+  return {
+    series,
+    xAxis,
+    yAxis,
+    visualMap: {
+      min: 0,
+      max: maxCount,
+      calculable: false,
+      show: !compact,
+      orient: "horizontal" as const,
+      left: "center",
+      bottom: 0,
+      inRange: {
+        color: [config.backgroundColor === "#ffffff" ? "#f0f4fa" : config.backgroundColor, colorFor(0, config)],
+      },
+      textStyle: { color: theme.text, fontSize },
+    },
+    tooltipTrigger: "item",
   };
 }

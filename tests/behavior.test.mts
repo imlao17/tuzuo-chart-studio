@@ -510,7 +510,7 @@ test("single numeric column passes generic templates but fails role-specific tem
   };
   for (const type of ALL_TYPES) {
     const err = firstError(type, ctx);
-    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart", "groupedScatter", "quadrant", "trendScatter", "correlationMatrix", "dumbbell"].includes(type)) {
+    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart", "groupedScatter", "quadrant", "trendScatter", "correlationMatrix", "dumbbell", "densityHeatmap"].includes(type)) {
       assert.ok(err && err.includes("2 个数值列"), `${type}: expected 2-column error, got ${err}`);
     } else if (["bandArea", "bubble", "errorBar"].includes(type)) {
       assert.ok(err && err.includes("3 个数值列"), `${type}: expected 3-column error, got ${err}`);
@@ -1897,4 +1897,68 @@ test("P100-7: split-axis bars isolate outliers in an upper zoomed grid", () => {
   const grid = option.grid as unknown[];
   assert.equal(grid.length, 2, "split axis needs two grids");
   assert.notEqual(sig(renderSample("splitAxisBar", { showLabels: false })), sig(renderSample("splitAxisBar", { showLabels: true })));
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 8 — pie/boxplot extensions.
+// ---------------------------------------------------------------------------
+
+test("P100-8: half donut sweeps a top semicircle", () => {
+  const option = renderSample("halfDonut");
+  const [pie] = seriesList(option) as Array<{
+    type?: string;
+    startAngle?: number;
+    endAngle?: number;
+    center?: string[];
+    radius?: number[];
+  }>;
+  assert.equal(pie.type, "pie");
+  assert.equal(pie.startAngle, 180);
+  assert.equal(pie.endAngle, 360);
+  assert.ok((pie.center?.[1] ?? "") === "72%", "flat edge pinned toward the bottom");
+  assert.deepEqual(pie.radius?.length, 2, "half donut is a ring");
+  assert.notEqual(sig(renderSample("halfDonut", { showLabels: false })), sig(renderSample("halfDonut", { showLabels: true })));
+});
+
+test("P100-8: multi-ring draws one concentric ring per series", () => {
+  const option = renderSample("multiRing");
+  const series = seriesList(option) as Array<{
+    type?: string;
+    radius?: number[];
+    data?: unknown[];
+  }>;
+  assert.equal(series.length, 2, "one ring per numeric column");
+  for (const ring of series) {
+    assert.equal(ring.type, "pie");
+    assert.deepEqual(ring.radius?.length, 2);
+    assert.ok((ring.radius?.[0] ?? 0) < (ring.radius?.[1] ?? 0), "inner < outer radius");
+  }
+  // Rings must be concentric: same center, non-overlapping radii (a small
+  // border gap of 2px is allowed between bands).
+  assert.ok(
+    (series[0]?.radius?.[1] ?? 0) <= (series[1]?.radius?.[0] ?? 0),
+    "ring 0 must not overlap ring 1",
+  );
+  assert.notEqual(sig(renderSample("multiRing", { showLabels: false })), sig(renderSample("multiRing", { showLabels: true })));
+});
+
+test("P100-8: horizontal boxplot swaps the axes", () => {
+  const option = renderSample("boxplotHorizontal");
+  const [box] = seriesList(option) as Array<{ type?: string; data?: number[][] }>;
+  assert.equal(box.type, "boxplot");
+  assert.equal((option.xAxis as { type?: string }).type, "value", "value axis on x");
+  assert.equal((option.yAxis as { type?: string }).type, "category", "category axis on y");
+  assert.equal(box.data?.length, 3, "one box per distribution column");
+  assert.notEqual(sig(renderSample("boxplotHorizontal", { showLabels: false })), sig(renderSample("boxplotHorizontal", { showLabels: true })));
+});
+
+test("P100-8: density heatmap bins x/y pairs into a count grid", () => {
+  const option = renderSample("densityHeatmap");
+  const [heat] = seriesList(option) as Array<{ type?: string; data?: [number, number, number][] }>;
+  assert.equal(heat.type, "heatmap");
+  const rows = getTemplateDefinition("densityHeatmap").sampleData.table.length - 1;
+  const total = (heat.data ?? []).reduce((sum, [, , count]) => sum + count, 0);
+  assert.equal(total, rows, "every row lands in exactly one bin");
+  assert.ok(option.visualMap, "density grid needs a value scale");
+  assert.notEqual(sig(renderSample("densityHeatmap", { showLabels: false })), sig(renderSample("densityHeatmap", { showLabels: true })));
 });

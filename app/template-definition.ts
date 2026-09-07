@@ -13,8 +13,11 @@
  */
 import type { ChartConfig, ChartFamily, ChartType } from "./chart-model";
 import {
+  buildBoxplotHorizontalOption,
   buildBoxplotOption,
   buildCalendarHeatmapOption,
+  buildDensityHeatmapOption,
+  buildHalfDonutOption,
   buildCandlestickOption,
   buildCorrelationMatrixOption,
   buildDotPlotOption,
@@ -25,6 +28,7 @@ import {
   buildHeatmapOption,
   buildCandleVolumeOption,
   buildMarimekkoOption,
+  buildMultiRingOption,
   buildOhlcBarOption,
   buildParallelOption,
   buildRadarOption,
@@ -1299,6 +1303,40 @@ const SAMPLE_CANDLE_VOLUME: SampleData = {
   seriesColumns: ["开盘", "收盘", "最低", "最高", "成交量"],
 };
 
+// --- Batch-8 (Flourish parity) sample data ---------------------------------
+
+const SAMPLE_MULTI_RING: SampleData = {
+  table: [
+    ["渠道", "线上店", "自营门店"],
+    ["家电", "360", "290"],
+    ["数码", "420", "240"],
+    ["家居", "250", "310"],
+    ["服饰", "480", "180"],
+  ],
+  categoryColumn: "渠道",
+  seriesColumns: ["线上店", "自营门店"],
+};
+
+const SAMPLE_DENSITY: SampleData = {
+  table: [
+    ["门店", "客流 千", "销售额 万"],
+    ["门店 A", "12", "86"],
+    ["门店 B", "18", "120"],
+    ["门店 C", "22", "146"],
+    ["门店 D", "30", "205"],
+    ["门店 E", "26", "188"],
+    ["门店 F", "35", "242"],
+    ["门店 G", "40", "288"],
+    ["门店 H", "48", "330"],
+    ["门店 I", "55", "402"],
+    ["门店 J", "61", "455"],
+    ["门店 K", "9", "58"],
+    ["门店 L", "15", "104"],
+  ],
+  categoryColumn: "门店",
+  seriesColumns: ["客流 千", "销售额 万"],
+};
+
 const SAMPLE_SPLIT_AXIS: SampleData = {
   table: [
     ["月份", "销售额 万"],
@@ -1587,6 +1625,26 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
   },
 
   // --- Pie / donut family (migrated) --------------------------------------
+  halfDonut: {
+    id: "halfDonut",
+    family: "pie",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: PIE_GROUPS,
+    capabilities: CAP_PIE,
+    buildOption: buildHalfDonutOption,
+    sampleData: SAMPLE_GAUGE,
+  },
+  multiRing: {
+    id: "multiRing",
+    family: "pie",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: PIE_GROUPS,
+    capabilities: CAP_PIE,
+    buildOption: buildMultiRingOption,
+    sampleData: SAMPLE_MULTI_RING,
+  },
   donut: {
     id: "donut",
     family: "pie",
@@ -2320,6 +2378,31 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_CARTESIAN,
     buildOption: buildSplitAxisOption,
     sampleData: SAMPLE_SPLIT_AXIS,
+  },
+
+  // --- Pie/boxplot extensions (Flourish parity batch 8) --------------------
+  boxplotHorizontal: {
+    id: "boxplotHorizontal",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_DISTRIBUTION_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_CARTESIAN_NO_LEGEND,
+    buildOption: buildBoxplotHorizontalOption,
+    sampleData: SAMPLE_DISTRIBUTION,
+  },
+  densityHeatmap: {
+    id: "densityHeatmap",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_X, BIND_Y],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("密度热力散点图需要 2 个数值列（X 和 Y）"),
+    ],
+    settingsGroups: CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_CARTESIAN_NO_LEGEND,
+    buildOption: buildDensityHeatmapOption,
+    sampleData: SAMPLE_DENSITY,
   },
 };
 

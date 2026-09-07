@@ -74,7 +74,7 @@
 | 5 | 层级与网络 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 hierarchy/network chart templates…"） | 新建 `renderers/hierarchy.ts`、`renderers/network.ts`；冲积图复用 sankey 渲染路径（差异在多阶段示例数据）；弦图用 ECharts 6.1 内置 chord 系列 |
 | 6 | 统计与分布 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 statistical/distribution chart templates…"） | violin/marimekko 两个 P2 均已完成（custom 系列 renderItem）；shared.ts 增加 parallel/parallelAxis/calendar 通道；平行坐标/小提琴/马赛克无数据标签面，showLabels 通用测试已豁免 |
 | 7 | 条柱线补充变体 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 bar/column variant chart templates…"） | splitAxisBar 这个 P2 已完成（双 grid 拆分离群值）；shared.ts 增加 grid 显式通道（candleVolume 双面板）；OHLC/蜡烛量无标签面已豁免 showLabels |
-| 8 | 环饼与箱线补充 | 4 | 待开始 | — | — | |
+| 8 | 环饼与箱线补充 | 4 | 已完成 | 2026-09-07 | 随本批提交（"Add 4 pie/boxplot extension chart templates…"） | 半环形图为 pie 渲染的 patch（180°–360° 扫掠）；多层环形每列一环 |
 | 9 | 卡片、表格与文字 | 5 | 待开始 | — | — | 词云需依赖决策 |
 | 10 | 时间与分面 | 3 | 待开始 | — | — | 小倍数是本批难点 |
 | 11 | 地图家族 | 5 | 待开始 | — | — | **先做 GeoJSON 基础设施决策（见批次说明）** |
@@ -177,10 +177,10 @@
 
 | # | 中文名 | id | ECharts 方案 | 数据绑定要点 | 状态 |
 |---|---|---|---|---|---|
-| 54 | 半环形图 | `halfDonut` | pie，startAngle/endAngle 半圆 | 分类 + 1 数值列 | 待做 |
-| 55 | 多层环形图 | `multiRing` | 多个 pie 同心不同半径 | 分类 + 多数值列（每列一环） | 待做 |
-| 56 | 水平箱线图 | `boxplotHorizontal` | boxplot 转置 | 复用现有箱线图绑定 | 待做 |
-| 57 | 密度热力散点图 | `densityHeatmap` | heatmap（2D 分箱）替代海量散点 | x、y 2 数值列 | 待做 |
+| 54 | 半环形图 | `halfDonut` | pie，startAngle/endAngle 半圆 | 分类 + 1 数值列 | 完成 |
+| 55 | 多层环形图 | `multiRing` | 多个 pie 同心不同半径 | 分类 + 多数值列（每列一环） | 完成 |
+| 56 | 水平箱线图 | `boxplotHorizontal` | boxplot 转置 | 复用现有箱线图绑定 | 完成 |
+| 57 | 密度热力散点图 | `densityHeatmap` | heatmap（2D 分箱）替代海量散点 | x、y 2 数值列 | 完成 |
 
 ### 批次 9 · 卡片、表格与文字（新 cards.ts / table.ts，family: "other"）
 
