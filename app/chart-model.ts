@@ -44,6 +44,11 @@ export type ChartType =
   | "polarLine"
   | "polarArea"
   | "scatter"
+  | "bubble"
+  | "groupedScatter"
+  | "quadrant"
+  | "trendScatter"
+  | "beeswarm"
   | "divergingBar"
   | "populationPyramid"
   | "streamgraph"
@@ -390,6 +395,11 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "polarLine", name: "极坐标折线图", family: "pie" },
   { id: "polarArea", name: "极坐标面积图", family: "pie" },
   { id: "scatter", name: "散点图", family: "other" },
+  { id: "bubble", name: "气泡图", family: "other" },
+  { id: "groupedScatter", name: "分组散点图", family: "other" },
+  { id: "quadrant", name: "象限图", family: "other" },
+  { id: "trendScatter", name: "回归散点图", family: "other" },
+  { id: "beeswarm", name: "蜂群图", family: "other" },
   { id: "divergingBar", name: "发散条形图", family: "other" },
   { id: "populationPyramid", name: "人口金字塔", family: "other" },
   { id: "streamgraph", name: "河流图", family: "area" },

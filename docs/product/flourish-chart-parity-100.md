@@ -70,7 +70,7 @@
 | 1 | 条形/柱状扩展 | 10 | 已完成 | 2026-09-07 | `6d28dc3` | 密度直方图与象形柱状图两个 P2 均已完成；象形柱状图的「每单位代表值」暂不可配置（单位符号固定 10px 高 + 2px 间距），后续批次可补 |
 | 2 | 折线/面积扩展 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 line/area chart templates…"） | 点线图/平滑面积图/阶梯面积图复用既有 line-area 路径；双轴折线/斜率/区间面积/脊线/凹凸为独立构造器 |
 | 3 | 径向/极坐标家族 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 radial/polar chart templates…"） | 新建 `renderers/radial.ts`；shared.ts 的 RendererResult 扩展了 polar/angleAxis/radiusAxis/graphic 通道（对既有模板零影响） |
-| 4 | 散点/气泡扩展 | 5 | 待开始 | — | — | |
+| 4 | 散点/气泡扩展 | 5 | 已完成 | 2026-09-07 | 随本批提交（"Add 5 scatter/bubble chart templates…"） | bubble/trendScatter 为 scatter 的配置注入包装器；象限图中线取中位数（均值可配置项留待后续） |
 | 5 | 层级与网络 | 8 | 待开始 | — | — | 新建 `renderers/hierarchy.ts`、`renderers/network.ts` |
 | 6 | 统计与分布 | 7 | 待开始 | — | — | 含 2 个 P2 |
 | 7 | 条柱线补充变体 | 8 | 待开始 | — | — | 含 1 个 P2 |
@@ -129,11 +129,11 @@
 
 | # | 中文名 | id | ECharts 方案 | 数据绑定要点 | 状态 |
 |---|---|---|---|---|---|
-| 26 | 气泡图 | `bubble` | scatter + sizeColumn 默认绑定 | x、y、size 3 数值列 | 待做 |
-| 27 | 分组散点图 | `groupedScatter` | scatter，按 colorColumn 拆成多系列 | x、y + 分类列（颜色） | 待做 |
-| 28 | 象限图 | `quadrant` | scatter + markArea 四象限底色 + 中线 | x、y 2 数值列；中值（均值/中位数/手动）可配 | 待做 |
-| 29 | 回归散点图 | `trendScatter` | scatter + 最小二乘趋势线（默认开启） | x、y 2 数值列（复用 `scatterTrendLine`） | 待做 |
-| 30 | 蜂群图 | `beeswarm` | scatter，确定性一维抖动（排序 + 圆堆积） | 分类 + 1 数值列 | 待做 |
+| 26 | 气泡图 | `bubble` | scatter + sizeColumn 默认绑定 | x、y、size 3 数值列 | 完成 |
+| 27 | 分组散点图 | `groupedScatter` | scatter，按 colorColumn 拆成多系列 | x、y + 分类列（颜色） | 完成 |
+| 28 | 象限图 | `quadrant` | scatter + markArea 四象限底色 + 中线 | x、y 2 数值列；中值（均值/中位数/手动）可配 | 完成 |
+| 29 | 回归散点图 | `trendScatter` | scatter + 最小二乘趋势线（默认开启） | x、y 2 数值列（复用 `scatterTrendLine`） | 完成 |
+| 30 | 蜂群图 | `beeswarm` | scatter，确定性一维抖动（排序 + 圆堆积） | 分类 + 1 数值列 | 完成 |
 
 ### 批次 5 · 层级与网络（新 hierarchy.ts / network.ts，family: "other"）
 

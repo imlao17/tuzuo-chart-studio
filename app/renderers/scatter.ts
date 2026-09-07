@@ -199,3 +199,220 @@ export function buildScatterOption(ctx: RenderContext): RendererResult {
 
   return { series, xAxis, yAxis };
 }
+
+// ---------------------------------------------------------------------------
+// Flourish parity batch 4: scatter/bubble extensions.
+// ---------------------------------------------------------------------------
+
+/** Numeric columns actually selected (names), in order. Shared by wrappers. */
+function selectedNumericColumns(ctx: RenderContext): string[] {
+  const valid = ctx.config.seriesColumns.filter((header) =>
+    ctx.config.parsed.numericHeaders.includes(header),
+  );
+  return valid.length ? valid : ctx.config.parsed.numericHeaders.slice(0, 1);
+}
+
+/** 气泡图: scatter where the third numeric column (or an explicit sizeColumn)
+ *  drives per-point bubble size. */
+export function buildBubbleOption(ctx: RenderContext): RendererResult {
+  const selected = selectedNumericColumns(ctx);
+  const sizeCandidate = selected[2];
+  return buildScatterOption({
+    ...ctx,
+    config: { ...ctx.config, sizeColumn: ctx.config.sizeColumn ?? sizeCandidate },
+  });
+}
+
+/** 回归散点图: scatter with the least-squares trend line forced on. */
+export function buildTrendScatterOption(ctx: RenderContext): RendererResult {
+  return buildScatterOption({
+    ...ctx,
+    config: { ...ctx.config, scatterTrendLine: true },
+  });
+}
+
+/** 象限图: scatter with median cross lines shading the four quadrants. */
+export function buildQuadrantOption(ctx: RenderContext): RendererResult {
+  const result = buildScatterOption(ctx);
+  const { config } = ctx;
+  const selected = selectedNumericColumns(ctx);
+  const xIndex = columnIndex(config.parsed.headers, selected[0] ?? "");
+  const yIndex = columnIndex(config.parsed.headers, selected[1] ?? "");
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const row of config.parsed.rows) {
+    const x = toNumber(row[xIndex]);
+    const y = toNumber(row[yIndex]);
+    if (Number.isFinite(x)) xs.push(x);
+    if (Number.isFinite(y)) ys.push(y);
+  }
+  const median = (values: number[]) => {
+    if (!values.length) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  const medX = median(xs);
+  const medY = median(ys);
+  const [scatterSeries] = result.series;
+  (scatterSeries as { markLine?: unknown }).markLine = {
+    silent: true,
+    symbol: ["none", "none"],
+    lineStyle: { type: "dashed" as const, color: config.theme.grid },
+    label: { show: false },
+    data: [{ xAxis: medX }, { yAxis: medY }],
+  };
+  (scatterSeries as { markArea?: unknown }).markArea = {
+    silent: true,
+    data: [
+      [
+        { itemStyle: { color: "rgba(22, 99, 235, 0.06)" }, xAxis: medX, yAxis: medY },
+        { xAxis: "max", yAxis: "max" },
+      ],
+      [
+        { itemStyle: { color: "rgba(22, 99, 235, 0.06)" }, xAxis: "min", yAxis: "min" },
+        { xAxis: medX, yAxis: medY },
+      ],
+    ],
+  };
+  return result;
+}
+
+/** 分组散点图: one series per category value so groups get legend entries and
+ *  their own palette slot. */
+export function buildGroupedScatterOption(ctx: RenderContext): RendererResult {
+  const { config, categories } = ctx;
+  const { parsed, theme, fontSize, compact = false } = config;
+  const pointSize = config.pointSize ?? 7;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const selected = selectedNumericColumns(ctx);
+  const xIndex = columnIndex(parsed.headers, selected[0] ?? "");
+  const yIndex = columnIndex(parsed.headers, selected[1] ?? "");
+
+  const textColor = theme.text;
+  const labelTextStyle = dataLabelTextStyle(config);
+  const xAxis = buildValueAxis(ctx, textColor, fontSize, compact);
+  const yAxis = buildValueAxis(ctx, textColor, fontSize, compact);
+
+  // Group rows by category value in first-seen order; deterministic mapping.
+  const groups: Array<{ name: string; points: [number, number][] }> = [];
+  const indexOfGroup: Record<string, number> = {};
+  parsed.rows.forEach((row, rowIndex) => {
+    const name = categories[rowIndex] ?? "";
+    if (!(name in indexOfGroup)) {
+      indexOfGroup[name] = groups.length;
+      groups.push({ name, points: [] });
+    }
+    groups[indexOfGroup[name]].points.push([
+      toNumber(row[xIndex]),
+      toNumber(row[yIndex]),
+    ]);
+  });
+
+  const series: SeriesOption[] = groups.map((group, index) => ({
+    name: group.name,
+    type: "scatter",
+    symbolSize: compact ? 7 : pointSize,
+    itemStyle: { color: colorFor(index, config, group.name), opacity: markOpacity },
+    label: {
+      show: compact ? false : config.showLabels,
+      position: resolveDataLabelPosition(config, "top"),
+      ...labelTextStyle,
+      formatter: () => group.name,
+    },
+    data: group.points.map(([x, y]) => [x, y]),
+  } as SeriesOption));
+  return { series, xAxis, yAxis };
+}
+
+/** 蜂群图: deterministic one-dimensional beeswarm. Within each category the
+ *  points are sorted and greedily nudged sideways so circles never overlap. */
+export function buildBeeswarmOption(ctx: RenderContext): RendererResult {
+  const { config, categories, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const pointSize = config.pointSize ?? 7;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const values = dataSeries[0]?.data ?? [];
+  const categoryIndex: Record<string, number> = {};
+  categories.forEach((name) => {
+    if (!(name in categoryIndex)) categoryIndex[name] = Object.keys(categoryIndex).length;
+  });
+
+  const finite = values.filter(Number.isFinite);
+  const valueMax = finite.length ? Math.max(...finite) : 1;
+  const valueMin = finite.length ? Math.min(...finite) : 0;
+  const valueRange = Math.max(valueMax - valueMin, 1);
+  const maxPerCategory = (() => {
+    const counts: Record<string, number> = {};
+    for (const name of categories) counts[name] = (counts[name] ?? 0) + 1;
+    return Math.max(1, ...Object.values(counts));
+  })();
+  // Half a slot-width as the point radius keeps stacked circles inside their
+  // category band; the sideways unit matches value units for collision math.
+  const slotWidth = valueRange / maxPerCategory;
+  const radius = slotWidth / 2;
+
+  const placedByCategory: Record<string, Array<{ y: number; x: number }>> = {};
+  const data = values.map((value, rowIndex) => {
+    const category = categories[rowIndex] ?? "";
+    const bucket = (placedByCategory[category] ??= []);
+    if (!Number.isFinite(value)) return [categoryIndex[category] ?? 0, value];
+    // Greedy beeswarm: try offsets 0, ±step, ±2step ... pick the first with
+    // no overlap against already-placed points of the same category.
+    const step = radius * 0.9;
+    let chosenX = 0;
+    outer: for (let k = 0; k < 64; k += 1) {
+      for (const candidate of (k === 0 ? [0] : [k * step, -k * step])) {
+        const collides = bucket.some(
+          (placed) =>
+            (placed.y - value) * (placed.y - value) +
+              (placed.x - candidate) * (placed.x - candidate) <
+            (2 * radius) * (2 * radius) * 0.98,
+        );
+        if (!collides) {
+          chosenX = candidate;
+          break outer;
+        }
+      }
+    }
+    bucket.push({ y: value, x: chosenX });
+    return [(categoryIndex[category] ?? 0) + chosenX / slotWidth, value];
+  });
+
+  const textColor = theme.text;
+  const labelTextStyle = dataLabelTextStyle(config);
+  const xAxis = {
+    ...buildValueAxis(ctx, textColor, fontSize, compact),
+    max: Math.max(0.5, Object.keys(categoryIndex).length - 0.5),
+    min: -0.5,
+    interval: 1,
+    axisLabel: {
+      ...((buildValueAxis(ctx, textColor, fontSize, compact) as { axisLabel?: Record<string, unknown> }).axisLabel ?? {}),
+      formatter: (value: number) => {
+        const names = Object.keys(categoryIndex);
+        const index = Math.round(value);
+        return names[index] ?? "";
+      },
+    },
+  };
+  const yAxis = buildValueAxis(ctx, textColor, fontSize, compact);
+  const series: SeriesOption[] = [
+    {
+      name: dataSeries[0]?.name ?? "数值",
+      type: "scatter",
+      symbolSize: compact ? 6 : pointSize + 5,
+      itemStyle: { color: colorFor(0, config), opacity: markOpacity },
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "top",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const item = params as { dataIndex: number };
+          return categories[item.dataIndex] ?? "";
+        },
+      },
+      data,
+    } as SeriesOption,
+  ];
+  return { series, xAxis, yAxis };
+}

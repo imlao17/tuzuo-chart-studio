@@ -52,7 +52,14 @@ import {
   buildRadialBarOption,
   buildRoseOption,
 } from "./renderers/radial";
-import { buildScatterOption } from "./renderers/scatter";
+import {
+  buildBeeswarmOption,
+  buildBubbleOption,
+  buildGroupedScatterOption,
+  buildQuadrantOption,
+  buildScatterOption,
+  buildTrendScatterOption,
+} from "./renderers/scatter";
 import { buildStreamgraphOption } from "./renderers/streamgraph";
 import { buildWithRenderer, type RendererResult } from "./renderers/shared";
 import {
@@ -902,6 +909,90 @@ const SAMPLE_POLAR_LINE: SampleData = {
   seriesColumns: ["今年", "去年"],
 };
 
+// --- Batch-4 (Flourish parity) sample data ---------------------------------
+
+const SAMPLE_BUBBLE: SampleData = {
+  table: [
+    ["城市", "平均收入 万", "生活成本 万", "人口 万"],
+    ["城市 A", "32", "18", "2100"],
+    ["城市 B", "41", "26", "3400"],
+    ["城市 C", "27", "14", "980"],
+    ["城市 D", "48", "31", "5600"],
+    ["城市 E", "22", "11", "650"],
+    ["城市 F", "36", "21", "1800"],
+    ["城市 G", "52", "35", "7200"],
+  ],
+  categoryColumn: "城市",
+  seriesColumns: ["平均收入 万", "生活成本 万", "人口 万"],
+};
+
+const SAMPLE_GROUPED_SCATTER: SampleData = {
+  table: [
+    ["品种", "花瓣长 cm", "花瓣宽 cm"],
+    ["品种 A", "1.4", "0.2"],
+    ["品种 A", "1.7", "0.4"],
+    ["品种 A", "1.3", "0.3"],
+    ["品种 B", "4.7", "1.4"],
+    ["品种 B", "4.2", "1.5"],
+    ["品种 B", "5.1", "1.8"],
+    ["品种 A", "1.5", "0.1"],
+    ["品种 B", "4.4", "1.2"],
+  ],
+  categoryColumn: "品种",
+  seriesColumns: ["花瓣长 cm", "花瓣宽 cm"],
+};
+
+const SAMPLE_QUADRANT: SampleData = {
+  table: [
+    ["产品", "价格", "满意度"],
+    ["产品 A", "88", "92"],
+    ["产品 B", "45", "78"],
+    ["产品 C", "120", "66"],
+    ["产品 D", "62", "84"],
+    ["产品 E", "95", "48"],
+    ["产品 F", "30", "35"],
+    ["产品 G", "70", "72"],
+    ["产品 H", "55", "58"],
+  ],
+  categoryColumn: "产品",
+  seriesColumns: ["价格", "满意度"],
+};
+
+const SAMPLE_TREND: SampleData = {
+  table: [
+    ["门店", "广告投入 万", "销售额 万"],
+    ["门店 A", "12", "148"],
+    ["门店 B", "25", "196"],
+    ["门店 C", "8", "121"],
+    ["门店 D", "31", "228"],
+    ["门店 E", "18", "170"],
+    ["门店 F", "42", "265"],
+    ["门店 G", "15", "158"],
+  ],
+  categoryColumn: "门店",
+  seriesColumns: ["广告投入 万", "销售额 万"],
+};
+
+const SAMPLE_BEESWARM: SampleData = {
+  table: [
+    ["班级", "分数"],
+    ["一班", "88"],
+    ["一班", "92"],
+    ["一班", "76"],
+    ["一班", "84"],
+    ["二班", "71"],
+    ["二班", "95"],
+    ["二班", "83"],
+    ["二班", "67"],
+    ["三班", "79"],
+    ["三班", "90"],
+    ["三班", "86"],
+    ["三班", "74"],
+  ],
+  categoryColumn: "班级",
+  seriesColumns: ["分数"],
+};
+
 // --- Shared validators -----------------------------------------------------
 // Each returns null (pass) or a human-readable error string. Validators read
 // only the ValidationContext (parsed table + resolved categoryColumn /
@@ -1439,6 +1530,70 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_CARTESIAN,
     buildOption: buildScatterOption,
     sampleData: SAMPLE_SCATTER,
+  },
+
+  // --- Scatter/bubble extensions (Flourish parity batch 4) -----------------
+  bubble: {
+    id: "bubble",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_X, BIND_Y, BIND_SIZE],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireThreeNumericColumns("气泡图需要 3 个数值列（X、Y 和大小）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildBubbleOption,
+    sampleData: SAMPLE_BUBBLE,
+  },
+  groupedScatter: {
+    id: "groupedScatter",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_X, BIND_Y],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("分组散点图需要 2 个数值列（X 和 Y）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildGroupedScatterOption,
+    sampleData: SAMPLE_GROUPED_SCATTER,
+  },
+  quadrant: {
+    id: "quadrant",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_X, BIND_Y],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("象限图需要 2 个数值列（X 和 Y）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildQuadrantOption,
+    sampleData: SAMPLE_QUADRANT,
+  },
+  trendScatter: {
+    id: "trendScatter",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_X, BIND_Y],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("回归散点图需要 2 个数值列（X 和 Y）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildTrendScatterOption,
+    sampleData: SAMPLE_TREND,
+  },
+  beeswarm: {
+    id: "beeswarm",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildBeeswarmOption,
+    sampleData: SAMPLE_BEESWARM,
   },
 
   // --- Diverging / population pyramid family (migrated) -------------------

@@ -507,9 +507,9 @@ test("single numeric column passes generic templates but fails role-specific tem
   };
   for (const type of ALL_TYPES) {
     const err = firstError(type, ctx);
-    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart"].includes(type)) {
+    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart", "groupedScatter", "quadrant", "trendScatter"].includes(type)) {
       assert.ok(err && err.includes("2 个数值列"), `${type}: expected 2-column error, got ${err}`);
-    } else if (type === "bandArea") {
+    } else if (type === "bandArea" || type === "bubble") {
       assert.ok(err && err.includes("3 个数值列"), `${type}: expected 3-column error, got ${err}`);
     } else if (type === "candlestick") {
       assert.ok(err && err.includes("4 个数值列"), `${type}: expected OHLC error, got ${err}`);
@@ -1517,4 +1517,83 @@ test("P100-3: polar line hybrids plot on the polar frame", () => {
   const areaSeries = seriesList(area) as Array<{ areaStyle?: Record<string, unknown> }>;
   assert.ok(areaSeries[0]?.areaStyle, "polar area must fill");
   assert.notEqual(sig(line), sig(renderSample("polarLine", { showLabels: false })));
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 4 — scatter/bubble extensions.
+// ---------------------------------------------------------------------------
+
+test("P100-4: bubble chart drives per-point size from the third column", () => {
+  const [bubble] = seriesList(renderSample("bubble")) as Array<{
+    data?: Array<{ symbolSize?: number } | [number, number]>;
+  }>;
+  const sizes = (bubble.data ?? []).map((entry) =>
+    Array.isArray(entry) ? undefined : entry.symbolSize,
+  );
+  assert.ok(sizes.some((size) => size !== undefined), "bubble points must carry per-point sizes");
+  assert.ok(
+    sizes.some((size) => size !== undefined && size > 20),
+    "larger populations must map to bigger bubbles",
+  );
+  assert.notEqual(sig(renderSample("bubble", { markOpacity: 40 })), sig(renderSample("bubble", { markOpacity: 90 })));
+});
+
+test("P100-4: grouped scatter emits one series per group", () => {
+  const option = renderSample("groupedScatter");
+  const series = seriesList(option) as Array<{ name?: string; type?: string }>;
+  assert.deepEqual(
+    series.map((item) => item.name),
+    ["品种 A", "品种 B"],
+    "one series per category value, first-seen order",
+  );
+  for (const item of series) assert.equal(item.type, "scatter");
+  assert.notEqual(sig(renderSample("groupedScatter", { showLabels: false })), sig(renderSample("groupedScatter", { showLabels: true })));
+  // Editing a row moves its point (data-change redraw for the transpose path).
+  const { sampleData } = getTemplateDefinition("groupedScatter");
+  const table = sampleData.table.map((row) => [...row]);
+  table[1][2] = "0.9";
+  assert.notEqual(
+    sig(option),
+    sig(buildChartOption(baseConfig({
+      type: "groupedScatter",
+      parsed: tableToParsed(table),
+      categoryColumn: sampleData.categoryColumn,
+      seriesColumns: sampleData.seriesColumns,
+    }))),
+  );
+});
+
+test("P100-4: quadrant chart adds median cross lines and tinted quadrants", () => {
+  const option = renderSample("quadrant");
+  const [scatterSeries] = seriesList(option) as Array<{
+    markLine?: { data?: unknown[] };
+    markArea?: { data?: unknown[] };
+  }>;
+  assert.equal(scatterSeries.markLine?.data?.length, 2, "one vertical + one horizontal median line");
+  assert.ok(scatterSeries.markArea?.data?.length, "quadrant tints must be present");
+  assert.notEqual(sig(renderSample("quadrant")), sig(renderSample("quadrant", { showTooltip: false })));
+});
+
+test("P100-4: trend scatter draws its least-squares line by default", () => {
+  const [scatterSeries] = seriesList(renderSample("trendScatter")) as Array<{
+    markLine?: { data?: Array<[unknown, unknown]> };
+  }>;
+  const segments = scatterSeries.markLine?.data ?? [];
+  assert.equal(segments.length, 1, "one two-point trend segment");
+  // Plain scatter keeps the line off by default.
+  const plain = seriesList(renderSample("scatter")) as Array<{ markLine?: unknown }>;
+  assert.equal(plain[0]?.markLine, undefined);
+});
+
+test("P100-4: beeswarm packs points without collisions", () => {
+  const option = renderSample("beeswarm");
+  const [swarm] = seriesList(option) as Array<{ type?: string; data?: [number, number][] }>;
+  assert.equal(swarm.type, "scatter");
+  const rows = getTemplateDefinition("beeswarm").sampleData.table.length - 1;
+  assert.equal(swarm.data?.length, rows);
+  // Points are nudged sideways: x coordinates cluster near integer category
+  // indices but some carry a fractional offset.
+  const xs = (swarm.data ?? []).map(([x]) => x);
+  assert.ok(xs.some((x) => Math.abs(x - Math.round(x)) > 0.01), "expected sideways packing offsets");
+  assert.notEqual(sig(renderSample("beeswarm", { showLabels: false })), sig(renderSample("beeswarm", { showLabels: true })));
 });
