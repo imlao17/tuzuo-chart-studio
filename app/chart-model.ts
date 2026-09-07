@@ -93,7 +93,10 @@ export type ChartType =
   | "kpiCardRow"
   | "sparklineCard"
   | "barTable"
-  | "wordCloud";
+  | "wordCloud"
+  | "gantt"
+  | "timeline"
+  | "smallMultiples";
 
 export type ChartFamily = "line" | "area" | "bar" | "pie" | "other";
 
@@ -462,6 +465,9 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "sparklineCard", name: "趋势迷你卡", family: "other" },
   { id: "barTable", name: "条形表格图", family: "other" },
   { id: "wordCloud", name: "词云", family: "other" },
+  { id: "gantt", name: "甘特图", family: "bar" },
+  { id: "timeline", name: "时间线图", family: "other" },
+  { id: "smallMultiples", name: "小倍数分面图", family: "other" },
   { id: "groupedBar", name: "分组条形图", family: "bar" },
   { id: "capsuleBar", name: "胶囊条形图", family: "bar" },
   { id: "arrowBar", name: "箭头条形图", family: "bar" },

@@ -510,7 +510,7 @@ test("single numeric column passes generic templates but fails role-specific tem
   };
   for (const type of ALL_TYPES) {
     const err = firstError(type, ctx);
-    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart", "groupedScatter", "quadrant", "trendScatter", "correlationMatrix", "dumbbell", "densityHeatmap"].includes(type)) {
+    if (["scatter", "divergingBar", "populationPyramid", "rangeBar", "rangeColumn", "bulletBar", "slopeChart", "groupedScatter", "quadrant", "trendScatter", "correlationMatrix", "dumbbell", "densityHeatmap", "gantt"].includes(type)) {
       assert.ok(err && err.includes("2 个数值列"), `${type}: expected 2-column error, got ${err}`);
     } else if (["bandArea", "bubble", "errorBar"].includes(type)) {
       assert.ok(err && err.includes("3 个数值列"), `${type}: expected 3-column error, got ${err}`);
@@ -1072,9 +1072,8 @@ test("P1-5: comboAxisSync applies a shared min/max to both axes", () => {
 
 test("P1-5: non-combo templates are unaffected by the patchAxes array support", () => {
   // Regression: every other template still returns a single (non-array) yAxis.
-  // combo, pareto, dualAxisLine, candleVolume and splitAxisBar are the
-  // multi-axis exceptions by design.
-  for (const type of ALL_TYPES.filter((t) => !["combo", "pareto", "dualAxisLine", "candleVolume", "splitAxisBar"].includes(t))) {
+  // Multi-panel/multi-axis templates are array-typed by design.
+  for (const type of ALL_TYPES.filter((t) => !["combo", "pareto", "dualAxisLine", "candleVolume", "splitAxisBar", "smallMultiples"].includes(t))) {
     const option = buildChartOption(baseConfig({ type }));
     assert.equal(Array.isArray(option.yAxis), false, `${type}: yAxis unexpectedly an array`);
   }
@@ -2051,4 +2050,59 @@ test("P100-9: word cloud sizes words by weight without dependencies", () => {
   const lightest = words.find((element) => element.style?.text === "箱线图");
   assert.ok(fontSizeOf(heaviest!) > fontSizeOf(lightest!), "weight must drive font size");
   assert.equal(option.grid, undefined);
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 10 — time & facets.
+// ---------------------------------------------------------------------------
+
+test("P100-10: gantt bars float between start and end columns", () => {
+  const option = renderSample("gantt");
+  const series = seriesList(option) as Array<{
+    type?: string;
+    stack?: string;
+    itemStyle?: { color?: string };
+    label?: { show?: boolean };
+  }>;
+  assert.equal(series[0]?.stack, "gantt");
+  assert.equal(series[0]?.itemStyle?.color, "transparent", "offset base must be invisible");
+  assert.equal(series[1]?.stack, "gantt");
+  assert.equal((option.yAxis as { type?: string }).type, "category", "tasks on the category axis");
+  assert.equal(series[1]?.label?.show, true);
+  assert.notEqual(sig(renderSample("gantt", { showLabels: false })), sig(renderSample("gantt", { showLabels: true })));
+});
+
+test("P100-10: timeline alternates event labels above and below the axis", () => {
+  const option = renderSample("timeline");
+  const [events] = seriesList(option) as Array<{
+    type?: string;
+    data?: Array<{ value: [number, number]; label?: { position?: string } }>;
+  }>;
+  assert.equal(events.type, "scatter");
+  const rows = getTemplateDefinition("timeline").sampleData.table.length - 1;
+  assert.equal(events.data?.length, rows);
+  // All points sit on the axis line; labels alternate.
+  assert.ok(events.data?.every((item) => item.value[1] === 0), "events ride the axis");
+  const positions = events.data?.map((item) => item.label?.position);
+  assert.equal(positions?.[0], "top");
+  assert.equal(positions?.[1], "bottom");
+  assert.notEqual(sig(renderSample("timeline", { showLabels: false })), sig(renderSample("timeline", { showLabels: true })));
+});
+
+test("P100-10: small multiples open one grid per numeric column", () => {
+  const option = renderSample("smallMultiples");
+  const columns = getTemplateDefinition("smallMultiples").sampleData.seriesColumns.length;
+  const grids = option.grid as unknown[];
+  assert.equal(grids.length, columns, "one panel per column");
+  const series = seriesList(option) as Array<{ type?: string; xAxisIndex?: number }>;
+  assert.equal(series.length, columns);
+  series.forEach((item, index) => {
+    assert.equal(item.type, "bar");
+    assert.equal(item.xAxisIndex, index, "each series binds its own panel");
+  });
+  const xAxes = option.xAxis as unknown[];
+  const yAxes = option.yAxis as unknown[];
+  assert.equal(xAxes.length, columns);
+  assert.equal(yAxes.length, columns);
+  assert.notEqual(sig(renderSample("smallMultiples", { showLabels: false })), sig(renderSample("smallMultiples", { showLabels: true })));
 });

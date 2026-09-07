@@ -76,7 +76,7 @@
 | 7 | 条柱线补充变体 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 bar/column variant chart templates…"） | splitAxisBar 这个 P2 已完成（双 grid 拆分离群值）；shared.ts 增加 grid 显式通道（candleVolume 双面板）；OHLC/蜡烛量无标签面已豁免 showLabels |
 | 8 | 环饼与箱线补充 | 4 | 已完成 | 2026-09-07 | 随本批提交（"Add 4 pie/boxplot extension chart templates…"） | 半环形图为 pie 渲染的 patch（180°–360° 扫掠）；多层环形每列一环 |
 | 9 | 卡片、表格与文字 | 5 | 已完成 | 2026-09-07 | 随本批提交（"Add 5 card/table/text chart templates…"） | **词云依赖决策：不引入 echarts-wordcloud**（canvas-only、破坏 SVG 导出、违反红线 4），改为 graphic 文本 + 阿基米德螺旋自绘确定性布局 |
-| 10 | 时间与分面 | 3 | 待开始 | — | — | 小倍数是本批难点 |
+| 10 | 时间与分面 | 3 | 已完成 | 2026-09-07 | 随本批提交（"Add 3 time/facet chart templates…"） | 甘特图=透明基座浮动条；时间线标签上下交替；小倍数每列一个 grid 面板 |
 | 11 | 地图家族 | 5 | 待开始 | — | — | **先做 GeoJSON 基础设施决策（见批次说明）** |
 
 ## 7. 全量清单（100 = 已有 30 + 新增 70）
@@ -196,9 +196,9 @@
 
 | # | 中文名 | id | ECharts 方案 | 数据绑定要点 | 状态 |
 |---|---|---|---|---|---|
-| 63 | 甘特图 | `gantt` | range bar（起、止 2 数值/日期列），行=任务 | 任务列 + 开始列 + 结束列（+可选阶段分组列） | 待做 |
-| 64 | 时间线图 | `timeline` | 水平轴线 + scatter 事件点 + graphic 标签 | 事件列 + 日期/顺序列 | 待做 |
-| 65 | 小倍数分面图 | `smallMultiples` | 单 option 多 grid，每数值列一个小图（支持柱/线两种子形态） | 分类 + 多数值列 | 待做 |
+| 63 | 甘特图 | `gantt` | range bar（起、止 2 数值/日期列），行=任务 | 任务列 + 开始列 + 结束列（+可选阶段分组列） | 完成 |
+| 64 | 时间线图 | `timeline` | 水平轴线 + scatter 事件点 + graphic 标签 | 事件列 + 日期/顺序列 | 完成 |
+| 65 | 小倍数分面图 | `smallMultiples` | 单 option 多 grid，每数值列一个小图（支持柱/线两种子形态） | 分类 + 多数值列 | 完成 |
 
 ### 批次 11 · 地图家族（新 map.ts + GeoJSON 基础设施，family: "other"）
 

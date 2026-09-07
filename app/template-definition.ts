@@ -14,6 +14,8 @@
 import type { ChartConfig, ChartFamily, ChartType } from "./chart-model";
 import {
   buildBoxplotHorizontalOption,
+  buildSmallMultiplesOption,
+  buildTimelineOption,
   buildBoxplotOption,
   buildCalendarHeatmapOption,
   buildDensityHeatmapOption,
@@ -43,6 +45,7 @@ import {
   buildBulletOption,
   buildCapsuleOption,
   buildDumbbellOption,
+  buildGanttOption,
   buildDensityHistogramOption,
   buildHistogramOption,
   buildLollipopOption,
@@ -1419,6 +1422,51 @@ const SAMPLE_WORDCLOUD: SampleData = {
   seriesColumns: ["热度"],
 };
 
+// --- Batch-10 (Flourish parity) sample data --------------------------------
+
+const SAMPLE_GANTT: SampleData = {
+  table: [
+    ["阶段", "开始 天", "结束 天"],
+    ["立项评审", "0", "4"],
+    ["需求冻结", "3", "9"],
+    ["架构设计", "8", "16"],
+    ["开发", "14", "34"],
+    ["集成测试", "30", "40"],
+    ["发布", "38", "42"],
+  ],
+  categoryColumn: "阶段",
+  seriesColumns: ["开始 天", "结束 天"],
+};
+
+const SAMPLE_TIMELINE: SampleData = {
+  table: [
+    ["里程碑", "周次"],
+    ["立项", "1"],
+    ["原型确认", "3"],
+    ["视觉定稿", "5"],
+    ["开发完成", "9"],
+    ["内测", "11"],
+    ["公测", "13"],
+    ["正式发布", "15"],
+  ],
+  categoryColumn: "里程碑",
+  seriesColumns: ["周次"],
+};
+
+const SAMPLE_SMALL_MULTIPLES: SampleData = {
+  table: [
+    ["门店", "销售额 万", "客流量 千", "客单价 元"],
+    ["门店 A", "86", "12", "149"],
+    ["门店 B", "120", "18", "155"],
+    ["门店 C", "146", "22", "162"],
+    ["门店 D", "205", "30", "171"],
+    ["门店 E", "242", "35", "178"],
+    ["门店 F", "288", "40", "186"],
+  ],
+  categoryColumn: "门店",
+  seriesColumns: ["销售额 万", "客流量 千", "客单价 元"],
+};
+
 const SAMPLE_SPLIT_AXIS: SampleData = {
   table: [
     ["月份", "销售额 万"],
@@ -2537,6 +2585,41 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_GRAPHIC,
     buildOption: buildWordCloudOption,
     sampleData: SAMPLE_WORDCLOUD,
+  },
+
+  // --- Time & facets (Flourish parity batch 10) ----------------------------
+  gantt: {
+    id: "gantt",
+    family: "bar",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_LOWER, BIND_VALUE_UPPER],
+    validators: [
+      ...BASE_VALIDATORS,
+      requireTwoNumericColumns("甘特图需要 2 个数值列（开始和结束）"),
+    ],
+    settingsGroups: CARTESIAN_GROUPS,
+    capabilities: CAP_CARTESIAN,
+    buildOption: buildGanttOption,
+    sampleData: SAMPLE_GANTT,
+  },
+  timeline: {
+    id: "timeline",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_CARTESIAN_NO_LEGEND,
+    buildOption: buildTimelineOption,
+    sampleData: SAMPLE_TIMELINE,
+  },
+  smallMultiples: {
+    id: "smallMultiples",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_MULTIPLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_CARTESIAN_NO_LEGEND,
+    buildOption: buildSmallMultiplesOption,
+    sampleData: SAMPLE_SMALL_MULTIPLES,
   },
 };
 

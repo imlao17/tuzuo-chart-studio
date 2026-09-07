@@ -744,6 +744,56 @@ export function buildStackedDotOption(ctx: RenderContext): RendererResult {
   return { series, xAxis: categoryAxis, yAxis: valueAxis };
 }
 
+/** 甘特图: horizontal bars floating between start and end columns. */
+export function buildGanttOption(ctx: RenderContext): RendererResult {
+  const { config, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const barWidth = config.barWidth ?? 48;
+  const barRadius = config.barRadius ?? 3;
+  const start = dataSeries[0] ?? { name: "开始", data: [] };
+  const end = dataSeries[1] ?? { name: "结束", data: [] };
+  const durations = end.data.map((value, index) =>
+    Math.max(0, (Number.isFinite(value) ? value : 0) - (Number.isFinite(start.data[index]) ? start.data[index] : 0)),
+  );
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const series: SeriesOption[] = [
+    {
+      name: start.name,
+      type: "bar",
+      data: start.data,
+      stack: "gantt",
+      silent: true,
+      barMaxWidth: compact ? 20 : barWidth,
+      itemStyle: { color: "transparent" },
+      label: { show: false },
+      tooltip: { show: false },
+      emphasis: { focus: "none" },
+    },
+    {
+      name: end.name,
+      type: "bar",
+      data: durations,
+      stack: "gantt",
+      barMaxWidth: compact ? 20 : barWidth,
+      itemStyle: { color: colorFor(0, config), opacity: (config.markOpacity ?? 100) / 100, borderRadius: [0, barRadius, barRadius, 0] },
+      label: {
+        show: compact ? false : config.showLabels,
+        position: "right",
+        ...labelTextStyle,
+        formatter: (params: unknown) => {
+          const entry = params as { dataIndex: number };
+          return `${ctx.formatNumber(start.data[entry.dataIndex] ?? 0)} – ${ctx.formatNumber(end.data[entry.dataIndex] ?? 0)}`;
+        },
+      },
+      emphasis: { focus: "series" },
+    },
+  ];
+  return { series, xAxis: valueAxis, yAxis: categoryAxis };
+}
+
 /** 断轴条形图: split-grid bars with a broken-axis gap for outliers. */
 export function buildSplitAxisOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;

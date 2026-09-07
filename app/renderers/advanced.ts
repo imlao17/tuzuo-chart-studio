@@ -1555,3 +1555,114 @@ export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
     tooltipTrigger: "item",
   };
 }
+
+// ---------------------------------------------------------------------------
+// Flourish parity batch 10: timeline & small multiples.
+// ---------------------------------------------------------------------------
+
+/** 时间线图: events plotted along a horizontal axis with alternating labels. */
+export function buildTimelineOption(ctx: RenderContext): RendererResult {
+  const { config, categories, dataSeries } = ctx;
+  const { theme, fontSize, compact = false } = config;
+  const pointSize = config.pointSize ?? 7;
+  const values = dataSeries[0]?.data ?? [];
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const xAxis = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    min: Math.min(0, ...values.filter(Number.isFinite)),
+    splitLine: { show: false },
+    axisLine: { show: !compact, lineStyle: { color: "#aeb6bf" } },
+    axisTick: { show: false },
+  };
+  const yAxis = {
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    min: -1,
+    max: 1,
+    splitLine: { show: false },
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { show: false },
+  };
+  const series: SeriesOption[] = [
+    {
+      name: "事件",
+      type: "scatter",
+      symbol: "circle",
+      symbolSize: compact ? 6 : pointSize + 4,
+      itemStyle: { color: colorFor(0, config) },
+      data: categories.map((name, index) => ({
+        value: [Number.isFinite(values[index]) ? values[index] : index, 0],
+        label: {
+          show: compact ? false : config.showLabels,
+          position: index % 2 === 0 ? ("top" as const) : ("bottom" as const),
+          ...labelTextStyle,
+          formatter: () => name,
+        },
+      })),
+      emphasis: { focus: "self" },
+    } as SeriesOption,
+  ];
+  return { series, xAxis, yAxis };
+}
+
+/** 小倍数分面图: one mini chart (grid) per numeric column, bar sub-shape. */
+export function buildSmallMultiplesOption(ctx: RenderContext): RendererResult {
+  const { config, categories, dataSeries } = ctx;
+  const { compact = false, theme, fontSize } = config;
+  const barWidth = config.barWidth ?? 48;
+  const markOpacity = (config.markOpacity ?? 100) / 100;
+  const panelCount = Math.max(1, dataSeries.length);
+  const labelTextStyle = dataLabelTextStyle(config);
+
+  const gapPercent = compact ? 1.5 : 5;
+  const panelWidth = (100 - gapPercent * (panelCount - 1)) / panelCount;
+  const grids = dataSeries.map((_, index) => ({
+    left: `${index * (panelWidth + gapPercent)}%`,
+    width: `${panelWidth}%`,
+    top: compact ? "10%" : "20%",
+    bottom: compact ? "8%" : "16%",
+    containLabel: !compact,
+  }));
+  const xAxes = dataSeries.map((_, index) => ({
+    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    gridIndex: index,
+    axisLabel: {
+      show: false,
+    },
+    axisTick: { show: false },
+  }));
+  const yAxes = dataSeries.map((series, index) => ({
+    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    gridIndex: index,
+    name: compact ? "" : series.name,
+    nameLocation: "middle" as const,
+    nameGap: compact ? 12 : 24,
+    nameTextStyle: { color: theme.text, fontSize: Math.max(9, fontSize - 1) },
+  }));
+  const series: SeriesOption[] = dataSeries.map((item, index) => ({
+    name: item.name,
+    type: "bar",
+    data: item.data,
+    xAxisIndex: index,
+    yAxisIndex: index,
+    barMaxWidth: compact ? 12 : Math.max(8, barWidth / Math.max(1, panelCount / 2)),
+    itemStyle: {
+      color: colorFor(index, config, item.name),
+      opacity: markOpacity,
+      borderRadius: [3, 3, 0, 0],
+    },
+    label: {
+      show: compact ? false : config.showLabels,
+      position: "top",
+      ...labelTextStyle,
+      formatter: (params: unknown) => {
+        const entry = params as { value: string | number };
+        return ctx.formatNumber(entry.value);
+      },
+    },
+    emphasis: { focus: "series" },
+  } as SeriesOption));
+  // Panel titles ride each grid's value-axis name (middle), no graphic needed.
+  return { series, grid: grids, xAxis: xAxes, yAxis: yAxes };
+}
