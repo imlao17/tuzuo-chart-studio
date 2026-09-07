@@ -68,16 +68,16 @@
 | 批次 | 名称 | 模板数 | 状态 | 完成日期 | 提交 | 备注 |
 |---|---|---|---|---|---|---|
 | 1 | 条形/柱状扩展 | 10 | 已完成 | 2026-09-07 | `6d28dc3` | 密度直方图与象形柱状图两个 P2 均已完成；象形柱状图的「每单位代表值」暂不可配置（单位符号固定 10px 高 + 2px 间距），后续批次可补 |
-| 2 | 折线/面积扩展 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 line/area chart templates…"） | 点线图/平滑面积图/阶梯面积图复用既有 line-area 路径；双轴折线/斜率/区间面积/脊线/凹凸为独立构造器 |
-| 3 | 径向/极坐标家族 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 radial/polar chart templates…"） | 新建 `renderers/radial.ts`；shared.ts 的 RendererResult 扩展了 polar/angleAxis/radiusAxis/graphic 通道（对既有模板零影响） |
-| 4 | 散点/气泡扩展 | 5 | 已完成 | 2026-09-07 | 随本批提交（"Add 5 scatter/bubble chart templates…"） | bubble/trendScatter 为 scatter 的配置注入包装器；象限图中线取中位数（均值可配置项留待后续） |
-| 5 | 层级与网络 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 hierarchy/network chart templates…"） | 新建 `renderers/hierarchy.ts`、`renderers/network.ts`；冲积图复用 sankey 渲染路径（差异在多阶段示例数据）；弦图用 ECharts 6.1 内置 chord 系列 |
-| 6 | 统计与分布 | 7 | 已完成 | 2026-09-07 | 随本批提交（"Add 7 statistical/distribution chart templates…"） | violin/marimekko 两个 P2 均已完成（custom 系列 renderItem）；shared.ts 增加 parallel/parallelAxis/calendar 通道；平行坐标/小提琴/马赛克无数据标签面，showLabels 通用测试已豁免 |
-| 7 | 条柱线补充变体 | 8 | 已完成 | 2026-09-07 | 随本批提交（"Add 8 bar/column variant chart templates…"） | splitAxisBar 这个 P2 已完成（双 grid 拆分离群值）；shared.ts 增加 grid 显式通道（candleVolume 双面板）；OHLC/蜡烛量无标签面已豁免 showLabels |
-| 8 | 环饼与箱线补充 | 4 | 已完成 | 2026-09-07 | 随本批提交（"Add 4 pie/boxplot extension chart templates…"） | 半环形图为 pie 渲染的 patch（180°–360° 扫掠）；多层环形每列一环 |
-| 9 | 卡片、表格与文字 | 5 | 已完成 | 2026-09-07 | 随本批提交（"Add 5 card/table/text chart templates…"） | **词云依赖决策：不引入 echarts-wordcloud**（canvas-only、破坏 SVG 导出、违反红线 4），改为 graphic 文本 + 阿基米德螺旋自绘确定性布局 |
-| 10 | 时间与分面 | 3 | 已完成 | 2026-09-07 | 随本批提交（"Add 3 time/facet chart templates…"） | 甘特图=透明基座浮动条；时间线标签上下交替；小倍数每列一个 grid 面板 |
-| 11 | 地图家族 | 5 | 已完成 | 2026-09-08 | 随本批提交（"Add 5 map chart templates…"） | **GeoJSON 决策**：世界图取 Apache ECharts 官方 MIT 测试数据（1.0MB）、中国省级取 DataV.GeoAtlas（0.6MB），静态放 `public/geo/`，页面按模板懒加载 + `registerMap`（`src/studio/geo/register-maps.ts`）；世界地名经内置 nameMap 映射为中文；符号/热力/流向用内置国名质心表，无需坐标数据 |
+| 2 | 折线/面积扩展 | 8 | 已完成 | 2026-09-07 | `d143232` | 点线图/平滑面积图/阶梯面积图复用既有 line-area 路径；双轴折线/斜率/区间面积/脊线/凹凸为独立构造器 |
+| 3 | 径向/极坐标家族 | 7 | 已完成 | 2026-09-07 | `0824c6c` | 新建 `renderers/radial.ts`；shared.ts 的 RendererResult 扩展了 polar/angleAxis/radiusAxis/graphic 通道（对既有模板零影响） |
+| 4 | 散点/气泡扩展 | 5 | 已完成 | 2026-09-07 | `9533fcf` | bubble/trendScatter 为 scatter 的配置注入包装器；象限图中线取中位数（均值可配置项留待后续） |
+| 5 | 层级与网络 | 8 | 已完成 | 2026-09-07 | `aa1b3ac` | 新建 `renderers/hierarchy.ts`、`renderers/network.ts`；冲积图复用 sankey 渲染路径（差异在多阶段示例数据）；弦图用 ECharts 6.1 内置 chord 系列 |
+| 6 | 统计与分布 | 7 | 已完成 | 2026-09-07 | `bb10b0e` | violin/marimekko 两个 P2 均已完成（custom 系列 renderItem）；shared.ts 增加 parallel/parallelAxis/calendar 通道；平行坐标/小提琴/马赛克无数据标签面，showLabels 通用测试已豁免 |
+| 7 | 条柱线补充变体 | 8 | 已完成 | 2026-09-07 | `a84bcfa` | splitAxisBar 这个 P2 已完成（双 grid 拆分离群值）；shared.ts 增加 grid 显式通道（candleVolume 双面板）；OHLC/蜡烛量无标签面已豁免 showLabels |
+| 8 | 环饼与箱线补充 | 4 | 已完成 | 2026-09-07 | `008da73` | 半环形图为 pie 渲染的 patch（180°–360° 扫掠）；多层环形每列一环 |
+| 9 | 卡片、表格与文字 | 5 | 已完成 | 2026-09-07 | `bcb2d3a` | **词云依赖决策：不引入 echarts-wordcloud**（canvas-only、破坏 SVG 导出、违反红线 4），改为 graphic 文本 + 阿基米德螺旋自绘确定性布局 |
+| 10 | 时间与分面 | 3 | 已完成 | 2026-09-07 | `2b865e5` | 甘特图=透明基座浮动条；时间线标签上下交替；小倍数每列一个 grid 面板 |
+| 11 | 地图家族 | 5 | 已完成 | 2026-09-08 | `c909a70` | **GeoJSON 决策**：世界图取 Apache ECharts 官方 MIT 测试数据（1.0MB）、中国省级取 DataV.GeoAtlas（0.6MB），静态放 `public/geo/`，页面按模板懒加载 + `registerMap`（`src/studio/geo/register-maps.ts`）；世界地名经内置 nameMap 映射为中文；符号/热力/流向用内置国名质心表，无需坐标数据 |
 
 ## 7. 全量清单（100 = 已有 30 + 新增 70）
 
@@ -157,8 +157,8 @@
 | 41 | 累计分布图 | `ecdf` | line（排序后累计百分比） | 1 数值列 | 完成 |
 | 42 | 误差线图 | `errorBar` | bar + custom renderItem 误差须 | 分类 + 3 数值列（值、下误差、上误差） | 完成 |
 | 43 | 相关性矩阵图 | `correlationMatrix` | heatmap，renderer 内计算数值列两两 Pearson 相关系数 | ≥2 数值列 | 完成 |
-| 44 | 小提琴图 | `violin` | custom（KDE 密度镜像） | 分类 + 1 数值列（或每列一个提琴） | 待做（P2） |
-| 45 | 马赛克图 | `marimekko` | custom（变宽堆叠条） | 分类 + 多数值列 | 待做（P2） |
+| 44 | 小提琴图 | `violin` | custom（KDE 密度镜像） | 分类 + 1 数值列（或每列一个提琴） | 完成 |
+| 45 | 马赛克图 | `marimekko` | custom（变宽堆叠条） | 分类 + 多数值列 | 完成 |
 
 ### 批次 7 · 条柱线补充变体（bar.ts / scatter.ts / combo.ts）
 
@@ -171,7 +171,7 @@
 | 50 | 堆叠点图 | `stackedDot` | scatter，按值堆叠圆点（每点=1 单位） | 分类 + 1 数值列（整数计数语义） | 完成 |
 | 51 | OHLC 条形图 | `ohlcBar` | custom renderItem（传统开高低收细棒） | 4 数值列（开、收、低、高） | 完成 |
 | 52 | 蜡烛+成交量组合图 | `candleVolume` | candlestick + bar，双 grid/双轴 | 5 数值列（开、收、低、高、量） | 完成 |
-| 53 | 断轴条形图 | `splitAxisBar` | 双 grid 拼接 + 轴断裂标记 | 分类 + 1 数值列（个别离群值很大） | 待做（P2） |
+| 53 | 断轴条形图 | `splitAxisBar` | 双 grid 拼接 + 轴断裂标记 | 分类 + 1 数值列（个别离群值很大） | 完成 |
 
 ### 批次 8 · 环饼与箱线补充（pie.ts / advanced.ts / heatmap）
 
@@ -190,7 +190,7 @@
 | 59 | 指标卡组 | `kpiCardRow` | graphic 多卡横排 | 标签列 + 多数值列（每列一卡） | 完成 |
 | 60 | 趋势迷你卡 | `sparklineCard` | graphic 数字 + 小号 line 系列 | 标签列 + 当前值列 + 若干趋势列 | 完成 |
 | 61 | 条形表格图 | `barTable` | 每行 = 类别名 + 迷你条 + 数值文本（graphic + bar 组合） | 分类 + 1 数值列 | 完成 |
-| 62 | 词云 | `wordCloud` | 评估 `echarts-wordcloud` 依赖；若不可接受则标暂缓 | 文本列 + 权重数值列 | 待做（P2，依赖决策） |
+| 62 | 词云 | `wordCloud` | 评估 `echarts-wordcloud` 依赖；若不可接受则标暂缓 | 文本列 + 权重数值列 | 完成 |
 
 ### 批次 10 · 时间与分面（custom / 多 grid）
 
@@ -232,6 +232,14 @@
 - ECharts 6.1 无 `venn` / `circlePacking`，原候选维恩图、圆填充图未入清单，由密度直方图、弦图等顶替。
 
 ## 10. 完成定义（整个计划）
+
+> **执行完成（2026-09-08）**：100 个模板全部 `完成`（含全部 5 个 P2：密度直方图、象形柱状图、小提琴图、马赛克图、断轴条形图，以及词云的无依赖自绘实现），无暂缓/受阻项。11 个批次 13 个提交，`npm test`（typecheck + build + rendered-html + desktop + behavior 117 项）与 `npm run lint` 全绿。剩余跟进项见下节「后续跟进」。
+
+### 后续跟进
+
+1. 地图模板的 GeoJSON 为静态文件（`public/geo/`，合计约 1.6MB），桌面版分发前按 `docs/engineering/macos-desktop.md` 的要求重跑一次 DMG 启动验证。
+2. 世界地图 nameMap 覆盖约 42 个常用国名，长尾国家需按需补充映射。
+3. 象形柱状图的「每单位代表值」、象限图中线的均值/中位数切换，可作为后续小设置项补入（需同步 page.tsx 设置区最小接线）。
 
 - 第 7 节清单 100 项全部 `完成`（或经用户确认的少量 `暂缓` + 候补顶替）；
 - `npm test`、`npm run lint` 全绿；
