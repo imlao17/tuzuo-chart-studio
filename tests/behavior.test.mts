@@ -157,7 +157,7 @@ test("toggling showLabels changes the option for every label-bearing template", 
   // P1 gap); parallel/violin/marimekko have no per-point label surface (their
   // settings groups don't expose 数据标签), so they are exempt; every other
   // template wires showLabels through.
-  const exempt = new Set<ChartType>(["streamgraph", "parallelCoordinates", "violin", "marimekko", "ohlcBar", "candleVolume", "kpiCard", "kpiCardRow", "sparklineCard", "barTable", "wordCloud"]);
+  const exempt = new Set<ChartType>(["streamgraph", "parallelCoordinates", "violin", "marimekko", "ohlcBar", "candleVolume", "kpiCard", "kpiCardRow", "sparklineCard", "barTable", "wordCloud", "symbolMap", "geoHeatmap", "flowMap"]);
   const labelled = ALL_TYPES.filter((t) => !exempt.has(t));
   for (const type of labelled) {
     const off = sig(renderSample(type, { showLabels: false }));
@@ -518,7 +518,7 @@ test("single numeric column passes generic templates but fails role-specific tem
       assert.ok(err && err.includes("4 个数值列"), `${type}: expected OHLC error, got ${err}`);
     } else if (type === "candleVolume") {
       assert.ok(err && err.includes("5 个数值列"), `${type}: expected 5-column error, got ${err}`);
-    } else if (["sankey", "networkGraph", "chord", "adjacencyMatrix", "alluvial"].includes(type)) {
+    } else if (["sankey", "networkGraph", "chord", "adjacencyMatrix", "alluvial", "flowMap"].includes(type)) {
       assert.ok(err && err.includes("2 个文本列"), `${type}: expected flow-column error, got ${err}`);
     } else {
       assert.equal(err, null, `${type}: should accept a single numeric column`);
@@ -2105,4 +2105,84 @@ test("P100-10: small multiples open one grid per numeric column", () => {
   assert.equal(xAxes.length, columns);
   assert.equal(yAxes.length, columns);
   assert.notEqual(sig(renderSample("smallMultiples", { showLabels: false })), sig(renderSample("smallMultiples", { showLabels: true })));
+});
+
+// ---------------------------------------------------------------------------
+// Group: Flourish parity batch 11 — map family.
+// ---------------------------------------------------------------------------
+
+test("P100-11: world choropleth maps Chinese names over the world GeoJSON", () => {
+  const option = renderSample("worldChoropleth");
+  const [map] = seriesList(option) as Array<{
+    type?: string;
+    map?: string;
+    nameMap?: Record<string, string>;
+    data?: Array<{ name?: string; value?: number }>;
+  }>;
+  assert.equal(map.type, "map");
+  assert.equal(map.map, "world");
+  assert.equal(map.nameMap?.China, "中国", "English geojson names map to Chinese");
+  assert.ok(map.data?.some((entry) => entry.name === "中国"), "sample data uses Chinese names");
+  assert.ok(option.visualMap, "choropleth needs a value scale");
+  assert.equal(option.grid, undefined);
+  assert.notEqual(sig(renderSample("worldChoropleth", { showLabels: false })), sig(renderSample("worldChoropleth", { showLabels: true })));
+});
+
+test("P100-11: china choropleth binds the china map with province data", () => {
+  const option = renderSample("chinaChoropleth");
+  const [map] = seriesList(option) as Array<{
+    type?: string;
+    map?: string;
+    nameMap?: Record<string, string>;
+    data?: unknown[];
+  }>;
+  assert.equal(map.type, "map");
+  assert.equal(map.map, "china");
+  assert.equal(map.nameMap, undefined, "china geojson already uses Chinese names");
+  assert.ok(option.visualMap);
+});
+
+test("P100-11: symbol map plots centroid bubbles on the geo frame", () => {
+  const option = renderSample("symbolMap");
+  assert.ok(option.geo, "symbol map needs the geo coordinate");
+  const [scatter] = seriesList(option) as Array<{
+    type?: string;
+    coordinateSystem?: string;
+    data?: Array<{ name?: string; value: [number, number, number]; symbolSize?: number }>;
+  }>;
+  assert.equal(scatter.type, "scatter");
+  assert.equal(scatter.coordinateSystem, "geo");
+  const china = scatter.data?.find((entry) => entry.name === "中国");
+  assert.ok(china, "centroid table resolves 中国");
+  assert.ok(china.value[0] > 100 && china.value[1] > 30, "centroid carries lng/lat");
+  assert.ok((china.symbolSize ?? 0) > 20, "bubble size scales with the value");
+});
+
+test("P100-11: geo heatmap plots heat-weighted points", () => {
+  const option = renderSample("geoHeatmap");
+  assert.ok(option.geo);
+  const [heat] = seriesList(option) as Array<{
+    type?: string;
+    coordinateSystem?: string;
+    data?: Array<{ value: [number, number, number] }>;
+  }>;
+  assert.equal(heat.type, "heatmap");
+  assert.equal(heat.coordinateSystem, "geo");
+  assert.ok(option.visualMap, "geo heat needs a value scale");
+});
+
+test("P100-11: flow map draws centroid arcs from source-target pairs", () => {
+  const option = renderSample("flowMap");
+  assert.ok(option.geo);
+  const [lines] = seriesList(option) as Array<{
+    type?: string;
+    coordinateSystem?: string;
+    data?: Array<{ coords: [[number, number], [number, number]]; value?: number }>;
+  }>;
+  assert.equal(lines.type, "lines");
+  assert.equal(lines.coordinateSystem, "geo");
+  assert.equal(lines.data?.length, 8, "one arc per flow row");
+  const first = lines.data?.[0]?.coords;
+  assert.ok(first, "arcs carry real coordinates");
+  assert.notEqual(sig(renderSample("flowMap", { markOpacity: 30 })), sig(renderSample("flowMap", { markOpacity: 90 })));
 });

@@ -58,6 +58,8 @@ export type RendererResult = {
   parallelAxis?: EChartsOption["parallelAxis"];
   /** Calendar coordinate block (calendar heatmap). */
   calendar?: EChartsOption["calendar"];
+  /** Geo coordinate block (Flourish parity batch 11 map family). */
+  geo?: EChartsOption["geo"];
   /** Explicit grid override (multi-grid layouts, e.g. candle+volume). When
    *  absent, the assembler computes the standard single cartesian grid. */
   grid?: EChartsOption["grid"];
@@ -574,6 +576,7 @@ function assembleOption(
       parallel: patched.parallel,
       parallelAxis: patched.parallelAxis,
       calendar: patched.calendar,
+      geo: patched.geo,
       xAxis: patched.xAxis,
       yAxis: patched.yAxis,
       series: patched.series,

@@ -68,6 +68,7 @@ import {
   safeFilename,
 } from "../src/studio/export/download";
 import { AuthDialog } from "../src/studio/components/auth-dialog";
+import { ensureGeoMap, isGeoMapRegistered } from "../src/studio/geo/register-maps";
 import { ConfirmDialog } from "../src/studio/components/confirm-dialog";
 import { ExportToolbar } from "../src/studio/components/export-toolbar";
 import {
@@ -1126,6 +1127,10 @@ export default function Home() {
     CHART_TEMPLATES.find((template) => template.id === chartType) ??
     CHART_TEMPLATES[0];
   const templateDefinition = getTemplateDefinition(chartType);
+  const [geoMapTick, setGeoMapTick] = useState(0);
+  // The mount effect runs once by design; it reads the initial template's map
+  // through a ref so it stays off the dependency list.
+  const initialGeoMapRef = useRef(templateDefinition.geoMap);
 
   // Whether the current table data matches this template's sample data. Used
   // to decide whether to nudge the user toward "加载示例" after switching
@@ -1476,6 +1481,16 @@ export default function Home() {
       const initial = initialChartStateRef.current;
       const { init } = await import("echarts");
       if (cancelled || !chartElementRef.current || chartRef.current) return;
+      const initialGeoMap = initialGeoMapRef.current;
+      if (initialGeoMap) {
+        try {
+          await ensureGeoMap(initialGeoMap);
+        } catch {
+          // Registration failure falls through: the chart renders without
+          // map geometry rather than blocking the editor.
+        }
+      }
+      if (cancelled || !chartElementRef.current || chartRef.current) return;
       chartRef.current = init(chartElementRef.current, undefined, {
         renderer: "svg",
         width: initial.width,
@@ -1500,11 +1515,29 @@ export default function Home() {
         chartRef.current?.clear();
         return;
       }
+      const geoMap = templateDefinition.geoMap;
+      if (geoMap && !isGeoMapRegistered(geoMap)) return;
       chartRef.current?.resize({ width, height });
       chartRef.current?.setOption(option, true);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [dataError, height, option, width, workspaceMode]);
+  }, [dataError, height, option, width, workspaceMode, templateDefinition.geoMap, geoMapTick]);
+
+  useEffect(() => {
+    const geoMap = templateDefinition.geoMap;
+    if (!geoMap) return;
+    let cancelled = false;
+    ensureGeoMap(geoMap)
+      .then(() => {
+        if (!cancelled) setGeoMapTick((tick) => tick + 1);
+      })
+      .catch(() => {
+        // Swallowed: the update effect simply keeps waiting for the data.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [templateDefinition.geoMap]);
 
   useEffect(() => {
     const host = previewHostRef.current;

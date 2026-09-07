@@ -96,7 +96,12 @@ export type ChartType =
   | "wordCloud"
   | "gantt"
   | "timeline"
-  | "smallMultiples";
+  | "smallMultiples"
+  | "worldChoropleth"
+  | "chinaChoropleth"
+  | "symbolMap"
+  | "geoHeatmap"
+  | "flowMap";
 
 export type ChartFamily = "line" | "area" | "bar" | "pie" | "other";
 
@@ -468,6 +473,11 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
   { id: "gantt", name: "甘特图", family: "bar" },
   { id: "timeline", name: "时间线图", family: "other" },
   { id: "smallMultiples", name: "小倍数分面图", family: "other" },
+  { id: "worldChoropleth", name: "世界分级统计地图", family: "other" },
+  { id: "chinaChoropleth", name: "中国分级统计地图", family: "other" },
+  { id: "symbolMap", name: "符号地图", family: "other" },
+  { id: "geoHeatmap", name: "地点热力地图", family: "other" },
+  { id: "flowMap", name: "流向地图", family: "other" },
   { id: "groupedBar", name: "分组条形图", family: "bar" },
   { id: "capsuleBar", name: "胶囊条形图", family: "bar" },
   { id: "arrowBar", name: "箭头条形图", family: "bar" },

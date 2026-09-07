@@ -75,6 +75,13 @@ import {
   buildSparklineCardOption,
   buildWordCloudOption,
 } from "./renderers/cards";
+import {
+  buildChinaChoroplethOption,
+  buildFlowMapOption,
+  buildGeoHeatmapOption,
+  buildSymbolMapOption,
+  buildWorldChoroplethOption,
+} from "./renderers/map";
 import { buildComboOption, buildParetoOption } from "./renderers/combo";
 import { buildDivergingOption } from "./renderers/diverging";
 import {
@@ -194,6 +201,8 @@ export type TemplateDefinition = {
   /** 模板专属示例数据，用于模板库缩略图与「加载示例」入口 */
   sampleData: SampleData;
   buildOption?: (ctx: RenderContext) => RendererResult;
+  /** Map-family templates: the GeoJSON registered before first render. */
+  geoMap?: "world" | "china";
 };
 
 // --- Shared settings-group declarations -------------------------------------
@@ -1467,6 +1476,95 @@ const SAMPLE_SMALL_MULTIPLES: SampleData = {
   seriesColumns: ["销售额 万", "客流量 千", "客单价 元"],
 };
 
+// --- Batch-11 (Flourish parity) sample data --------------------------------
+
+const SAMPLE_WORLD_CHOROPLETH: SampleData = {
+  table: [
+    ["国家", "GDP 万亿美元"],
+    ["中国", "18.6"],
+    ["美国", "25.5"],
+    ["日本", "4.2"],
+    ["德国", "4.1"],
+    ["印度", "3.4"],
+    ["英国", "3.1"],
+    ["法国", "2.8"],
+    ["巴西", "1.9"],
+  ],
+  categoryColumn: "国家",
+  seriesColumns: ["GDP 万亿美元"],
+};
+
+const SAMPLE_CHINA_CHOROPLETH: SampleData = {
+  table: [
+    ["省份", "常住人口 万人"],
+    ["广东省", "12684"],
+    ["山东省", "10153"],
+    ["河南省", "9883"],
+    ["江苏省", "8505"],
+    ["四川省", "8374"],
+    ["浙江省", "6540"],
+    ["湖北省", "5775"],
+    ["福建省", "4154"],
+  ],
+  categoryColumn: "省份",
+  seriesColumns: ["常住人口 万人"],
+};
+
+const SAMPLE_SYMBOL_MAP: SampleData = {
+  table: [
+    ["国家", "用户数 万"],
+    ["中国", "4200"],
+    ["美国", "3100"],
+    ["印度", "2600"],
+    ["巴西", "1400"],
+    ["日本", "980"],
+    ["德国", "760"],
+    ["英国", "640"],
+    ["印度尼西亚", "1200"],
+  ],
+  categoryColumn: "国家",
+  seriesColumns: ["用户数 万"],
+};
+
+const SAMPLE_GEO_HEATMAP: SampleData = {
+  table: [
+    ["国家", "订单密度"],
+    ["中国", "92"],
+    ["韩国", "58"],
+    ["日本", "74"],
+    ["新加坡", "66"],
+    ["泰国", "38"],
+    ["印度", "52"],
+    ["德国", "30"],
+    ["英国", "44"],
+    ["美国", "68"],
+    ["澳大利亚", "24"],
+  ],
+  categoryColumn: "国家",
+  seriesColumns: ["订单密度"],
+};
+
+const SAMPLE_FLOW_MAP: SampleData = {
+  table: [
+    ["来源", "去向", "航班量 班"],
+    ["中国", "美国", "320"],
+    ["中国", "德国", "280"],
+    ["中国", "澳大利亚", "190"],
+    ["中国", "新加坡", "410"],
+    ["中国", "日本", "380"],
+    ["中国", "印度", "150"],
+    ["中国", "英国", "210"],
+    ["中国", "巴西", "90"],
+  ],
+  categoryColumn: "来源",
+  seriesColumns: ["航班量 班"],
+  roleDefaults: {
+    source: "来源",
+    target: "去向",
+    value: "航班量 班",
+  },
+};
+
 const SAMPLE_SPLIT_AXIS: SampleData = {
   table: [
     ["月份", "销售额 万"],
@@ -2620,6 +2718,63 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     capabilities: CAP_CARTESIAN_NO_LEGEND,
     buildOption: buildSmallMultiplesOption,
     sampleData: SAMPLE_SMALL_MULTIPLES,
+  },
+
+  // --- Map family (Flourish parity batch 11) -------------------------------
+  worldChoropleth: {
+    id: "worldChoropleth",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildWorldChoroplethOption,
+    sampleData: SAMPLE_WORLD_CHOROPLETH,
+    geoMap: "world",
+  },
+  chinaChoropleth: {
+    id: "chinaChoropleth",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND,
+    capabilities: CAP_NON_CARTESIAN_NO_LEGEND,
+    buildOption: buildChinaChoroplethOption,
+    sampleData: SAMPLE_CHINA_CHOROPLETH,
+    geoMap: "china",
+  },
+  symbolMap: {
+    id: "symbolMap",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: GRAPHIC_GROUPS,
+    capabilities: { ...CAP_NON_CARTESIAN_NO_LEGEND, labels: false },
+    buildOption: buildSymbolMapOption,
+    sampleData: SAMPLE_SYMBOL_MAP,
+    geoMap: "world",
+  },
+  geoHeatmap: {
+    id: "geoHeatmap",
+    family: "other",
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_VALUE_SINGLE],
+    validators: BASE_VALIDATORS,
+    settingsGroups: GRAPHIC_GROUPS,
+    capabilities: { ...CAP_NON_CARTESIAN_NO_LEGEND, labels: false },
+    buildOption: buildGeoHeatmapOption,
+    sampleData: SAMPLE_GEO_HEATMAP,
+    geoMap: "world",
+  },
+  flowMap: {
+    id: "flowMap",
+    family: "other",
+    dataBindings: [BIND_SOURCE, BIND_TARGET, BIND_VALUE_SINGLE],
+    validators: [...BASE_VALIDATORS, requireSankeyColumns],
+    settingsGroups: GRAPHIC_GROUPS,
+    capabilities: { ...CAP_NON_CARTESIAN_NO_LEGEND, labels: false },
+    buildOption: buildFlowMapOption,
+    sampleData: SAMPLE_FLOW_MAP,
+    geoMap: "world",
   },
 };
 

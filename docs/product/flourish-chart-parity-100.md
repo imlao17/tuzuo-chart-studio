@@ -1,6 +1,6 @@
 # Flourish 对标：补齐 100 种常用图表 · 自动化执行手册
 
-更新日期：2026-09-07
+更新日期：2026-09-08
 
 本文档是**可执行的工作单**。自动化执行者（agent）必须先完整阅读本文档，再按「自动化执行协议」逐批次实施。人工协作者也可以用它跟踪进度。
 
@@ -77,7 +77,7 @@
 | 8 | 环饼与箱线补充 | 4 | 已完成 | 2026-09-07 | 随本批提交（"Add 4 pie/boxplot extension chart templates…"） | 半环形图为 pie 渲染的 patch（180°–360° 扫掠）；多层环形每列一环 |
 | 9 | 卡片、表格与文字 | 5 | 已完成 | 2026-09-07 | 随本批提交（"Add 5 card/table/text chart templates…"） | **词云依赖决策：不引入 echarts-wordcloud**（canvas-only、破坏 SVG 导出、违反红线 4），改为 graphic 文本 + 阿基米德螺旋自绘确定性布局 |
 | 10 | 时间与分面 | 3 | 已完成 | 2026-09-07 | 随本批提交（"Add 3 time/facet chart templates…"） | 甘特图=透明基座浮动条；时间线标签上下交替；小倍数每列一个 grid 面板 |
-| 11 | 地图家族 | 5 | 待开始 | — | — | **先做 GeoJSON 基础设施决策（见批次说明）** |
+| 11 | 地图家族 | 5 | 已完成 | 2026-09-08 | 随本批提交（"Add 5 map chart templates…"） | **GeoJSON 决策**：世界图取 Apache ECharts 官方 MIT 测试数据（1.0MB）、中国省级取 DataV.GeoAtlas（0.6MB），静态放 `public/geo/`，页面按模板懒加载 + `registerMap`（`src/studio/geo/register-maps.ts`）；世界地名经内置 nameMap 映射为中文；符号/热力/流向用内置国名质心表，无需坐标数据 |
 
 ## 7. 全量清单（100 = 已有 30 + 新增 70）
 
@@ -206,11 +206,11 @@
 
 | # | 中文名 | id | ECharts 方案 | 数据绑定要点 | 状态 |
 |---|---|---|---|---|---|
-| 66 | 世界分级统计地图 | `worldChoropleth` | map 系列 + visualMap | 地名列（世界国名，中/英文映射表）+ 1 数值列 | 待做 |
-| 67 | 中国分级统计地图 | `chinaChoropleth` | map（中国省级） | 省名列 + 1 数值列 | 待做 |
-| 68 | 符号地图 | `symbolMap` | geo 底图 + scatter/effectScatter（大小随值） | 地名列 + 1 数值列（内置地名→经纬度质心表） | 待做 |
-| 69 | 地点热力地图 | `geoHeatmap` | geo 底图 + heatmap | 同上（质心 + 权重） | 待做 |
-| 70 | 流向地图 | `flowMap` | geo 底图 + lines 系列（地名对 → 质心弧线） | 来源列 + 去向列 + 1 数值列 | 待做 |
+| 66 | 世界分级统计地图 | `worldChoropleth` | map 系列 + visualMap | 地名列（世界国名，中/英文映射表）+ 1 数值列 | 完成 |
+| 67 | 中国分级统计地图 | `chinaChoropleth` | map（中国省级） | 省名列 + 1 数值列 | 完成 |
+| 68 | 符号地图 | `symbolMap` | geo 底图 + scatter/effectScatter（大小随值） | 地名列 + 1 数值列（内置地名→经纬度质心表） | 完成 |
+| 69 | 地点热力地图 | `geoHeatmap` | geo 底图 + heatmap | 同上（质心 + 权重） | 完成 |
+| 70 | 流向地图 | `flowMap` | geo 底图 + lines 系列（地名对 → 质心弧线） | 来源列 + 去向列 + 1 数值列 | 完成 |
 
 ### 已有 30 个模板（对照锚点，状态：已有）
 
