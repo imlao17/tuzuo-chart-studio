@@ -122,6 +122,18 @@ test("projects: validateData enforces string, JSON validity, and size quota", ()
   const validJson = JSON.stringify({ chartType: "bar", tableData: [["A", "B"], ["1", "2"]] });
   assert.equal(validateData(validJson), validJson);
 
+  assert.throws(
+    () => validateData(JSON.stringify({ note: "not a project" })),
+    (err: unknown) =>
+      err instanceof AuthError &&
+      err.code === "PROJECT_DATA_INVALID" &&
+      err.status === 400,
+  );
+  assert.throws(
+    () => validateData(JSON.stringify({ chartType: 42 })),
+    (err: unknown) => err instanceof AuthError && err.code === "PROJECT_DATA_INVALID",
+  );
+
   const oversizedData = JSON.stringify({ padding: "x".repeat(MAX_PROJECT_DATA_BYTES + 10) });
   assert.throws(
     () => validateData(oversizedData),

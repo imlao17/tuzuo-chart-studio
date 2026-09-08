@@ -74,10 +74,25 @@ export function validateData(data: unknown) {
       "项目内容过大，请精简数据后再保存",
     );
   }
+  let parsed: unknown;
   try {
-    JSON.parse(data);
+    parsed = JSON.parse(data);
   } catch {
     throw new AuthError(400, "PROJECT_DATA_INVALID", "项目内容格式无效");
+  }
+  // Minimal shape gate: the editor's normalizeProject tolerates partial data,
+  // but garbage that isn't even a project object would fail on every open.
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    !Array.isArray((parsed as { tableData?: unknown }).tableData) ||
+    typeof (parsed as { chartType?: unknown }).chartType !== "string"
+  ) {
+    throw new AuthError(
+      400,
+      "PROJECT_DATA_INVALID",
+      "项目内容缺少必要的图表字段",
+    );
   }
   return data;
 }

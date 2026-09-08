@@ -1,4 +1,4 @@
-import { and, eq, gt, ne } from "drizzle-orm";
+import { and, eq, gt, lt, ne } from "drizzle-orm";
 import type { NextResponse } from "next/server";
 import {
   authRateLimits,
@@ -196,6 +196,12 @@ export async function loginWithEmail(
     createdAt: now,
     lastSeenAt: now,
   });
+
+  // Housekeeping: drop expired rows so the tables don't grow forever.
+  await db.delete(sessions).where(lt(sessions.expiresAt, now));
+  await db
+    .delete(emailVerificationTokens)
+    .where(lt(emailVerificationTokens.expiresAt, now));
 
   return {
     sessionToken,
