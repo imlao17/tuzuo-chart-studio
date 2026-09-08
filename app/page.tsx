@@ -2079,6 +2079,9 @@ export default function Home() {
     // together, so a single 撤销 returns to the previous template with its
     // own data intact.
     loadSampleFor(nextDef, `已载入「${name}」示例数据`, type);
+    // A template switch starts a new chart; unbind the previously opened
+    // cloud project so 更新 can never overwrite it with unrelated content.
+    setCloudProjectId(null);
     setCloudProjectId(null);
     setTemplateOpen(false);
     setWorkspaceMode("preview");
