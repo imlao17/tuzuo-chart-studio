@@ -34,7 +34,6 @@ export function useAuthSession({
 
   useEffect(() => {
     let cancelled = false;
-    let frame = 0;
 
     async function loadSession() {
       try {
@@ -53,7 +52,10 @@ export function useAuthSession({
       }
     }
 
-    frame = window.requestAnimationFrame(() => {
+    // setTimeout instead of rAF: a throttled frame queue (backgrounded pane)
+    // pauses rAF entirely and the ?verified / ?reset / ?auth_error handling
+    // would never run; timers only slow down, so they always fire.
+    const frame = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       if (params.get("verified") === "1") {
         setAuthMode("login");
@@ -89,12 +91,12 @@ export function useAuthSession({
           `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`,
         );
       }
-    });
+    }, 0);
 
     loadSession();
     return () => {
       cancelled = true;
-      window.cancelAnimationFrame(frame);
+      window.clearTimeout(frame);
     };
   }, [requireAuthForExport, setStatus]);
 
@@ -181,6 +183,14 @@ export function useAuthSession({
       },
     };
     const endpoint = endpoints[authMode];
+
+    if (
+      (authMode === "register" || authMode === "change") &&
+      authConfirmPassword !== authPassword
+    ) {
+      setAuthMessage("两次输入的密码不一致");
+      return;
+    }
 
     try {
       const response = await fetch(endpoint.url, {

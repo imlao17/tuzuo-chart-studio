@@ -82,7 +82,7 @@ npm run desktop:mac       # 生成未签名的内测 DMG 与 ZIP
 
 ## 部署与账号体系
 
-当前版本已经接入最小可上线账号闭环：邮箱注册、邮箱验证、登录会话、登出、登录/注册限流，以及可配置的下载权限拦截。
+当前版本已经接入可用的账号闭环：邮箱注册、邮箱验证、登录会话、登出、忘记密码（邮件重置链接，30 分钟有效）、修改密码（改后其他设备下线）、登录/注册/重置限流，以及可配置的下载权限拦截。登录后还可以使用**云端项目**：把当前图表（含数据、模板、样式）保存到账号下，随时在其他浏览器打开，每个账号最多 50 个项目、单项 1MB。
 
 两种运行方式：
 
@@ -96,11 +96,13 @@ npm run desktop:mac       # 生成未签名的内测 DMG 与 ZIP
 | 配置 | 用途 |
 |---|---|
 | `DB` | Cloudflare D1 绑定名，已在 `.openai/hosting.json` 里声明为 `"d1": "DB"` |
-| `RESEND_API_KEY` | 发送邮箱验证邮件 |
+| `RESEND_API_KEY` | 发送邮箱验证与密码重置邮件 |
 | `EMAIL_FROM` | 验证邮件发件人，例如 `图作 <no-reply@example.com>` |
 | `APP_BASE_URL` | 生产站点根地址，用来生成邮箱验证链接 |
 
-本地开发可临时配置 `AUTH_DEV_SHOW_VERIFICATION_LINK=true`。这样即使没有配置邮件服务，注册接口也会返回验证链接，方便本地验证流程；生产环境不要开启。
+本地开发可临时配置 `AUTH_DEV_SHOW_VERIFICATION_LINK=true`（写入 `.dev.vars`，已被 git 忽略）。这样即使没有配置邮件服务，注册与忘记密码接口也会直接返回验证/重置链接，方便本地验证流程；生产环境不要开启。
+
+云端项目与账号数据存储在 D1（数据表：`users`、`email_verification_tokens`、`password_reset_tokens`、`sessions`、`auth_rate_limits`、`projects`）。注意：账号 API 需要 D1 绑定，`vinext start` 生产模式必须绑定真实 D1；本地验证账号功能请用 `vinext dev`。
 
 数据库迁移流程：
 

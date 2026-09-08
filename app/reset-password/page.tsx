@@ -18,11 +18,13 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
+    // setTimeout instead of rAF: a throttled frame queue (backgrounded pane)
+    // pauses rAF entirely, leaving the token empty and the form unusable.
+    const timer = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       setToken(params.get("token") ?? "");
-    });
-    return () => window.cancelAnimationFrame(frame);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
