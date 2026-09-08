@@ -14,6 +14,7 @@ import type { RenderContext } from "../template-definition";
 import {
   colorFor,
   dataLabelTextStyle,
+  inShapeLabelTextStyle,
   LEGEND_HORIZONTAL_SPACE,
   LEGEND_VERTICAL_SPACE,
   type RendererResult,
@@ -210,7 +211,6 @@ export function buildRadialBarOption(ctx: RenderContext): RendererResult {
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const stacked = config.type === "radialStackedBar";
   const frame = buildPolarFrame(ctx, categories);
-  const labelTextStyle = dataLabelTextStyle(config);
   const series: SeriesOption[] = dataSeries.map((item, index) => ({
     name: item.name,
     type: "bar",
@@ -226,7 +226,8 @@ export function buildRadialBarOption(ctx: RenderContext): RendererResult {
     label: {
       show: compact ? false : config.showLabels,
       position: "middle",
-      ...labelTextStyle,
+      // Middle labels sit ON the colored bar; match the ink to it.
+      ...inShapeLabelTextStyle(config, colorFor(index, config, item.name)),
       formatter: (params: unknown) => {
         const entry = params as { value: string | number };
         return ctx.formatNumber(entry.value);

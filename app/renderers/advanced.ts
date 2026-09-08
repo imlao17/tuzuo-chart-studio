@@ -14,6 +14,7 @@ import {
   buildValueAxis,
   colorFor,
   dataLabelTextStyle,
+  inShapeLabelTextStyle,
   LEGEND_HORIZONTAL_SPACE,
   LEGEND_VERTICAL_SPACE,
   resolveDataLabelPosition,
@@ -246,6 +247,10 @@ export function buildHeatmapOption(ctx: RenderContext): RendererResult {
         label: {
           show: compact ? false : config.showLabels,
           ...labelTextStyle,
+          // Cell colors ramp light→primary; the outline keeps ink readable
+          // on the dark end of the ramp.
+          textBorderColor: config.transparent ? "rgba(255,255,255,0.9)" : config.backgroundColor,
+          textBorderWidth: 1.5,
           formatter: (params: unknown) => {
             const value = (params as { value?: [number, number, number] }).value;
             return value ? formatNumber(value[2]) : "";
@@ -264,7 +269,9 @@ export function buildTreemapOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
   const primary = dataSeries[0] ?? { name: "数值", data: [] };
   const box = contentBox(ctx);
-  const labelTextStyle = dataLabelTextStyle(config);
+  // Treemap cells are filled with the palette color; the label must contrast
+  // against it (white ink on the default deep blue).
+  const labelTextStyle = inShapeLabelTextStyle(config, colorFor(0, config));
   const markOpacity = (config.markOpacity ?? 100) / 100;
 
   return {
@@ -305,7 +312,6 @@ export function buildFunnelOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries, formatNumber } = ctx;
   const primary = dataSeries[0] ?? { name: "数值", data: [] };
   const box = contentBox(ctx);
-  const labelTextStyle = dataLabelTextStyle(config);
   const values = finiteValues(primary.data);
   const markOpacity = (config.markOpacity ?? 100) / 100;
 
@@ -325,7 +331,7 @@ export function buildFunnelOption(ctx: RenderContext): RendererResult {
         label: {
           show: config.compact ? false : config.showLabels,
           position: resolveDataLabelPosition(config, "inside"),
-          ...labelTextStyle,
+          ...inShapeLabelTextStyle(config, colorFor(0, config)),
           formatter: (params: unknown) => {
             const item = params as { name: string; value: number };
             return `${item.name} ${formatNumber(item.value)}`;
@@ -731,6 +737,8 @@ export function buildCalendarHeatmapOption(ctx: RenderContext): RendererResult {
         show: compact ? false : config.showLabels,
         ...labelTextStyle,
         fontSize: Math.max(8, fontSize - 3),
+        textBorderColor: config.transparent ? "rgba(255,255,255,0.9)" : config.backgroundColor,
+        textBorderWidth: 1.5,
         formatter: (params: unknown) => {
           const entry = params as { value: [string, number] };
           return ctx.formatNumber(entry.value[1]);
@@ -945,6 +953,9 @@ export function buildCorrelationMatrixOption(ctx: RenderContext): RendererResult
         show: compact ? false : config.showLabels,
         ...labelTextStyle,
         fontSize: Math.max(8, fontSize - 2),
+        // Cells ramp blue→white→red; the outline keeps ink readable on both ends.
+        textBorderColor: config.transparent ? "rgba(255,255,255,0.9)" : config.backgroundColor,
+        textBorderWidth: 1.5,
         formatter: (params: unknown) => {
           const entry = params as { value: [number, number, number] };
           return entry.value[2].toFixed(2);
@@ -1543,6 +1554,8 @@ export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
         show: !compact && config.showLabels,
         ...labelTextStyle,
         fontSize: Math.max(8, fontSize - 2),
+        textBorderColor: config.transparent ? "rgba(255,255,255,0.9)" : config.backgroundColor,
+        textBorderWidth: 1.5,
         formatter: (params: unknown) => {
           const entry = params as { value: [number, number, number] };
           return entry.value[2] > 0 ? String(entry.value[2]) : "";

@@ -10,7 +10,9 @@
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
 import {
+  colorFor,
   dataLabelTextStyle,
+  inShapeLabelTextStyle,
   LEGEND_HORIZONTAL_SPACE,
   LEGEND_VERTICAL_SPACE,
   resolvePieLabelPosition,
@@ -129,7 +131,11 @@ export function buildPieOption(ctx: RenderContext): RendererResult {
       label: {
         show: compact ? false : config.showLabels,
         position: resolvePieLabelPosition(config),
-        ...labelTextStyle,
+        // Inside labels sit on the slice fill and need contrast ink; outside
+        // labels stay on the canvas and keep the theme ink.
+        ...(resolvePieLabelPosition(config) === "inside"
+          ? inShapeLabelTextStyle(config, colorFor(0, config, primary.name))
+          : labelTextStyle),
         formatter: labelFormatter,
         lineHeight: labelTextStyle.fontSize + 5,
       },

@@ -12,6 +12,7 @@ import type { RenderContext } from "../template-definition";
 import {
   colorFor,
   dataLabelTextStyle,
+  inShapeLabelTextStyle,
   type RendererResult,
 } from "./shared";
 
@@ -42,7 +43,6 @@ function buildHierarchy(ctx: RenderContext, rootName = "总览"): HierarchyNode 
 export function buildSunburstOption(ctx: RenderContext): RendererResult {
   const { config } = ctx;
   const { compact = false } = config;
-  const labelTextStyle = dataLabelTextStyle(config);
   const series: SeriesOption[] = [
     {
       name: "层级",
@@ -52,7 +52,8 @@ export function buildSunburstOption(ctx: RenderContext): RendererResult {
       data: [buildHierarchy(ctx)],
       label: {
         show: compact ? false : config.showLabels,
-        ...labelTextStyle,
+        // Arcs use palette colors; the ink must contrast with them.
+        ...inShapeLabelTextStyle(config, colorFor(0, config)),
         rotate: "radial" as const,
         minAngle: 8,
       },

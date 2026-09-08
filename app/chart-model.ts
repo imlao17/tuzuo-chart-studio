@@ -275,6 +275,10 @@ export type ChartConfig = {
   sizeColumn?: string;
   colorColumn?: string;
   shapeColumn?: string;
+  // Labels drawn on colored shapes (treemap, sunburst, funnel, radial bars,
+  // heatmap cells, pie-inside) auto-switch between dark and white text for
+  // contrast. On by default; an explicit 数据标签颜色 always wins.
+  labelAutoContrast?: boolean;
   // Quadrant chart only: reference lines use the median (default) or the mean.
   quadrantCenter?: "median" | "mean";
   // Pictorial column only: value each unit glyph represents. Undefined lets

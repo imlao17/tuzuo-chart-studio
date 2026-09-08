@@ -103,6 +103,50 @@ export function dataLabelTextStyle(config: ChartConfig) {
   );
 }
 
+/** Perceived luminance of a hex color (0 = darkest, 1 = lightest). */
+export function hexLuminance(hex: string) {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!match) return 0;
+  const value = parseInt(match[1], 16);
+  const channel = (shift: number) => {
+    const raw = (value >> shift) & 0xff;
+    const normalized = raw / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0);
+}
+
+/**
+ * Label color for text drawn ON a colored shape (treemap cells, sunburst
+ * arcs, funnel slices, radial bars, pie-inside). Auto-contrast picks white
+ * or dark ink by the fill's luminance; an explicit 数据标签颜色 always wins;
+ * labelAutoContrast: false restores the old fixed theme ink.
+ */
+export function inShapeLabelColor(
+  config: ChartConfig,
+  fillColor: string,
+): string {
+  if (config.labelStyle?.color || config.labelColor) {
+    return dataLabelColor(config);
+  }
+  if (config.labelAutoContrast === false) {
+    return config.theme.text;
+  }
+  const luminance = hexLuminance(fillColor);
+  return luminance < 0.4 ? "#ffffff" : config.theme.text;
+}
+
+/** Label text style for in-shape labels (auto contrast + user overrides). */
+export function inShapeLabelTextStyle(config: ChartConfig, fillColor: string) {
+  return resolveTextStyle(
+    config.labelStyle,
+    inShapeLabelColor(config, fillColor),
+    config.fontSize,
+  );
+}
+
 function titleTextStyle(config: ChartConfig, textColor: string, fontSize: number) {
   return resolveTextStyle(
     config.titleStyle,
