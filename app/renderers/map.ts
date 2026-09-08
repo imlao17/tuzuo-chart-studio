@@ -11,12 +11,43 @@
  */
 import type { SeriesOption } from "echarts";
 import { columnIndex, toNumber } from "../chart-model";
-import type { RenderContext } from "../template-definition";
+import type { RenderContext, ValidationContext } from "../template-definition";
 import {
   colorFor,
   dataLabelTextStyle,
   type RendererResult,
 } from "./shared";
+
+/**
+ * Whether at least `min` of the category names resolve to known geography
+ * (centroid hits for point templates, mapped/province names for choropleths).
+ * Templates whose points would all be filtered out should auto-load their
+ * sample data instead of rendering an empty-looking map.
+ */
+export function hasKnownGeoNames(
+  ctx: ValidationContext,
+  min: number,
+  scope: "centroids" | "world" | "china",
+): boolean {
+  const categoryIndex = columnIndex(ctx.parsed.headers, ctx.categoryColumn);
+  const names = ctx.parsed.rows.map((row) => row[categoryIndex]);
+  const valueColumn = ctx.seriesColumns.find((header) =>
+    ctx.parsed.numericHeaders.includes(header),
+  );
+  const valueIndex = columnIndex(ctx.parsed.headers, valueColumn ?? "");
+  const values = ctx.parsed.rows.map((row) => toNumber(row[valueIndex] ?? ""));
+  let hits = 0;
+  for (let index = 0; index < names.length; index += 1) {
+    const name = names[index]?.trim() ?? "";
+    const value = values[index];
+    if (!Number.isFinite(value)) continue;
+    if (scope === "centroids" && COUNTRY_CENTROIDS[name] !== undefined) hits += 1;
+    else if (scope === "world" && Object.values(WORLD_NAME_MAP).includes(name)) hits += 1;
+    else if (scope === "china" && name.endsWith("省") || name.endsWith("市") || name.endsWith("自治区")) hits += 1;
+    if (hits >= min) return true;
+  }
+  return false;
+}
 
 /** GeoJSON (English) name → the Chinese names used in user data. */
 const WORLD_NAME_MAP: Record<string, string> = {

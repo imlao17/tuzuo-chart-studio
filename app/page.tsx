@@ -427,6 +427,16 @@ function cloneFieldRoles(roles: FieldRoles): FieldRoles {
   ) as FieldRoles;
 }
 
+// Field roles hold a string for single-column bindings and a string[] for
+// multi-column ones. Template switches preserve roles, so every read must
+// tolerate both shapes — a string reaching the multi-series branch used to
+// crash the whole editor (value?.filter is not a function → blank preview).
+function roleAsList(value: string | string[] | undefined): string[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string" && value) return [value];
+  return [];
+}
+
 function cloneProject(project: ProjectState = DEFAULT_PROJECT): ProjectState {
   return {
     ...project,
@@ -1230,9 +1240,9 @@ export default function Home() {
       resolvedRoles.rightValue = right;
     } else {
       // generic multi-series templates: value role, selection order preserved.
-      const selected = (fieldRoles.value as string[] | undefined)?.filter(
-        (header) => numeric.includes(header),
-      ) ?? [];
+      const selected = roleAsList(fieldRoles.value).filter((header) =>
+        numeric.includes(header),
+      );
       seriesColumns = selected.length ? selected : numeric.slice(0, 1);
     }
 
@@ -1510,19 +1520,20 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
+    // Direct synchronous setOption: wrapping this in requestAnimationFrame
+    // left the preview stuck on the previous chart whenever the frame queue
+    // was throttled (backgrounded tab, occluded pane) — the template state
+    // advanced but the canvas never repainted.
+    if (dataError) {
       // When data validation fails, clear any previously rendered chart so the
       // preview overlay is the only thing visible (no stale/misleading chart).
-      if (dataError) {
-        chartRef.current?.clear();
-        return;
-      }
-      const geoMap = templateDefinition.geoMap;
-      if (geoMap && !isGeoMapRegistered(geoMap)) return;
-      chartRef.current?.resize({ width, height });
-      chartRef.current?.setOption(option, true);
-    });
-    return () => window.cancelAnimationFrame(frame);
+      chartRef.current?.clear();
+      return;
+    }
+    const geoMap = templateDefinition.geoMap;
+    if (geoMap && !isGeoMapRegistered(geoMap)) return;
+    chartRef.current?.resize({ width, height });
+    chartRef.current?.setOption(option, true);
   }, [dataError, height, option, width, workspaceMode, templateDefinition.geoMap, geoMapTick]);
 
   useEffect(() => {
@@ -1879,10 +1890,11 @@ export default function Home() {
       sourceColumn,
       targetColumn,
     };
-    const incompatible = nextDef.validators.some(
-      (validator) => validator.validate(context) !== null,
+    const passesValidators = nextDef.validators.every(
+      (validator) => validator.validate(context) === null,
     );
-    if (incompatible) {
+    const usableData = passesValidators && (!nextDef.canUseData || nextDef.canUseData(context));
+    if (!usableData) {
       const name =
         CHART_TEMPLATES.find((template) => template.id === type)?.name ?? type;
       loadSampleFor(nextDef, `已载入「${name}」示例数据`);
@@ -2140,7 +2152,7 @@ export default function Home() {
         if (binding.multiple) {
           // Multi-column value role: checkbox list, selection order preserved
           // (toggleSeries appends to the end).
-          const selected = (fieldRoles.value as string[] | undefined) ?? [];
+          const selected = roleAsList(fieldRoles.value);
           return (
             <div key={binding.role} className="series-list">
               <span className="field-caption">
