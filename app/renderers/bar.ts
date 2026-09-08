@@ -478,7 +478,6 @@ export function buildPictorialOption(ctx: RenderContext): RendererResult {
     config.pictorialUnitValue !== undefined && config.pictorialUnitValue > 0
       ? config.pictorialUnitValue
       : adaptiveUnit;
-  const unitPixelHeight = Math.round(unitValue * 10) / 10;
 
   const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
   const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);

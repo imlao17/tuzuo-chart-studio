@@ -1411,6 +1411,8 @@ export default function Home() {
     [
       areaOpacity,
       axisLabelRotation,
+      pictorialUnitValueInput,
+      quadrantCenter,
       backgroundColor,
       barCategoryGap,
       barGap,
