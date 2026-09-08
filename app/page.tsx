@@ -63,7 +63,6 @@ import {
   type DataBindingRole,
   getTemplateDefinition,
   type TemplateDefinition,
-  type ValidationContext,
 } from "./template-definition";
 import {
   downloadBlob,
@@ -1879,27 +1878,17 @@ export default function Home() {
   }
 
   function selectTemplate(type: ChartType) {
-    // Keep the user's data when its shape satisfies the new template, but
-    // auto-load the template's sample data otherwise — a template switch must
-    // always land on a visible chart, never an empty error state.
+    // Every template switch loads the target template's sample data: the
+    // gallery thumbnails preview exactly that data, so what you click is what
+    // you get. The load goes through the undoable checkpoint history, so
+    // switching back (or 撤销) restores the user's own table.
     const nextDef = getTemplateDefinition(type);
-    const context: ValidationContext = {
-      parsed,
-      categoryColumn,
-      seriesColumns,
-      sourceColumn,
-      targetColumn,
-    };
-    const passesValidators = nextDef.validators.every(
-      (validator) => validator.validate(context) === null,
-    );
-    const usableData = passesValidators && (!nextDef.canUseData || nextDef.canUseData(context));
-    if (!usableData) {
-      const name =
-        CHART_TEMPLATES.find((template) => template.id === type)?.name ?? type;
-      loadSampleFor(nextDef, `已载入「${name}」示例数据`);
-    }
-    setChartType(type);
+    const name =
+      CHART_TEMPLATES.find((template) => template.id === type)?.name ?? type;
+    // One atomic checkpoint: sample table + role bindings + the new type
+    // together, so a single 撤销 returns to the previous template with its
+    // own data intact.
+    loadSampleFor(nextDef, `已载入「${name}」示例数据`, type);
     setTemplateOpen(false);
     setWorkspaceMode("preview");
   }
@@ -1908,7 +1897,7 @@ export default function Home() {
     loadSampleFor(templateDefinition, "已加载示例数据");
   }
 
-  function loadSampleFor(def: TemplateDefinition, label: string) {
+  function loadSampleFor(def: TemplateDefinition, label: string, type?: ChartType) {
     // Load the target template's semantically appropriate sample data into the
     // editor. Replaces the table and role bindings, but leaves styling
     // (palette, canvas, margins) untouched.
@@ -1957,6 +1946,7 @@ export default function Home() {
     const sampleProject = cloneProject(currentProject);
     sampleProject.tableData = sampleData.table.map((row) => [...row]);
     sampleProject.fieldRoles = cloneFieldRoles(nextRoles);
+    if (type) sampleProject.chartType = type;
     applyCheckpoint(sampleProject, JSON.stringify(sampleProject), label);
   }
 
