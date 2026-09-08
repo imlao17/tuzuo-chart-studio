@@ -81,6 +81,7 @@ import {
   buildGeoHeatmapOption,
   buildSymbolMapOption,
   buildWorldChoroplethOption,
+  hasKnownGeoNames,
 } from "./renderers/map";
 import { buildComboOption, buildParetoOption } from "./renderers/combo";
 import { buildDivergingOption } from "./renderers/diverging";
@@ -203,6 +204,13 @@ export type TemplateDefinition = {
   buildOption?: (ctx: RenderContext) => RendererResult;
   /** Map-family templates: the GeoJSON registered before first render. */
   geoMap?: "world" | "china";
+  /**
+   * Semantic data check beyond shape validators: when the current table
+   * passes the validators but cannot produce meaningful marks (e.g. a map
+   * template whose place names resolve to nothing), the template switch
+   * auto-loads the sample data instead of rendering a near-empty chart.
+   */
+  canUseData?: (ctx: ValidationContext) => boolean;
 };
 
 // --- Shared settings-group declarations -------------------------------------
@@ -2731,6 +2739,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     buildOption: buildWorldChoroplethOption,
     sampleData: SAMPLE_WORLD_CHOROPLETH,
     geoMap: "world",
+    canUseData: (ctx) => hasKnownGeoNames(ctx, 1, "world"),
   },
   chinaChoropleth: {
     id: "chinaChoropleth",
@@ -2742,6 +2751,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     buildOption: buildChinaChoroplethOption,
     sampleData: SAMPLE_CHINA_CHOROPLETH,
     geoMap: "china",
+    canUseData: (ctx) => hasKnownGeoNames(ctx, 1, "china"),
   },
   symbolMap: {
     id: "symbolMap",
@@ -2753,6 +2763,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     buildOption: buildSymbolMapOption,
     sampleData: SAMPLE_SYMBOL_MAP,
     geoMap: "world",
+    canUseData: (ctx) => hasKnownGeoNames(ctx, 1, "centroids"),
   },
   geoHeatmap: {
     id: "geoHeatmap",
@@ -2764,6 +2775,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     buildOption: buildGeoHeatmapOption,
     sampleData: SAMPLE_GEO_HEATMAP,
     geoMap: "world",
+    canUseData: (ctx) => hasKnownGeoNames(ctx, 1, "centroids"),
   },
   flowMap: {
     id: "flowMap",
@@ -2775,6 +2787,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
     buildOption: buildFlowMapOption,
     sampleData: SAMPLE_FLOW_MAP,
     geoMap: "world",
+    canUseData: (ctx) => hasKnownGeoNames(ctx, 1, "centroids"),
   },
 };
 
