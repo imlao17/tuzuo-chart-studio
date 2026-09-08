@@ -273,11 +273,13 @@ export function buildBarTableOption(ctx: RenderContext): RendererResult {
         style: { fill: labelTextStyle, opacity: config.transparent ? 0.9 : 0.92 },
       } as unknown as GraphicElement,
       textElement({
-        x: barLeft + barAreaWidth + box.width * 0.04,
+        // Right-align the value against the card edge so long numbers can
+        // never spill past the canvas.
+        x: box.x + box.width,
         y: centerY,
         style: {
           text: ctx.formatNumber(row.value),
-          textAlign: "left",
+          textAlign: "right",
           textVerticalAlign: "middle",
           fill: theme.text,
           font: `${Math.round(nameSize)}px "Inter", "PingFang SC", sans-serif`,

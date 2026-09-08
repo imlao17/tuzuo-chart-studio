@@ -589,7 +589,9 @@ export function buildSankeyOption(ctx: RenderContext): RendererResult {
         name: valueName || "流量",
         type: "sankey",
         top: box.top,
-        right: box.right,
+        // The last column's labels draw to the right of its nodes; without
+        // extra room the canvas edge clips them (新加坡 → 新加).
+        right: box.right + (config.compact ? 18 : 68),
         bottom: box.bottom,
         left: box.left,
         nodeAlign: "justify",

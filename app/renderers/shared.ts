@@ -497,16 +497,51 @@ function assembleOption(
   // returned by templates that still run legacy today. Mirror the legacy
   // condition accordingly.
   const hasSingleAxis = Boolean(patched.singleAxis);
+  let computedGrid = {
+    top: gridTop,
+    right: gridRight,
+    bottom: gridBottom,
+    left: gridLeft,
+    containLabel: !compact,
+  };
+  // Horizontal bar layouts draw data labels past each bar's end, i.e. beyond
+  // the largest value at the grid's right edge. Without extra room the canvas
+  // edge clips those labels, so reserve roughly one label width.
+  const horizontalLayout =
+    (patched.xAxis as { type?: string })?.type === "value" &&
+    (patched.yAxis as { type?: string })?.type === "category";
+  if (
+    !compact &&
+    capabilities.labels &&
+    config.showLabels &&
+    horizontalLayout
+  ) {
+    computedGrid = {
+      ...computedGrid,
+      right: computedGrid.right + Math.round(fontSize * 5.5),
+    };
+  }
+  // Line charts with end labels have the same overflow: the label sits just
+  // past the last point, which touches the grid's right edge.
+  const seriesList = Array.isArray(patched.series)
+    ? patched.series
+    : patched.series
+      ? [patched.series]
+      : [];
+  const usesEndLabel = !compact && seriesList.some((series) => {
+    const endLabel = (series as { endLabel?: { show?: boolean } }).endLabel;
+    return endLabel?.show === true;
+  });
+  if (usesEndLabel) {
+    computedGrid = {
+      ...computedGrid,
+      right: computedGrid.right + Math.round(fontSize * 5.5),
+    };
+  }
   const grid =
     !capabilities.axes || hasSingleAxis
       ? undefined
-      : (patched.grid ?? {
-          top: gridTop,
-          right: gridRight,
-          bottom: gridBottom,
-          left: gridLeft,
-          containLabel: !compact,
-        });
+      : (patched.grid ?? computedGrid);
 
   return {
     animation: !compact,
