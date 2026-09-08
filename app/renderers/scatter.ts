@@ -231,7 +231,7 @@ export function buildTrendScatterOption(ctx: RenderContext): RendererResult {
   });
 }
 
-/** 象限图: scatter with median cross lines shading the four quadrants. */
+/** 象限图: scatter with median (or mean) cross lines shading the four quadrants. */
 export function buildQuadrantOption(ctx: RenderContext): RendererResult {
   const result = buildScatterOption(ctx);
   const { config } = ctx;
@@ -246,14 +246,18 @@ export function buildQuadrantOption(ctx: RenderContext): RendererResult {
     if (Number.isFinite(x)) xs.push(x);
     if (Number.isFinite(y)) ys.push(y);
   }
-  const median = (values: number[]) => {
+  const center = config.quadrantCenter === "mean" ? "mean" : "median";
+  const centerOf = (values: number[]) => {
     if (!values.length) return 0;
+    if (center === "mean") {
+      return values.reduce((sum, value) => sum + value, 0) / values.length;
+    }
     const sorted = [...values].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
     return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   };
-  const medX = median(xs);
-  const medY = median(ys);
+  const medX = centerOf(xs);
+  const medY = centerOf(ys);
   const [scatterSeries] = result.series;
   (scatterSeries as { markLine?: unknown }).markLine = {
     silent: true,

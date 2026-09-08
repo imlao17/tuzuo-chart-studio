@@ -275,6 +275,8 @@ export type ChartConfig = {
   sizeColumn?: string;
   colorColumn?: string;
   shapeColumn?: string;
+  // Quadrant chart only: reference lines use the median (default) or the mean.
+  quadrantCenter?: "median" | "mean";
   // Scatter only: draw a least-squares trend line through the points.
   scatterTrendLine?: boolean;
   // Combo only: split bar/line series across left and right Y axes.

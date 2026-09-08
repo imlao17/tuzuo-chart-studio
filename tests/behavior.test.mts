@@ -2189,3 +2189,86 @@ test("P100-11: flow map draws centroid arcs from source-target pairs", () => {
   assert.ok(first, "arcs carry real coordinates");
   assert.notEqual(sig(renderSample("flowMap", { markOpacity: 30 })), sig(renderSample("flowMap", { markOpacity: 90 })));
 });
+
+test("P100-B2: quadrant center switches between median and mean", () => {
+  const option = renderSample("quadrant");
+  const [scatter] = seriesList(option) as Array<{
+    markLine?: { data?: Array<{ xAxis?: number; yAxis?: number }> };
+  }>;
+  const medianOption = sig(renderSample("quadrant"));
+  // Default (absent) behaves as median.
+  const meanOption = sig(
+    buildChartOption(
+      baseConfig({
+        type: "quadrant",
+        parsed: tableToParsed([
+          ["产品", "价格", "满意度"],
+          ["A", "10", "90"],
+          ["B", "20", "80"],
+          ["C", "30", "70"],
+          ["D", "40", "60"],
+        ]),
+        categoryColumn: "产品",
+        seriesColumns: ["价格", "满意度"],
+        quadrantCenter: "mean",
+      }),
+    ),
+  );
+  assert.notEqual(meanOption, medianOption, "median and mean centers differ");
+  const lines = scatter.markLine?.data ?? [];
+  assert.equal(lines.length, 2, "one vertical + one horizontal center line");
+  // Median of 10,20,30,40 = 25; mean = 25. Craft an asymmetric dataset where
+  // they differ: values 10,20,30,90 → median 25, mean 37.5.
+  const optionMedian = sig(
+    buildChartOption(
+      baseConfig({
+        type: "quadrant",
+        parsed: tableToParsed([
+          ["产品", "价格", "满意度"],
+          ["A", "10", "10"],
+          ["B", "20", "20"],
+          ["C", "30", "30"],
+          ["D", "90", "90"],
+        ]),
+        categoryColumn: "产品",
+        seriesColumns: ["价格", "满意度"],
+      }),
+    ),
+  );
+  const optionMean = sig(
+    buildChartOption(
+      baseConfig({
+        type: "quadrant",
+        parsed: tableToParsed([
+          ["产品", "价格", "满意度"],
+          ["A", "10", "10"],
+          ["B", "20", "20"],
+          ["C", "30", "30"],
+          ["D", "90", "90"],
+        ]),
+        categoryColumn: "产品",
+        seriesColumns: ["价格", "满意度"],
+        quadrantCenter: "mean",
+      }),
+    ),
+  );
+  assert.notEqual(optionMedian, optionMean, "asymmetric data must differ between median/mean");
+  const linesMedian = (seriesList(
+    buildChartOption(
+      baseConfig({
+        type: "quadrant",
+        parsed: tableToParsed([
+          ["产品", "价格"],
+          ["A", "10"],
+          ["B", "20"],
+          ["C", "30"],
+          ["D", "90"],
+        ]),
+        categoryColumn: "产品",
+        seriesColumns: ["价格"],
+      }),
+    ),
+  )[0] as { markLine?: { data?: Array<{ xAxis?: number }> } }).markLine?.data ?? [];
+  const xMedian = linesMedian[0]?.xAxis;
+  assert.equal(xMedian, 25, "median of 10,20,30,90 is 25");
+});

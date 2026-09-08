@@ -190,6 +190,7 @@ type ProjectState = {
   colorColumn: string | null;
   shapeColumn: string | null;
   scatterTrendLine: boolean;
+  quadrantCenter: "median" | "mean";
   comboDualAxis: boolean;
   y2AxisTitle: string;
   comboAxisSync: boolean;
@@ -268,6 +269,7 @@ const DEFAULT_PROJECT: ProjectState = {
   colorColumn: null,
   shapeColumn: null,
   scatterTrendLine: false,
+  quadrantCenter: "median",
   comboDualAxis: false,
   y2AxisTitle: "",
   comboAxisSync: false,
@@ -865,6 +867,11 @@ function normalizeProject(input: unknown): ProjectState | null {
     sizeColumn: optionalTextValue(source.sizeColumn, base.sizeColumn),
     colorColumn: optionalTextValue(source.colorColumn, base.colorColumn),
     shapeColumn: optionalTextValue(source.shapeColumn, base.shapeColumn),
+    quadrantCenter: oneOf(
+      source.quadrantCenter,
+      ["median", "mean"] as const,
+      "median",
+    ),
     scatterTrendLine: booleanValue(
       source.scatterTrendLine,
       base.scatterTrendLine,
@@ -1002,6 +1009,9 @@ export default function Home() {
   );
   const [scatterTrendLine, setScatterTrendLine] = useState(
     DEFAULT_PROJECT.scatterTrendLine,
+  );
+  const [quadrantCenter, setQuadrantCenter] = useState(
+    DEFAULT_PROJECT.quadrantCenter,
   );
   // P1-5 combo dual Y axis. All default to off/empty = renderer unchanged.
   const [comboDualAxis, setComboDualAxis] = useState(
@@ -1349,6 +1359,7 @@ export default function Home() {
         sizeColumn: sizeColumn ?? undefined,
         colorColumn: colorColumn ?? undefined,
         shapeColumn: shapeColumn ?? undefined,
+        quadrantCenter: quadrantCenter === "mean" ? "mean" : undefined,
         scatterTrendLine: scatterTrendLine || undefined,
         comboDualAxis: comboDualAxis || undefined,
         y2AxisTitle: y2AxisTitle || undefined,
@@ -1690,6 +1701,7 @@ export default function Home() {
     return {
       tableData: tableData.map((row) => [...row]),
       chartType,
+      quadrantCenter,
       fieldRoles: cloneFieldRoles(fieldRoles),
       seriesKind: { ...seriesKind },
       title,
@@ -3531,6 +3543,22 @@ export default function Home() {
                 checked={scatterTrendLine}
                 onChange={setScatterTrendLine}
               />
+            )}
+            {chartType === "quadrant" && (
+              <label className="field">
+                <span>象限中线</span>
+                <select
+                  value={quadrantCenter}
+                  onChange={(event) =>
+                    setQuadrantCenter(
+                      event.target.value === "mean" ? "mean" : "median",
+                    )
+                  }
+                >
+                  <option value="median">中位数</option>
+                  <option value="mean">平均值</option>
+                </select>
+              </label>
             )}
             {chartType === "combo" && (
               <>
