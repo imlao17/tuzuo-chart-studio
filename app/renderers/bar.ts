@@ -469,6 +469,17 @@ export function buildPictorialOption(ctx: RenderContext): RendererResult {
   const item = dataSeries[0] ?? { name: "数值", data: [] };
   const color = colorFor(0, config, item.name);
 
+  // Unit sizing: a fixed pictorialUnitValue gives exact "one glyph = N units"
+  // semantics; the adaptive default keeps each column's glyph count ≈ value/max.
+  const values = item.data.filter(Number.isFinite);
+  const maxValue = values.length ? Math.max(...values.map(Math.abs)) : 1;
+  const adaptiveUnit = maxValue / 10;
+  const unitValue =
+    config.pictorialUnitValue !== undefined && config.pictorialUnitValue > 0
+      ? config.pictorialUnitValue
+      : adaptiveUnit;
+  const unitPixelHeight = Math.round(unitValue * 10) / 10;
+
   const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
   const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
   const series: SeriesOption[] = [
@@ -479,7 +490,12 @@ export function buildPictorialOption(ctx: RenderContext): RendererResult {
       symbol: "rect",
       symbolRepeat: true,
       symbolClip: true,
-      symbolSize: [Math.max(10, Math.round(barWidth * 0.6)), 10],
+      // Glyph height derives from the unit value so the on-screen density
+      // stays proportional between adaptive and explicit configurations.
+      symbolSize: [
+        Math.max(10, Math.round(barWidth * 0.6)),
+        Math.max(4, Math.min(40, Math.round((unitValue / maxValue) * 220))),
+      ],
       symbolMargin: 2,
       barMaxWidth: compact ? 20 : barWidth,
       itemStyle: { color, opacity: markOpacity },

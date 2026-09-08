@@ -277,6 +277,9 @@ export type ChartConfig = {
   shapeColumn?: string;
   // Quadrant chart only: reference lines use the median (default) or the mean.
   quadrantCenter?: "median" | "mean";
+  // Pictorial column only: value each unit glyph represents. Undefined lets
+  // the renderer pick an adaptive unit from the data (max ÷ 10).
+  pictorialUnitValue?: number;
   // Scatter only: draw a least-squares trend line through the points.
   scatterTrendLine?: boolean;
   // Combo only: split bar/line series across left and right Y axes.

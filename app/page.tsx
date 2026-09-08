@@ -191,6 +191,7 @@ type ProjectState = {
   shapeColumn: string | null;
   scatterTrendLine: boolean;
   quadrantCenter: "median" | "mean";
+  pictorialUnitValue: number | null;
   comboDualAxis: boolean;
   y2AxisTitle: string;
   comboAxisSync: boolean;
@@ -270,6 +271,7 @@ const DEFAULT_PROJECT: ProjectState = {
   shapeColumn: null,
   scatterTrendLine: false,
   quadrantCenter: "median",
+  pictorialUnitValue: null,
   comboDualAxis: false,
   y2AxisTitle: "",
   comboAxisSync: false,
@@ -872,6 +874,11 @@ function normalizeProject(input: unknown): ProjectState | null {
       ["median", "mean"] as const,
       "median",
     ),
+    pictorialUnitValue:
+      typeof source.pictorialUnitValue === "number" &&
+      source.pictorialUnitValue > 0
+        ? source.pictorialUnitValue
+        : null,
     scatterTrendLine: booleanValue(
       source.scatterTrendLine,
       base.scatterTrendLine,
@@ -1012,6 +1019,9 @@ export default function Home() {
   );
   const [quadrantCenter, setQuadrantCenter] = useState(
     DEFAULT_PROJECT.quadrantCenter,
+  );
+  const [pictorialUnitValueInput, setPictorialUnitValueInput] = useState(
+    String(DEFAULT_PROJECT.pictorialUnitValue ?? ""),
   );
   // P1-5 combo dual Y axis. All default to off/empty = renderer unchanged.
   const [comboDualAxis, setComboDualAxis] = useState(
@@ -1360,6 +1370,10 @@ export default function Home() {
         colorColumn: colorColumn ?? undefined,
         shapeColumn: shapeColumn ?? undefined,
         quadrantCenter: quadrantCenter === "mean" ? "mean" : undefined,
+        pictorialUnitValue:
+          Number(pictorialUnitValueInput) > 0
+            ? Number(pictorialUnitValueInput)
+            : undefined,
         scatterTrendLine: scatterTrendLine || undefined,
         comboDualAxis: comboDualAxis || undefined,
         y2AxisTitle: y2AxisTitle || undefined,
@@ -1702,6 +1716,10 @@ export default function Home() {
       tableData: tableData.map((row) => [...row]),
       chartType,
       quadrantCenter,
+      pictorialUnitValue:
+        Number(pictorialUnitValueInput) > 0
+          ? Number(pictorialUnitValueInput)
+          : null,
       fieldRoles: cloneFieldRoles(fieldRoles),
       seriesKind: { ...seriesKind },
       title,
@@ -3543,6 +3561,21 @@ export default function Home() {
                 checked={scatterTrendLine}
                 onChange={setScatterTrendLine}
               />
+            )}
+            {chartType === "pictorialColumn" && (
+              <label className="field">
+                <span>每单位代表值</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={pictorialUnitValueInput}
+                  placeholder="自动（最大值 ÷ 10）"
+                  onChange={(event) =>
+                    setPictorialUnitValueInput(event.target.value)
+                  }
+                />
+              </label>
             )}
             {chartType === "quadrant" && (
               <label className="field">

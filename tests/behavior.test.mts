@@ -2272,3 +2272,20 @@ test("P100-B2: quadrant center switches between median and mean", () => {
   const xMedian = linesMedian[0]?.xAxis;
   assert.equal(xMedian, 25, "median of 10,20,30,90 is 25");
 });
+
+test("P100-B3: pictorial unit value overrides the adaptive glyph size", () => {
+  const adaptive = renderSample("pictorialColumn");
+  const [adaptiveSeries] = seriesList(adaptive) as Array<{
+    symbolSize?: [number, number];
+    symbolRepeat?: boolean;
+  }>;
+  assert.equal(adaptiveSeries.symbolRepeat, true);
+  const withUnit = renderSample("pictorialColumn", { pictorialUnitValue: 1 });
+  const [unitSeries] = seriesList(withUnit) as Array<{ symbolSize?: [number, number] }>;
+  // With data max 52 and adaptive unit = 5.2, an explicit unit of 1 must
+  // render a smaller glyph (denser packing).
+  assert.ok(
+    (unitSeries.symbolSize?.[1] ?? 0) < (adaptiveSeries.symbolSize?.[1] ?? 0),
+    `explicit unit ${JSON.stringify(unitSeries.symbolSize)} should be shorter than adaptive ${JSON.stringify(adaptiveSeries.symbolSize)}`,
+  );
+});
