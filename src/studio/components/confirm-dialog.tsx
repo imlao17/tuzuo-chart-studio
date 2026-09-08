@@ -8,6 +8,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  variant = "danger",
   onCancel,
   onConfirm,
 }: {
@@ -15,6 +16,7 @@ export function ConfirmDialog({
   title: string;
   description: string;
   confirmLabel: string;
+  variant?: "danger" | "primary";
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -44,7 +46,7 @@ export function ConfirmDialog({
           <h2 id="confirm-dialog-title">{title}</h2>
           <button
             type="button"
-            className="icon-button"
+            className="dialog-close-button"
             onClick={onCancel}
             aria-label="关闭确认窗口"
             title="关闭"
@@ -59,7 +61,7 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
-            className="button button-danger"
+            className={`button ${variant === "primary" ? "button-primary" : "button-danger"}`}
             onClick={() => {
               onConfirm();
               onCancel();

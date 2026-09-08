@@ -3,6 +3,7 @@
 import type { ECharts } from "echarts";
 import { useEffect, useState } from "react";
 import { renderPngDataUrl } from "../export/download";
+import type { ExportAction } from "../types";
 
 type PngDownload = {
   option: Parameters<ECharts["setOption"]>[0];
@@ -29,7 +30,7 @@ export function usePngExport({
   transparent: boolean;
   backgroundColor: string;
   dataError: string | null;
-  requireDownloadAuth: () => boolean;
+  requireDownloadAuth?: (action?: ExportAction) => boolean;
   setStatus: (message: string) => void;
 }) {
   const [exporting, setExporting] = useState(false);
@@ -91,7 +92,7 @@ export function usePngExport({
   ]);
 
   async function copyPng() {
-    if (!requireDownloadAuth()) return;
+    if (requireDownloadAuth && !requireDownloadAuth({ type: "copy" })) return;
     setExporting(true);
     try {
       const blob =

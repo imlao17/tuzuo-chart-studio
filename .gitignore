@@ -51,3 +51,4 @@ tsconfig.tsbuildinfo
 /.workbuddy/
 /.zcode/
 .omx/
+.dev.vars

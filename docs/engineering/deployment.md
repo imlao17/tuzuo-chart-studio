@@ -29,7 +29,7 @@ NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=false
 
 ## 生产托管模式
 
-适合以后作为公开产品给别人使用。推荐公开部署时开启“登录后才能导出”：
+适合作为公开产品供外部用户访问。建议开启权限控制：
 
 ```bash
 NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=true
@@ -38,11 +38,24 @@ RESEND_API_KEY=...
 EMAIL_FROM="图作 <no-reply@your-domain.example>"
 ```
 
+### 渐进式分级权益模型（Freemium）
+
+为了兼顾“极低试用门槛”与“高价值权益引导注册”，开启 `NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=true` 后，图作采用分级策略：
+
+| 功能操作 | 免登录（游客/试用） | 登录用户（免费注册） | 说明 |
+| --- | :---: | :---: | --- |
+| 1x / 2x PNG 下载 | ✅ 开放 | ✅ 开放 | 满足日常汇报、社交媒体、PPT 插入需求 |
+| 复制 PNG 到剪贴板 | ✅ 开放 | ✅ 开放 | 极速粘入飞书、微信、Notion |
+| SVG 矢量无损导出 | ✅ 开放 | ✅ 开放 | 满足开发对接与基本矢量排版 |
+| 本地项目保存与读取 (`.tuzuo.json`) | ✅ 开放 | ✅ 开放 | 保证单机数据不丢失，安全隐私无忧 |
+| **4x 印刷级超高清 PNG** | 🔒 需登录 | ✅ 开放 | 适合专业印刷、超大画布展板 |
+| **云端工程保存与集中管理** | 🔒 需登录 | ✅ 开放 | 多设备无缝同步，云端随时恢复 |
+
 环境变量说明：
 
 | 变量 | 必填场景 | 说明 |
 | --- | --- | --- |
-| `NEXT_PUBLIC_TUZUO_REQUIRE_AUTH` | 公开托管建议必填 | `true` 时保存项目、复制 PNG、导出 SVG、下载 PNG 都需要登录 |
+| `NEXT_PUBLIC_TUZUO_REQUIRE_AUTH` | 公开托管建议必填 | `true` 时启用上述渐进式权益分级（4x 导出与云端工程需登录；1x/2x、SVG、复制、本地保存全开放） |
 | `APP_BASE_URL` | 注册邮箱验证必填 | 生产站点根地址，用来生成可信邮箱验证链接 |
 | `RESEND_API_KEY` | 真实发邮件必填 | Resend API Key |
 | `EMAIL_FROM` | 真实发邮件必填 | 验证邮件发件人 |
@@ -59,7 +72,9 @@ EMAIL_FROM="图作 <no-reply@your-domain.example>"
 - `users`：用户、角色、状态、邮箱验证时间；
 - `email_verification_tokens`：邮箱验证 token；
 - `sessions`：登录会话；
-- `auth_rate_limits`：登录与注册限流。
+- `auth_rate_limits`：登录、注册与密码重置限流；
+- `password_reset_tokens`：密码重置 token；
+- `projects`：用户云端图表工程存储。
 
 生成迁移：
 
@@ -89,11 +104,10 @@ npm audit --omit=dev
 
 ## 当前不包含的能力
 
-- 云端项目保存；
-- 团队空间；
-- 分享链接；
-- 支付或订阅；
-- 第三方登录；
-- 多租户权限模型。
+- 团队空间 / 多人协作；
+- 外链公开分享与只读嵌入；
+- 支付或商业订阅；
+- 第三方 OAuth 登录（如 GitHub / Google / 微信）；
+- 多租户企业权限模型。
 
-这些能力后续可以加，但不应该影响本地模式的基础导出能力。
+这些能力后续可以按需扩展，但不影响本地模式与单人云端保存的基础能力。

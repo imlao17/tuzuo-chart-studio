@@ -9,6 +9,8 @@ export function AuthDialog({
   mode,
   email,
   password,
+  confirmPassword,
+  currentPassword,
   message,
   verificationUrl,
   submitting,
@@ -16,11 +18,15 @@ export function AuthDialog({
   onModeChange,
   onEmailChange,
   onPasswordChange,
+  onConfirmPasswordChange,
+  onCurrentPasswordChange,
   onSubmit,
 }: {
   mode: AuthMode;
   email: string;
   password: string;
+  confirmPassword: string;
+  currentPassword: string;
   message: string;
   verificationUrl: string | null;
   submitting: boolean;
@@ -28,8 +34,23 @@ export function AuthDialog({
   onModeChange: (mode: AuthMode) => void;
   onEmailChange: (email: string) => void;
   onPasswordChange: (password: string) => void;
+  onConfirmPasswordChange: (password: string) => void;
+  onCurrentPasswordChange: (password: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const isMainMode = mode === "login" || mode === "register";
+  const titleByMode: Record<AuthMode, string> = {
+    login: "登录图作账号",
+    register: "注册图作账号",
+    forgot: "重置密码",
+    change: "修改密码",
+  };
+  const submitLabelByMode: Record<AuthMode, string> = {
+    login: "登录",
+    register: "发送验证邮件",
+    forgot: "发送重置邮件",
+    change: "修改密码",
+  };
   const dialogRef = useDialogFocus<HTMLElement>({ open: true, onClose });
 
   return (
@@ -53,15 +74,21 @@ export function AuthDialog({
               <Mail size={16} />
             </span>
             <div>
-              <h2 id="auth-dialog-title">
-                {mode === "login" ? "登录图作账号" : "注册图作账号"}
-              </h2>
-              <p>登录后可下载 SVG、PNG 和项目文件</p>
+              <h2 id="auth-dialog-title">{titleByMode[mode]}</h2>
+              <p>
+                {mode === "forgot"
+                  ? "输入注册邮箱，我们会发送重置链接"
+                  : mode === "change"
+                    ? "修改后其他设备需要重新登录"
+                    : mode === "register"
+                      ? "免费注册图作账号，享受超高清导出与云端保存"
+                      : "登录后解锁 4x 印刷级超高清导出与云端工程同步"}
+              </p>
             </div>
           </div>
           <button
             type="button"
-            className="icon-button"
+            className="dialog-close-button"
             onClick={onClose}
             aria-label="关闭账号面板"
             title="关闭"
@@ -70,53 +97,104 @@ export function AuthDialog({
           </button>
         </div>
 
-        <div className="auth-mode-switch" role="tablist" aria-label="账号操作">
+        {isMainMode ? (
+          <div className="auth-mode-switch" role="tablist" aria-label="账号操作">
+            <button
+              type="button"
+              className={mode === "login" ? "active" : ""}
+              onClick={() => onModeChange("login")}
+              role="tab"
+              aria-selected={mode === "login"}
+            >
+              登录
+            </button>
+            <button
+              type="button"
+              className={mode === "register" ? "active" : ""}
+              onClick={() => onModeChange("register")}
+              role="tab"
+              aria-selected={mode === "register"}
+            >
+              注册
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
-            className={mode === "login" ? "active" : ""}
+            className="auth-back-link"
             onClick={() => onModeChange("login")}
-            role="tab"
-            aria-selected={mode === "login"}
           >
-            登录
+            ← 返回登录
           </button>
-          <button
-            type="button"
-            className={mode === "register" ? "active" : ""}
-            onClick={() => onModeChange("register")}
-            role="tab"
-            aria-selected={mode === "register"}
-          >
-            注册
-          </button>
-        </div>
+        )}
 
         <form className="auth-form" onSubmit={onSubmit}>
-          <label className="field">
-            <span>邮箱</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => onEmailChange(event.target.value)}
-              autoComplete="email"
-              placeholder="name@example.com"
-              required
-            />
-          </label>
-          <label className="field">
-            <span>密码</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => onPasswordChange(event.target.value)}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              minLength={8}
-              required
-            />
-          </label>
+          {mode !== "change" && (
+            <label className="field">
+              <span>邮箱</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => onEmailChange(event.target.value)}
+                autoComplete="email"
+                placeholder="name@example.com"
+                required
+              />
+            </label>
+          )}
+          {mode === "change" && (
+            <label className="field">
+              <span>当前密码</span>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(event) => onCurrentPasswordChange(event.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </label>
+          )}
+          {mode !== "forgot" && (
+            <label className="field">
+              <span>{mode === "change" ? "新密码" : "密码"}</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => onPasswordChange(event.target.value)}
+                autoComplete={
+                  mode === "login" ? "current-password" : "new-password"
+                }
+                minLength={8}
+                required
+              />
+            </label>
+          )}
+          {(mode === "register" || mode === "change") && (
+            <label className="field">
+              <span>{mode === "change" ? "确认新密码" : "确认密码"}</span>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => onConfirmPasswordChange(event.target.value)}
+                autoComplete="new-password"
+                placeholder={mode === "change" ? "再次输入新密码" : "再次输入密码"}
+                minLength={8}
+                required
+              />
+            </label>
+          )}
 
           {mode === "register" && (
             <p className="auth-note">注册后需要完成邮箱验证，再登录下载。</p>
+          )}
+          {mode === "login" && (
+            <button
+              type="button"
+              className="auth-back-link"
+              onClick={() => onModeChange("forgot")}
+            >
+              忘记密码？
+            </button>
           )}
 
           {message && (
@@ -124,7 +202,7 @@ export function AuthDialog({
               <span>{message}</span>
               {verificationUrl && (
                 <a href={verificationUrl} target="_blank" rel="noreferrer">
-                  打开验证链接
+                  {mode === "forgot" ? "打开重置链接" : "打开验证链接"}
                 </a>
               )}
             </div>
@@ -136,7 +214,7 @@ export function AuthDialog({
             disabled={submitting}
           >
             {submitting && <LoaderCircle className="spin" size={16} />}
-            {mode === "login" ? "登录" : "发送验证邮件"}
+            {submitLabelByMode[mode]}
           </button>
         </form>
       </section>

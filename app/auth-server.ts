@@ -1,8 +1,9 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, ne } from "drizzle-orm";
 import type { NextResponse } from "next/server";
 import {
   authRateLimits,
   emailVerificationTokens,
+  passwordResetTokens,
   sessions,
   users,
 } from "../db/schema";
@@ -11,6 +12,7 @@ export const SESSION_COOKIE = "tuzuo_session";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const VERIFICATION_TTL_MS = 1000 * 60 * 60 * 24;
+const PASSWORD_RESET_TTL_MS = 1000 * 60 * 30;
 const PASSWORD_ALGORITHM = "pbkdf2-sha256";
 const PASSWORD_ITERATIONS = 310000;
 const PASSWORD_KEY_BITS = 256;
@@ -18,6 +20,9 @@ const AUTH_RATE_LIMIT_WINDOW_MS = 1000 * 60 * 15;
 const AUTH_RATE_LIMITS = {
   login: 10,
   register: 5,
+  passwordReset: 5,
+  resetPassword: 10,
+  changePassword: 10,
 } as const;
 
 type UserRecord = typeof users.$inferSelect;
@@ -274,6 +279,182 @@ export async function verifyEmailToken(token: string) {
     .where(eq(emailVerificationTokens.userId, verificationToken.userId));
 }
 
+export async function requestPasswordReset(
+  input: { email?: unknown },
+  request: Request,
+) {
+  const email = normalizeEmail(input.email);
+  validateEmail(email);
+
+  const db = await getAuthDb();
+  await enforceAuthRateLimit(db, "passwordReset", request, email);
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+
+  // Never reveal whether the address is registered; the response shape is
+  // identical either way. The reset link only comes back in local dev mode.
+  if (!user || user.status === "disabled") {
+    return {
+      emailDelivery: "skipped" as const,
+      resetUrl: null,
+    };
+  }
+
+  const now = Date.now();
+  const resetToken = randomToken(32);
+  const runtimeEnv = await getRuntimeEnv();
+  const resetUrl = new URL(
+    "/reset-password",
+    await getAppOrigin(request, runtimeEnv),
+  );
+  resetUrl.searchParams.set("token", resetToken);
+
+  await db
+    .delete(passwordResetTokens)
+    .where(eq(passwordResetTokens.userId, user.id));
+  await db.insert(passwordResetTokens).values({
+    id: crypto.randomUUID(),
+    userId: user.id,
+    tokenHash: await sha256Base64Url(resetToken),
+    expiresAt: now + PASSWORD_RESET_TTL_MS,
+    createdAt: now,
+  });
+
+  const emailDelivery = await sendPasswordResetEmail(
+    email,
+    resetUrl.toString(),
+    runtimeEnv,
+  );
+
+  return {
+    emailDelivery,
+    resetUrl: shouldExposeVerificationLink(runtimeEnv)
+      ? resetUrl.toString()
+      : null,
+  };
+}
+
+export async function resetPasswordWithToken(
+  input: { token?: unknown; password?: unknown },
+  request: Request,
+) {
+  const token = String(input.token ?? "").trim();
+  const password = String(input.password ?? "");
+  if (!token) {
+    throw new AuthError(400, "TOKEN_REQUIRED", "重置链接无效");
+  }
+  validatePassword(password);
+
+  const db = await getAuthDb();
+  await enforceAuthRateLimit(db, "resetPassword", request, token.slice(0, 16));
+  const now = Date.now();
+  const [resetRecord] = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(
+      and(
+        eq(passwordResetTokens.tokenHash, await sha256Base64Url(token)),
+        gt(passwordResetTokens.expiresAt, now),
+      ),
+    )
+    .limit(1);
+
+  if (!resetRecord) {
+    throw new AuthError(400, "TOKEN_INVALID", "重置链接已失效，请重新获取");
+  }
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, resetRecord.userId))
+    .limit(1);
+
+  if (!user || user.status === "disabled") {
+    throw new AuthError(403, "ACCOUNT_DISABLED", "这个账号暂时不可用");
+  }
+
+  await db
+    .update(users)
+    .set({
+      passwordHash: await hashPassword(password),
+      emailVerifiedAt: user.emailVerifiedAt ?? now,
+      updatedAt: now,
+    })
+    .where(eq(users.id, resetRecord.userId));
+  // A reset invalidates every existing session for the account.
+  await db
+    .delete(sessions)
+    .where(eq(sessions.userId, resetRecord.userId));
+  await db
+    .delete(passwordResetTokens)
+    .where(eq(passwordResetTokens.userId, resetRecord.userId));
+
+  return { ok: true as const };
+}
+
+export async function changePassword(
+  input: { currentPassword?: unknown; newPassword?: unknown },
+  request: Request,
+) {
+  const currentPassword = String(input.currentPassword ?? "");
+  const newPassword = String(input.newPassword ?? "");
+  if (!currentPassword) {
+    throw new AuthError(400, "PASSWORD_REQUIRED", "请输入当前密码");
+  }
+  validatePassword(newPassword);
+  if (currentPassword === newPassword) {
+    throw new AuthError(400, "PASSWORD_UNCHANGED", "新密码不能与当前密码相同");
+  }
+
+  const db = await getAuthDb();
+  const sessionToken = readCookie(request, SESSION_COOKIE);
+  if (!sessionToken) {
+    throw new AuthError(401, "NOT_SIGNED_IN", "请先登录");
+  }
+  await enforceAuthRateLimit(
+    db,
+    "changePassword",
+    request,
+    sessionToken.slice(0, 16),
+  );
+  const now = Date.now();
+  const [session] = await db
+    .select()
+    .from(sessions)
+    .where(
+      and(eq(sessions.tokenHash, await sha256Base64Url(sessionToken)), gt(sessions.expiresAt, now)),
+    )
+    .limit(1);
+  if (!session) {
+    throw new AuthError(401, "NOT_SIGNED_IN", "请先登录");
+  }
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
+  if (!user || user.status !== "active" || !user.emailVerifiedAt) {
+    throw new AuthError(401, "NOT_SIGNED_IN", "请先登录");
+  }
+  if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+    throw new AuthError(401, "INVALID_CREDENTIALS", "当前密码不正确");
+  }
+
+  await db
+    .update(users)
+    .set({ passwordHash: await hashPassword(newPassword), updatedAt: now })
+    .where(eq(users.id, user.id));
+  // Keep the current session, drop every other device.
+  await db
+    .delete(sessions)
+    .where(and(eq(sessions.userId, user.id), ne(sessions.id, session.id)));
+
+  return { ok: true as const };
+}
+
 export function setSessionCookie(
   response: NextResponse,
   request: Request,
@@ -430,13 +611,13 @@ async function getRuntimeEnv(): Promise<RuntimeEnv> {
   }
 }
 
-function validateEmail(email: string) {
+export function validateEmail(email: string) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new AuthError(400, "EMAIL_INVALID", "请输入有效邮箱");
   }
 }
 
-function validatePassword(password: string) {
+export function validatePassword(password: string) {
   if (password.length < 8) {
     throw new AuthError(400, "PASSWORD_TOO_SHORT", "密码至少需要 8 位");
   }
@@ -493,6 +674,48 @@ async function sendVerificationEmail(
   return "sent";
 }
 
+async function sendPasswordResetEmail(
+  email: string,
+  resetUrl: string,
+  runtimeEnv: RuntimeEnv,
+) {
+  if (!runtimeEnv.RESEND_API_KEY || !runtimeEnv.EMAIL_FROM) {
+    if (shouldExposeVerificationLink(runtimeEnv)) return "skipped";
+    throw new AuthError(
+      503,
+      "EMAIL_NOT_CONFIGURED",
+      "邮箱服务尚未配置，暂时不能发送重置邮件",
+    );
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${runtimeEnv.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: runtimeEnv.EMAIL_FROM,
+      to: email,
+      subject: "重置你的图作密码",
+      text: `点击链接重置图作账号密码：${resetUrl}`,
+      html: `<p>点击下面的链接重置图作账号密码：</p><p><a href="${escapeHtml(
+        resetUrl,
+      )}">重置密码</a></p><p>链接 30 分钟内有效。如果这不是你的操作，请忽略这封邮件。</p>`,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new AuthError(
+      502,
+      "EMAIL_DELIVERY_FAILED",
+      "重置邮件发送失败，请稍后重试",
+    );
+  }
+
+  return "sent";
+}
+
 function shouldExposeVerificationLink(runtimeEnv: RuntimeEnv) {
   return runtimeEnv.AUTH_DEV_SHOW_VERIFICATION_LINK === "true";
 }
@@ -517,7 +740,7 @@ function readCookie(request: Request, name: string) {
   return null;
 }
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16);
   const derived = await derivePassword(password, salt, PASSWORD_ITERATIONS);
   return [
@@ -528,7 +751,7 @@ async function hashPassword(password: string) {
   ].join(":");
 }
 
-async function verifyPassword(password: string, storedHash: string) {
+export async function verifyPassword(password: string, storedHash: string) {
   const [algorithm, iterationsText, saltText, hashText] = storedHash.split(":");
   const iterations = Number(iterationsText);
   if (
@@ -540,10 +763,14 @@ async function verifyPassword(password: string, storedHash: string) {
   ) {
     return false;
   }
-  const salt = base64UrlToBytes(saltText);
-  const expected = base64UrlToBytes(hashText);
-  const actual = await derivePassword(password, salt, iterations);
-  return constantTimeEqual(actual, expected);
+  try {
+    const salt = base64UrlToBytes(saltText);
+    const expected = base64UrlToBytes(hashText);
+    const actual = await derivePassword(password, salt, iterations);
+    return constantTimeEqual(actual, expected);
+  } catch {
+    return false;
+  }
 }
 
 async function derivePassword(
@@ -571,7 +798,7 @@ async function derivePassword(
   return new Uint8Array(bits);
 }
 
-async function sha256Base64Url(value: string) {
+export async function sha256Base64Url(value: string) {
   const digest = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(value),

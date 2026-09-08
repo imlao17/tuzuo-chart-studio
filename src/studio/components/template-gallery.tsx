@@ -159,7 +159,7 @@ export function TemplateGallery({
             </label>
             <button
               type="button"
-              className="icon-button"
+              className="dialog-close-button"
               onClick={onClose}
               aria-label="关闭模板库"
               title="关闭"

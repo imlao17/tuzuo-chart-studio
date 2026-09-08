@@ -72,3 +72,42 @@ export const authRateLimits = sqliteTable(
     index("auth_rate_limits_updated_at_idx").on(table.updatedAt),
   ],
 );
+
+export const passwordResetTokens = sqliteTable(
+  "password_reset_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("password_reset_tokens_token_hash_unique").on(
+      table.tokenHash,
+    ),
+    index("password_reset_tokens_user_id_idx").on(table.userId),
+    index("password_reset_tokens_expires_at_idx").on(table.expiresAt),
+  ],
+);
+
+export const projects = sqliteTable(
+  "projects",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** Full project state serialized as JSON (same shape as .tuzuo.json). */
+    data: text("data").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("projects_user_id_idx").on(table.userId),
+    index("projects_user_id_updated_at_idx").on(table.userId, table.updatedAt),
+  ],
+);

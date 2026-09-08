@@ -10,8 +10,12 @@ import {
   BarChart3,
   Check,
   ChevronDown,
+  CloudUpload,
   Columns3,
+  CopyPlus,
   FileUp,
+  LoaderCircle,
+  LogIn,
   LayoutGrid,
   Lock,
   LockOpen,
@@ -430,6 +434,19 @@ function cloneFieldRoles(roles: FieldRoles): FieldRoles {
 // multi-column ones. Template switches preserve roles, so every read must
 // tolerate both shapes — a string reaching the multi-series branch used to
 // crash the whole editor (value?.filter is not a function → blank preview).
+function formatCloudDate(timestamp: number) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  const datePart = sameYear
+    ? `${date.getMonth() + 1}月${date.getDate()}日`
+    : `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+  const timePart = `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+  return `${datePart} ${timePart}`;
+}
+
 function roleAsList(value: string | string[] | undefined): string[] {
   if (Array.isArray(value)) return value;
   if (typeof value === "string" && value) return [value];
@@ -1094,10 +1111,15 @@ export default function Home() {
     setAuthEmail,
     authPassword,
     setAuthPassword,
+    authConfirmPassword,
+    setAuthConfirmPassword,
     authMessage,
     authVerificationUrl,
     authSubmitting,
     openAuthPanel,
+    openChangePassword,
+    authCurrentPassword,
+    setAuthCurrentPassword,
     requireDownloadAuth,
     submitAuthForm,
     logout,
@@ -1741,6 +1763,141 @@ export default function Home() {
     };
   }
 
+  // --- Cloud projects (signed-in storage in D1) ------------------------------
+  type CloudProjectSummary = {
+    id: string;
+    name: string;
+    createdAt: number;
+    updatedAt: number;
+  };
+  const [cloudProjects, setCloudProjects] = useState<CloudProjectSummary[]>([]);
+  const [cloudListState, setCloudListState] = useState<
+    "idle" | "loading" | "error"
+  >("idle");
+  const [cloudSaving, setCloudSaving] = useState(false);
+  const [cloudProjectId, setCloudProjectId] = useState<string | null>(null);
+  const [cloudDeleteTarget, setCloudDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  async function refreshCloudProjects() {
+    if (!authUser) {
+      setCloudProjects([]);
+      setCloudListState("idle");
+      return;
+    }
+    setCloudListState("loading");
+    try {
+      const response = await fetch("/api/projects", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("cloud list failed");
+      const body = (await response.json()) as { projects?: CloudProjectSummary[] };
+      setCloudProjects(body.projects ?? []);
+      setCloudListState("idle");
+    } catch {
+      setCloudListState("error");
+    }
+  }
+
+  useEffect(() => {
+    // rAF wrapper keeps the synchronous state reset out of the effect body
+    // (avoids cascading renders), matching the project-restore effect above.
+    const frame = window.requestAnimationFrame(() => {
+      setCloudProjectId(null);
+      refreshCloudProjects();
+    });
+    return () => window.cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when the signed-in user changes
+  }, [authUser]);
+
+  async function saveCloudProject(asNew = false) {
+    if (cloudSaving) return;
+    if (!authUser) {
+      openAuthPanel("login");
+      setStatus("登录后才能保存到云端");
+      return;
+    }
+    setCloudSaving(true);
+    const targetId = asNew ? null : cloudProjectId;
+    try {
+      const response = await fetch(
+        targetId ? `/api/projects/${targetId}` : "/api/projects",
+        {
+          method: targetId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            name: title.trim() || "未命名图表",
+            data: currentProjectFingerprint,
+          }),
+        },
+      );
+      const body = (await response.json().catch(() => ({}))) as {
+        project?: CloudProjectSummary;
+        message?: string;
+      };
+      if (!response.ok || !body.project) {
+        throw new Error(body.message || "云端保存失败");
+      }
+      setCloudProjectId(body.project.id);
+      setStatus(
+        targetId
+          ? `已更新云端项目：${body.project.name}`
+          : `已保存为云端项目：${body.project.name}`,
+      );
+      refreshCloudProjects();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "云端保存失败");
+    } finally {
+      setCloudSaving(false);
+    }
+  }
+
+  async function openCloudProject(id: string) {
+    try {
+      const response = await fetch(`/api/projects/${id}`, {
+        credentials: "include",
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        project?: { id: string; name: string; data: string };
+        message?: string;
+      };
+      if (!response.ok || !body.project) {
+        throw new Error(body.message || "云端项目打开失败");
+      }
+      const project = normalizeProject(JSON.parse(body.project.data));
+      if (!project) {
+        throw new Error("云端项目内容无法识别");
+      }
+      applyProject(project, `已打开云端项目：${body.project.name}`);
+      setCloudProjectId(body.project.id);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "云端项目打开失败");
+    }
+  }
+
+  async function deleteCloudProject(id: string) {
+    try {
+      const response = await fetch(`/api/projects/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as {
+          message?: string;
+        };
+        throw new Error(body.message || "云端项目删除失败");
+      }
+      if (cloudProjectId === id) setCloudProjectId(null);
+      setStatus("已删除云端项目");
+      refreshCloudProjects();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "云端项目删除失败");
+    }
+  }
+
   function applyProject(project: ProjectState, message?: string) {
     setTableData(project.tableData.map((row) => [...row]));
     setChartType(project.chartType);
@@ -1827,7 +1984,7 @@ export default function Home() {
   }
 
   function saveProjectFile() {
-    if (!requireDownloadAuth()) return;
+    if (!requireDownloadAuth({ type: "project" })) return;
     const payload: ProjectFile = {
       app: PROJECT_FILE_APP,
       version: PROJECT_FILE_VERSION,
@@ -1851,6 +2008,7 @@ export default function Home() {
       const project = normalizeProject(JSON.parse(await file.text()));
       if (!project) throw new Error("Invalid project file");
       applyProject(project, `已打开 ${file.name}`);
+      setCloudProjectId(null);
       setProjectLoaded(true);
     } catch {
       setStatus("项目文件读取失败");
@@ -1889,6 +2047,7 @@ export default function Home() {
     // together, so a single 撤销 returns to the previous template with its
     // own data intact.
     loadSampleFor(nextDef, `已载入「${name}」示例数据`, type);
+    setCloudProjectId(null);
     setTemplateOpen(false);
     setWorkspaceMode("preview");
   }
@@ -2100,7 +2259,7 @@ export default function Home() {
   }
 
   function exportSvg() {
-    if (!requireDownloadAuth()) return;
+    if (!requireDownloadAuth({ type: "svg" })) return;
     if (!chartRef.current) return;
     downloadBlob(
       new Blob([chartRef.current.renderToSVGString({ useViewBox: true })], {
@@ -2114,6 +2273,7 @@ export default function Home() {
   function resetAll() {
     const resetProject = cloneProject(DEFAULT_PROJECT);
     applyCheckpoint(resetProject, JSON.stringify(resetProject), "已恢复示例");
+    setCloudProjectId(null);
     setPixelRatio(2);
   }
 
@@ -2468,6 +2628,7 @@ export default function Home() {
           title={title}
           projectInputRef={projectInputRef}
           onOpenAuth={() => openAuthPanel("login")}
+          onChangePassword={openChangePassword}
           onLogout={logout}
           onProjectFileChange={handleProjectFile}
           onSaveProject={saveProjectFile}
@@ -2479,7 +2640,7 @@ export default function Home() {
               event.preventDefault();
               return;
             }
-            if (!requireDownloadAuth()) {
+            if (!requireDownloadAuth({ type: "png", ratio: pixelRatio })) {
               event.preventDefault();
               return;
             }
@@ -2726,6 +2887,112 @@ export default function Home() {
                 ))}
               </div>
             </div>
+          </section>
+          <section className="panel-section cloud-section" aria-label="云端项目">
+            <div className="section-heading">
+              <span>云端项目</span>
+            </div>
+            {authUser ? (
+              <>
+                <div className="cloud-actions">
+                  <button
+                    type="button"
+                    className="button button-secondary cloud-save-button"
+                    onClick={() => saveCloudProject(false)}
+                    disabled={cloudSaving}
+                    title={
+                      cloudProjectId
+                        ? "更新当前云端项目"
+                        : "把当前图表保存到账号"
+                    }
+                  >
+                    {cloudSaving ? (
+                      <LoaderCircle className="spin" size={14} />
+                    ) : (
+                      <CloudUpload size={14} />
+                    )}
+                    {cloudProjectId ? "更新云端项目" : "保存到云端"}
+                  </button>
+                  {cloudProjectId && (
+                    <button
+                      type="button"
+                      className="button button-secondary cloud-save-button"
+                      onClick={() => saveCloudProject(true)}
+                      disabled={cloudSaving}
+                      title="作为新的云端项目保存"
+                    >
+                      <CopyPlus size={14} />
+                      另存为新项目
+                    </button>
+                  )}
+                </div>
+                {cloudListState === "loading" ? (
+                  <p className="cloud-empty">正在载入云端项目…</p>
+                ) : cloudListState === "error" ? (
+                  <p className="cloud-empty">
+                    载入失败，
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={refreshCloudProjects}
+                    >
+                      重试
+                    </button>
+                  </p>
+                ) : cloudProjects.length === 0 ? (
+                  <p className="cloud-empty">还没有云端项目</p>
+                ) : (
+                  <ul className="cloud-project-list">
+                    {cloudProjects.map((project) => (
+                      <li
+                        key={project.id}
+                        className={
+                          cloudProjectId === project.id ? "current" : ""
+                        }
+                      >
+                        <button
+                          type="button"
+                          className="cloud-project-open"
+                          onClick={() => openCloudProject(project.id)}
+                          title={project.name}
+                        >
+                          <span className="cloud-project-name">
+                            {project.name}
+                          </span>
+                          <span className="cloud-project-date">
+                            {formatCloudDate(project.updatedAt)}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button cloud-project-delete"
+                          aria-label={`删除 ${project.name}`}
+                          title="删除云端项目"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setCloudDeleteTarget({
+                              id: project.id,
+                              name: project.name,
+                            });
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                className="button button-secondary cloud-login-button"
+                onClick={() => openAuthPanel("login")}
+              >
+                <LogIn size={14} />
+                登录后开启云端保存
+              </button>
+            )}
           </section>
           <button
             type="button"
@@ -3810,6 +4077,8 @@ export default function Home() {
           mode={authMode}
           email={authEmail}
           password={authPassword}
+          confirmPassword={authConfirmPassword}
+          currentPassword={authCurrentPassword}
           message={authMessage}
           verificationUrl={authVerificationUrl}
           submitting={authSubmitting}
@@ -3817,6 +4086,8 @@ export default function Home() {
           onModeChange={openAuthPanel}
           onEmailChange={setAuthEmail}
           onPasswordChange={setAuthPassword}
+          onConfirmPasswordChange={setAuthConfirmPassword}
+          onCurrentPasswordChange={setAuthCurrentPassword}
           onSubmit={submitAuthForm}
         />
       )}
@@ -3826,8 +4097,27 @@ export default function Home() {
         title="确认恢复示例"
         description="这会重置当前数据、标题、画布和全部样式。操作完成后仍可使用撤销恢复。"
         confirmLabel="恢复示例"
+        variant="primary"
         onCancel={() => setResetConfirmOpen(false)}
         onConfirm={resetAll}
+      />
+
+      <ConfirmDialog
+        open={Boolean(cloudDeleteTarget)}
+        title={
+          cloudDeleteTarget
+            ? `确认删除「${cloudDeleteTarget.name}」`
+            : "确认删除"
+        }
+        description="删除后无法恢复，确定要从云端删除这个项目吗？"
+        confirmLabel="删除项目"
+        onCancel={() => setCloudDeleteTarget(null)}
+        onConfirm={() => {
+          if (cloudDeleteTarget) {
+            deleteCloudProject(cloudDeleteTarget.id);
+            setCloudDeleteTarget(null);
+          }
+        }}
       />
 
       {status && (

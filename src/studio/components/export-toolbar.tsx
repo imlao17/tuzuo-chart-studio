@@ -5,6 +5,7 @@ import {
   Download,
   FileUp,
   ImageDown,
+  KeyRound,
   LoaderCircle,
   LockOpen,
   LogIn,
@@ -15,7 +16,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { safeFilename } from "../export/download";
-import type { AuthUser } from "../types";
+import { isFreeExportAction, type AuthUser } from "../types";
 
 export function ExportToolbar({
   requireAuthForExport,
@@ -29,6 +30,7 @@ export function ExportToolbar({
   title,
   projectInputRef,
   onOpenAuth,
+  onChangePassword,
   onLogout,
   onProjectFileChange,
   onSaveProject,
@@ -48,6 +50,7 @@ export function ExportToolbar({
   title: string;
   projectInputRef: RefObject<HTMLInputElement | null>;
   onOpenAuth: () => void;
+  onChangePassword: () => void;
   onLogout: () => void;
   onProjectFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onSaveProject: () => void;
@@ -56,15 +59,18 @@ export function ExportToolbar({
   onExportSvg: () => void;
   onPngDownloadClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
-  const canExport = !requireAuthForExport || Boolean(authUser);
+  const is4xLocked =
+    !isFreeExportAction({ type: "png", ratio: pixelRatio }) &&
+    requireAuthForExport &&
+    !authUser;
+  const canDownloadCurrentPng = !is4xLocked;
   const closeMenu = (element: HTMLElement) =>
     element.closest("details")?.removeAttribute("open");
 
   return (
     <div className="export-toolbar">
-      {requireAuthForExport && (
-        <div className="toolbar-group auth-toolbar" aria-label="账号">
-          {authLoading ? (
+      <div className="toolbar-group auth-toolbar" aria-label="账号">
+        {authLoading ? (
           <span className="auth-state">
             <LoaderCircle className="spin" size={15} />
             检查登录
@@ -75,6 +81,15 @@ export function ExportToolbar({
               <User size={15} />
               {authUser.email}
             </span>
+            <button
+              type="button"
+              className="icon-button toolbar-icon-button"
+              onClick={onChangePassword}
+              title="修改密码"
+              aria-label="修改密码"
+            >
+              <KeyRound size={16} />
+            </button>
             <button
               type="button"
               className="icon-button toolbar-icon-button"
@@ -94,9 +109,8 @@ export function ExportToolbar({
             <LogIn size={16} />
             登录 / 注册
           </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
       <div className="toolbar-group project-toolbar" aria-label="项目">
         <button
           type="button"
@@ -118,7 +132,7 @@ export function ExportToolbar({
           type="button"
           className="icon-button toolbar-icon-button"
           onClick={onSaveProject}
-          title="保存图作项目"
+          title="保存图作项目 (.tuzuo.json)"
           aria-label="保存图作项目"
         >
           <Save size={16} />
@@ -129,8 +143,8 @@ export function ExportToolbar({
           type="button"
           className="icon-button copy-action"
           onClick={onCopyPng}
-          title={canExport ? "复制 PNG" : "登录后复制 PNG"}
-          aria-label={canExport ? "复制 PNG" : "登录后复制 PNG"}
+          title="复制 PNG 到剪贴板"
+          aria-label="复制 PNG 到剪贴板"
           disabled={exporting || Boolean(dataError)}
           aria-hidden={Boolean(dataError)}
         >
@@ -142,20 +156,23 @@ export function ExportToolbar({
           onClick={onExportSvg}
           disabled={Boolean(dataError)}
           aria-hidden={Boolean(dataError)}
-          title={canExport ? "下载 SVG" : "登录后下载 SVG"}
+          title="下载 SVG（矢量无损）"
         >
           <Download size={17} />
           SVG
         </button>
         <a
           className="button button-primary"
-          href={canExport && pngDownloadReady ? pngDownloadObjectUrl : undefined}
-          download={`${safeFilename(title)}@${pixelRatio}x.png`}
-          aria-disabled={
-            (requireAuthForExport && (!authUser || authLoading)) ||
-            !pngDownloadReady
+          href={
+            canDownloadCurrentPng && pngDownloadReady
+              ? pngDownloadObjectUrl
+              : undefined
           }
-          title={canExport ? "下载 PNG" : "登录后下载 PNG"}
+          download={`${safeFilename(title)}@${pixelRatio}x.png`}
+          aria-disabled={!pngDownloadReady}
+          title={
+            is4xLocked ? "4x 超高清导出需登录（免费）" : "下载 PNG"
+          }
           onClick={onPngDownloadClick}
         >
           {!pngDownloadReady ? (
@@ -211,17 +228,28 @@ export function ExportToolbar({
             )}
             <span className="export-menu-label">PNG 倍率</span>
             <div className="ratio-control" aria-label="PNG 导出倍率">
-              {[1, 2, 4].map((ratio) => (
-                <button
-                  key={ratio}
-                  type="button"
-                  className={pixelRatio === ratio ? "active" : ""}
-                  onClick={() => onPixelRatioChange(ratio)}
-                  aria-pressed={pixelRatio === ratio}
-                >
-                  {ratio}×
-                </button>
-              ))}
+              {[1, 2, 4].map((ratio) => {
+                const isLocked =
+                  !isFreeExportAction({ type: "png", ratio }) &&
+                  requireAuthForExport &&
+                  !authUser;
+                return (
+                  <button
+                    key={ratio}
+                    type="button"
+                    className={pixelRatio === ratio ? "active" : ""}
+                    onClick={() => onPixelRatioChange(ratio)}
+                    aria-pressed={pixelRatio === ratio}
+                    title={
+                      isLocked
+                        ? "4x 印刷级超高清（登录后免费解锁）"
+                        : `${ratio}× 倍率`
+                    }
+                  >
+                    {ratio}×{isLocked ? " 🔒" : ""}
+                  </button>
+                );
+              })}
             </div>
             <div className="export-menu-divider" />
             <button

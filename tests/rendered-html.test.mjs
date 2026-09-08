@@ -88,6 +88,10 @@ test("includes the complete chart studio implementation", async () => {
     templateGallery,
     settingsRegistry,
     hostingConfig,
+    forgotPasswordRoute,
+    projectsRoute,
+    projectsServer,
+    resetPasswordPage,
   ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/chart-model.ts", import.meta.url), "utf8"),
@@ -163,6 +167,19 @@ test("includes the complete chart studio implementation", async () => {
       "utf8",
     ),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/api/auth/forgot-password/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/api/projects/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/projects-server.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/reset-password/page.tsx", import.meta.url),
+      "utf8",
+    ),
   ]);
 
   const templateDefinitions =
@@ -231,7 +248,7 @@ test("includes the complete chart studio implementation", async () => {
   assert.match(layoutPreferencesHook, /tuzuo-studio-layout/);
   assert.match(layoutPreferencesHook, /leftPanelWidth/);
   assert.match(layoutPreferencesHook, /dataPanelHeight/);
-  assert.match(authDialog, /登录后可下载 SVG、PNG 和项目文件/);
+  assert.match(authDialog, /登录后解锁 4x 印刷级超高清导出与云端工程同步/);
   assert.match(authSessionHook, /登录后才能下载/);
   assert.match(styles, /\.brand-logo/);
   assert.match(styles, /\.studio-grid\.left-collapsed/);
@@ -270,6 +287,32 @@ test("includes the complete chart studio implementation", async () => {
   assert.match(authServer, /PBKDF2/);
   assert.match(authServer, /RESEND_API_KEY/);
   assert.match(authServer, /SESSION_COOKIE/);
+  // Account system: password reset/change + cloud projects.
+  assert.match(authServer, /requestPasswordReset/);
+  assert.match(authServer, /resetPasswordWithToken/);
+  assert.match(authServer, /changePassword/);
+  assert.match(authServer, /passwordResetTokens/);
+  assert.match(forgotPasswordRoute, /requestPasswordReset/);
+  assert.match(authDialog, /忘记密码/);
+  assert.match(authDialog, /重置密码/);
+  assert.match(authDialog, /修改密码/);
+  assert.match(resetPasswordPage, /reset-password/);
+  assert.match(resetPasswordPage, /reset=1/);
+  assert.match(authSchema, /passwordResetTokens/);
+  assert.match(authSchema, /export const projects/);
+  assert.match(projectsServer, /MAX_PROJECTS_PER_USER/);
+  assert.match(projectsServer, /PROJECT_NOT_FOUND/);
+  assert.match(projectsRoute, /createCloudProject/);
+  assert.match(projectsRoute, /listCloudProjects/);
+  assert.match(page, /保存到云端/);
+  assert.match(page, /另存为新项目/);
+  assert.match(page, /云端项目/);
+  assert.match(page, /openCloudProject/);
+  assert.match(authSessionHook, /forgot/);
+  assert.match(authSessionHook, /changePassword|change-password/);
+  assert.match(authSessionHook, /authConfirmPassword/);
+  assert.match(authDialog, /确认密码|确认新密码/);
+  assert.match(authServer, /PASSWORD_UNCHANGED/);
   assert.match(authRegisterRoute, /registerWithEmail/);
   assert.match(authLoginRoute, /setSessionCookie/);
   assert.match(authVerifyRoute, /verifyEmailToken/);
