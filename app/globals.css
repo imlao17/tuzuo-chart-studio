@@ -1105,6 +1105,7 @@ button:disabled {
 
 .data-toolbar-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
 }
 
@@ -2893,4 +2894,75 @@ button:disabled {
 
 .auth-back-link:hover {
   text-decoration: underline;
+}
+
+/* --- Annotation layer controls -------------------------------------------- */
+
+.annotation-add-row {
+  display: flex;
+  gap: 6px;
+  padding: 2px 0 8px;
+}
+
+.annotation-add-row .button {
+  flex: 1 1 0;
+  padding: 5px 8px;
+  font-size: var(--text-small);
+}
+
+.annotation-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface);
+  margin-bottom: 6px;
+  padding: 6px 8px;
+}
+
+.annotation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.annotation-kind {
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.annotation-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.annotation-field {
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: 3px 5px;
+  font-size: var(--text-small);
+  color: inherit;
+  background: var(--surface);
+}
+
+/* --- URL data import ------------------------------------------------------- */
+
+.url-import-row {
+  display: flex;
+  gap: 6px;
+  flex: 1 1 100%;
+}
+
+.url-import-input {
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: 4px 8px;
+  font-size: var(--text-small);
+  color: inherit;
+  background: var(--surface);
 }

@@ -73,6 +73,7 @@ import {
   downloadBlob,
   safeFilename,
 } from "../src/studio/export/download";
+import { fetchTableFromUrl, parseWorkbook } from "../src/studio/import/table-import";
 import { AuthDialog } from "../src/studio/components/auth-dialog";
 import { ensureGeoMap, isGeoMapRegistered } from "../src/studio/geo/register-maps";
 import { ConfirmDialog } from "../src/studio/components/confirm-dialog";
@@ -1057,6 +1058,14 @@ export default function Home() {
   const [annotations, setAnnotations] = useState<ChartAnnotation[]>(
     DEFAULT_PROJECT.annotations,
   );
+  const [importUrl, setImportUrl] = useState(
+    // SSR has no window; the localStorage read only happens on the client.
+    () =>
+      typeof window === "undefined"
+        ? ""
+        : window.localStorage.getItem("tuzuo-import-url") ?? "",
+  );
+  const [importingUrl, setImportingUrl] = useState(false);
   const [streamTimeAxis, setStreamTimeAxis] = useState(
     DEFAULT_PROJECT.streamTimeAxis,
   );
@@ -2343,17 +2352,45 @@ export default function Home() {
     });
   }
 
+  async function importFromUrl() {
+    const url = importUrl.trim();
+    if (!url) {
+      setStatus("请输入数据链接");
+      return;
+    }
+    setImportingUrl(true);
+    try {
+      const { table, source } = await fetchTableFromUrl(url);
+      setTableData(table);
+      setWorkspaceMode("data");
+      setImportUrl(source);
+      window.localStorage.setItem("tuzuo-import-url", source);
+      setStatus(`已从链接载入 ${table.length - 1} 行数据`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "链接导入失败");
+    } finally {
+      setImportingUrl(false);
+    }
+  }
+
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
 
     try {
+      if (/\.xlsx?$/i.test(file.name)) {
+        const matrix = parseWorkbook(await file.arrayBuffer());
+        setTableData(matrix);
+        setWorkspaceMode("data");
+        setStatus(`已载入工作簿 ${file.name}`);
+        return;
+      }
       const matrix = parseDelimitedTable(await file.text());
       setTableData(matrix);
       setWorkspaceMode("data");
       setStatus(`已载入 ${file.name}`);
-    } catch {
-      setStatus("文件读取失败");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "文件读取失败");
     } finally {
       event.target.value = "";
     }
@@ -3203,15 +3240,32 @@ export default function Home() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <FileUp size={16} />
-                  上传 CSV / TSV
+                  上传 CSV / TSV / Excel
                 </button>
                 <input
                   ref={fileInputRef}
                   className="sr-only"
                   type="file"
-                  accept=".csv,.tsv,text/csv,text/tab-separated-values"
+                  accept=".csv,.tsv,.xlsx,.xls,text/csv,text/tab-separated-values"
                   onChange={handleFile}
                 />
+                <div className="url-import-row">
+                  <input
+                    className="url-import-input"
+                    value={importUrl}
+                    onChange={(event) => setImportUrl(event.target.value)}
+                    placeholder="粘贴公开 CSV / 表格链接"
+                    aria-label="数据链接"
+                  />
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={importFromUrl}
+                    disabled={importingUrl}
+                  >
+                    {importingUrl ? "载入中…" : "从链接导入"}
+                  </button>
+                </div>
                 <button
                   type="button"
                   className="button button-secondary"

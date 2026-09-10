@@ -166,3 +166,42 @@ test("export: isFreeExportAction enforces freemium tiered permissions", () => {
   assert.equal(isFreeExportAction(undefined), false, "unspecified action requires auth");
 });
 
+
+import { parseWorkbook } from "../src/studio/import/table-import";
+import * as XLSX from "xlsx";
+
+test("import: xlsx workbook parses to a string table (round trip)", () => {
+  const rows = [
+    ["月份", "收入"],
+    ["一月", "128"],
+    ["二月", "146"],
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  const buffer = XLSX.write({ SheetNames: ["Sheet1"], Sheets: { Sheet1: sheet } }, {
+    bookType: "xlsx",
+    type: "array",
+  }) as ArrayBuffer;
+  const table = parseWorkbook(buffer);
+  assert.deepEqual(table, rows);
+  // 数字被规范为字符串但保留显示值
+  assert.equal(typeof table[1][1], "string");
+});
+
+test("import: empty workbooks and sheets raise readable errors", () => {
+  // 库在 write 阶段就拒绝完全空的簿（ 英文错误，属库自身行为）。
+  assert.throws(() =>
+    XLSX.write({ SheetNames: [], Sheets: {} }, { bookType: "xlsx", type: "array" }),
+  );
+  // 含一个空工作表的簿可以写出，但解析报「工作表为空」。
+  const sheet = XLSX.utils.aoa_to_sheet([]);
+  assert.throws(
+    () =>
+      parseWorkbook(
+        XLSX.write({ SheetNames: ["Sheet1"], Sheets: { Sheet1: sheet } }, {
+          bookType: "xlsx",
+          type: "array",
+        }) as ArrayBuffer,
+      ),
+    /工作表为空/,
+  );
+});
