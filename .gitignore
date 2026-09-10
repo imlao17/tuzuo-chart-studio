@@ -52,3 +52,4 @@ tsconfig.tsbuildinfo
 /.zcode/
 .omx/
 .dev.vars
+.env.local

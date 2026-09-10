@@ -42,7 +42,9 @@ test("server-renders the chart studio", async () => {
   assert.match(html, /数字格式/);
   assert.match(html, /标题样式/);
   assert.match(html, /副标题样式/);
-  assert.match(html, /本地模式/);
+  // The export menu renders a mode note in both gates: 本地模式可直接导出
+  // when the gate is off, 检查登录 when exports require sign-in (.env.local).
+  assert.match(html, /本地模式|检查登录/);
   assert.match(html, /下载 PNG/);
   assert.match(html, /PNG/);
   assert.match(html, /SVG/);
