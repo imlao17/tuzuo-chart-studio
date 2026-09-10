@@ -51,6 +51,7 @@ import {
 import {
   buildChartOption,
   CHART_TEMPLATES,
+  type ChartAnnotation,
   type ChartConfig,
   ChartType,
   INITIAL_TABLE,
@@ -122,6 +123,7 @@ type FieldRoles = Partial<Record<DataBindingRole, string | string[]>>;
 // `DEFAULT_PROJECT` is the single source of truth — collect/apply both
 // derive from it so a field is never accidentally dropped.
 type ProjectState = {
+  annotations: ChartAnnotation[];
   tableData: string[][];
   chartType: ChartType;
   fieldRoles: FieldRoles;
@@ -276,6 +278,7 @@ const DEFAULT_PROJECT: ProjectState = {
   y2AxisTitle: "",
   comboAxisSync: false,
   streamTimeAxis: false,
+  annotations: [],
 };
 
 const PROJECT_STORAGE_KEY = "tuzuo-current-project";
@@ -449,6 +452,22 @@ function formatCloudDate(timestamp: number) {
     date.getMinutes(),
   ).padStart(2, "0")}`;
   return `${datePart} ${timePart}`;
+}
+
+// Tolerant reader for annotation arrays coming from project files/cloud.
+function normalizeAnnotations(value: unknown): ChartAnnotation[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (item): item is ChartAnnotation =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as { id?: unknown }).id === "string" &&
+        ((item as { kind?: unknown }).kind === "text" ||
+          (item as { kind?: unknown }).kind === "arrow" ||
+          (item as { kind?: unknown }).kind === "rect"),
+    )
+    .map((item) => ({ ...item }));
 }
 
 function roleAsList(value: string | string[] | undefined): string[] {
@@ -886,6 +905,7 @@ function normalizeProject(input: unknown): ProjectState | null {
     comboDualAxis: booleanValue(source.comboDualAxis, base.comboDualAxis),
     y2AxisTitle: textValue(source.y2AxisTitle, base.y2AxisTitle),
     comboAxisSync: booleanValue(source.comboAxisSync, base.comboAxisSync),
+    annotations: normalizeAnnotations(source.annotations),
     streamTimeAxis: booleanValue(source.streamTimeAxis, base.streamTimeAxis),
   };
 }
@@ -1034,6 +1054,9 @@ export default function Home() {
     DEFAULT_PROJECT.comboAxisSync,
   );
   // P1-6 streamgraph time axis. Default off = row-index axis (unchanged).
+  const [annotations, setAnnotations] = useState<ChartAnnotation[]>(
+    DEFAULT_PROJECT.annotations,
+  );
   const [streamTimeAxis, setStreamTimeAxis] = useState(
     DEFAULT_PROJECT.streamTimeAxis,
   );
@@ -1154,6 +1177,7 @@ export default function Home() {
   const settingsPanelRef = useRef<HTMLElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
+  const annotationSeqRef = useRef(0);
   const applyProjectRef = useRef<
     ((project: ProjectState, message?: string) => void) | null
   >(null);
@@ -1378,6 +1402,7 @@ export default function Home() {
         comboDualAxis: comboDualAxis || undefined,
         y2AxisTitle: y2AxisTitle || undefined,
         comboAxisSync: comboAxisSync || undefined,
+        annotations: annotations.length ? annotations : undefined,
         streamTimeAxis: streamTimeAxis || undefined,
         markOpacity,
         areaOpacity,
@@ -1409,6 +1434,7 @@ export default function Home() {
         seriesKind,
       }),
     [
+      annotations,
       areaOpacity,
       axisLabelRotation,
       pictorialUnitValueInput,
@@ -1653,10 +1679,6 @@ export default function Home() {
   }, [authPanelOpen, redo, resetConfirmOpen, templateOpen, undo]);
 
   useEffect(() => {
-    applyProjectRef.current = applyProject;
-  });
-
-  useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
         const saved = window.localStorage.getItem(PROJECT_STORAGE_KEY);
@@ -1717,6 +1739,7 @@ export default function Home() {
     return {
       tableData: tableData.map((row) => [...row]),
       chartType,
+      annotations: annotations.map((a) => ({ ...a })),
       quadrantCenter,
       pictorialUnitValue:
         Number(pictorialUnitValueInput) > 0
@@ -1930,6 +1953,42 @@ export default function Home() {
     }
   }
 
+  // --- Annotation layer management -------------------------------------------
+  function commitAnnotations(next: ChartAnnotation[], message: string) {
+    setAnnotations(next);
+    const project = collectProject();
+    project.annotations = next.map((a) => ({ ...a }));
+    applyCheckpoint(project, JSON.stringify(project), message);
+  }
+
+  function addAnnotation(kind: "text" | "arrow" | "rect") {
+    annotationSeqRef.current += 1;
+    const id = `ann-${annotationSeqRef.current}`;
+    const cx = Math.round(width / 2);
+    const cy = Math.round(height / 2);
+    const next: ChartAnnotation =
+      kind === "text"
+        ? { id, kind, x: cx - 60, y: cy, text: "标注文字", color: theme.text, fontSize: 14 }
+        : kind === "arrow"
+          ? { id, kind, x1: cx - 80, y1: cy, x2: cx + 80, y2: cy, color: theme.text }
+          : { id, kind, x: cx - 80, y: cy - 30, width: 160, height: 60, color: theme.text };
+    commitAnnotations([...annotations, next], `已添加${kind === "text" ? "文字" : kind === "arrow" ? "箭头" : "矩形"}标注`);
+  }
+
+  function updateAnnotation(id: string, patch: Partial<ChartAnnotation>) {
+    commitAnnotations(
+      annotations.map((a) => (a.id === id ? ({ ...a, ...patch } as ChartAnnotation) : a)),
+      "已更新标注",
+    );
+  }
+
+  function removeAnnotation(id: string) {
+    commitAnnotations(
+      annotations.filter((a) => a.id !== id),
+      "已删除标注",
+    );
+  }
+
   function applyProject(project: ProjectState, message?: string) {
     setTableData(project.tableData.map((row) => [...row]));
     setChartType(project.chartType);
@@ -1983,6 +2042,7 @@ export default function Home() {
     setComboDualAxis(project.comboDualAxis);
     setY2AxisTitle(project.y2AxisTitle);
     setComboAxisSync(project.comboAxisSync);
+    setAnnotations(project.annotations.map((a) => ({ ...a })));
     setStreamTimeAxis(project.streamTimeAxis);
     setMarkOpacity(project.markOpacity);
     setAreaOpacity(project.areaOpacity);
@@ -2014,6 +2074,12 @@ export default function Home() {
     setSettingsOpen(DEFAULT_SETTINGS_OPEN);
     if (message) setStatus(message);
   }
+  // Keep the ref in sync AFTER applyProject is declared (the early mount
+  // effect reads through the ref; new hooks rules reject hoisted access).
+  useEffect(() => {
+    applyProjectRef.current = applyProject;
+  });
+
 
   function saveProjectFile() {
     if (!requireDownloadAuth({ type: "project" })) return;
@@ -4120,6 +4186,145 @@ export default function Home() {
               checked={useThousandsSeparator}
               onChange={setUseThousandsSeparator}
             />
+          </SettingsSection>
+
+          <SettingsSection
+            id="annotations"
+            query={settingsQuery}
+            icon={<Pencil size={15} />}
+            open={Boolean(settingsQuery) || settingsOpen.annotations}
+            hidden={!sectionShown("annotations")}
+            onToggle={() => toggleSettingsSection("annotations")}
+          >
+            <div className="annotation-add-row">
+              <button type="button" className="button button-secondary" onClick={() => addAnnotation("text")}>
+                文字
+              </button>
+              <button type="button" className="button button-secondary" onClick={() => addAnnotation("arrow")}>
+                箭头
+              </button>
+              <button type="button" className="button button-secondary" onClick={() => addAnnotation("rect")}>
+                矩形
+              </button>
+            </div>
+            {annotations.length === 0 && (
+              <p className="cloud-empty">还没有标注，点击上方按钮添加</p>
+            )}
+            {annotations.map((item) => (
+              <div key={item.id} className="annotation-card">
+                <div className="annotation-head">
+                  <span className="annotation-kind">
+                    {item.kind === "text" ? "文字" : item.kind === "arrow" ? "箭头" : "矩形"}
+                  </span>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="删除标注"
+                    title="删除"
+                    onClick={() => removeAnnotation(item.id)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+                {item.kind === "text" && (
+                  <>
+                    <input
+                      className="annotation-field"
+                      value={item.text}
+                      onChange={(event) => updateAnnotation(item.id, { text: event.target.value })}
+                      placeholder="标注内容"
+                    />
+                    <div className="annotation-row">
+                      <input
+                        className="annotation-field"
+                        type="number"
+                        value={item.x}
+                        aria-label="X"
+                        onChange={(event) => updateAnnotation(item.id, { x: Number(event.target.value) })}
+                      />
+                      <input
+                        className="annotation-field"
+                        type="number"
+                        value={item.y}
+                        aria-label="Y"
+                        onChange={(event) => updateAnnotation(item.id, { y: Number(event.target.value) })}
+                      />
+                      <input
+                        className="annotation-field"
+                        type="color"
+                        value={item.color ?? "#17202a"}
+                        aria-label="颜色"
+                        onChange={(event) => updateAnnotation(item.id, { color: event.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
+                {item.kind === "arrow" && (
+                  <div className="annotation-row">
+                    <input
+                      className="annotation-field"
+                      type="number"
+                      aria-label="起点 X"
+                      value={item.x1}
+                      onChange={(event) => updateAnnotation(item.id, { x1: Number(event.target.value) })}
+                    />
+                    <input
+                      className="annotation-field"
+                      type="number"
+                      aria-label="起点 Y"
+                      value={item.y1}
+                      onChange={(event) => updateAnnotation(item.id, { y1: Number(event.target.value) })}
+                    />
+                    <input
+                      className="annotation-field"
+                      type="number"
+                      aria-label="终点 X"
+                      value={item.x2}
+                      onChange={(event) => updateAnnotation(item.id, { x2: Number(event.target.value) })}
+                    />
+                    <input
+                      className="annotation-field"
+                      type="number"
+                      aria-label="终点 Y"
+                      value={item.y2}
+                      onChange={(event) => updateAnnotation(item.id, { y2: Number(event.target.value) })}
+                    />
+                  </div>
+                )}
+                {item.kind === "rect" && (
+                  <div className="annotation-row">
+                    <input
+                      className="annotation-field"
+                      type="number"
+                      aria-label="X"
+                      value={item.x}
+                      onChange={(event) => updateAnnotation(item.id, { x: Number(event.target.value) })}
+                    />
+                    <input
+                      className="annotation-field"
+                      type="number"
+                      aria-label="Y"
+                      value={item.y}
+                      onChange={(event) => updateAnnotation(item.id, { y: Number(event.target.value) })}
+                    />
+                    <input
+                      className="annotation-field"
+                      type="number"
+                      aria-label="宽"
+                      value={item.width}
+                      onChange={(event) => updateAnnotation(item.id, { width: Number(event.target.value) })}
+                    />
+                    <input
+                      className="annotation-field"
+                      type="number"
+                      aria-label="高"
+                      value={item.height}
+                      onChange={(event) => updateAnnotation(item.id, { height: Number(event.target.value) })}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
           </SettingsSection>
 
           {settingsQuery &&

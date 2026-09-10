@@ -14,6 +14,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  type ChartAnnotation,
   buildChartOption,
   buildThumbnailOption,
   CHART_TEMPLATES,
@@ -2288,4 +2289,34 @@ test("P100-B3: pictorial unit value overrides the adaptive glyph size", () => {
     (unitSeries.symbolSize?.[1] ?? 0) < (adaptiveSeries.symbolSize?.[1] ?? 0),
     `explicit unit ${JSON.stringify(unitSeries.symbolSize)} should be shorter than adaptive ${JSON.stringify(adaptiveSeries.symbolSize)}`,
   );
+});
+
+
+test("P100-ANN: annotations render through the shared graphic channel", () => {
+  const annotations: ChartAnnotation[] = [
+    { id: "a1", kind: "text", x: 40, y: 30, text: "峰值区间", color: "#d64545", fontSize: 16 },
+    { id: "a2", kind: "arrow", x1: 100, y1: 60, x2: 200, y2: 120, color: "#2563eb" },
+    { id: "a3", kind: "rect", x: 150, y: 90, width: 120, height: 60 },
+  ];
+  const option = buildChartOption(baseConfig({ type: "line", annotations }));
+  const graphic = (option.graphic ?? []) as Array<{
+    type?: string;
+    style?: { text?: string; fill?: string; stroke?: string };
+    shape?: Record<string, number>;
+  }>;
+  const texts = graphic.filter((el) => el.type === "text");
+  const lines = graphic.filter((el) => el.type === "line");
+  const rects = graphic.filter((el) => el.type === "rect");
+  assert.equal(texts.length, 1);
+  assert.equal(texts[0]?.style?.text, "峰值区间");
+  assert.equal(texts[0]?.style?.fill, "#d64545");
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0]?.style?.stroke, "#2563eb");
+  assert.equal(rects.length, 1);
+  assert.equal(rects[0]?.shape?.width, 120);
+  // No annotations → no annotation graphics.
+  const empty = buildChartOption(baseConfig({ type: "line" }));
+  assert.equal(empty.graphic, undefined);
+  // Coordinate fidelity.
+  assert.equal(rects[0]?.shape?.x, 150);
 });
