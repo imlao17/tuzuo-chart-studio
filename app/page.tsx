@@ -125,6 +125,12 @@ type FieldRoles = Partial<Record<DataBindingRole, string | string[]>>;
 // derive from it so a field is never accidentally dropped.
 type ProjectState = {
   annotations: ChartAnnotation[];
+  watermark: {
+    dataUrl: string;
+    position: "tl" | "tr" | "bl" | "br";
+    opacity: number;
+    width: number;
+  } | null;
   tableData: string[][];
   chartType: ChartType;
   fieldRoles: FieldRoles;
@@ -280,6 +286,7 @@ const DEFAULT_PROJECT: ProjectState = {
   comboAxisSync: false,
   streamTimeAxis: false,
   annotations: [],
+  watermark: null,
 };
 
 const PROJECT_STORAGE_KEY = "tuzuo-current-project";
@@ -456,6 +463,33 @@ function formatCloudDate(timestamp: number) {
 }
 
 // Tolerant reader for annotation arrays coming from project files/cloud.
+function normalizeWatermark(value: unknown): {
+  dataUrl: string;
+  position: "tl" | "tr" | "bl" | "br";
+  opacity: number;
+  width: number;
+} | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as {
+    dataUrl?: unknown;
+    position?: unknown;
+    opacity?: unknown;
+    width?: unknown;
+  };
+  if (typeof candidate.dataUrl !== "string" || !candidate.dataUrl.startsWith("data:image/")) {
+    return null;
+  }
+  const position = ["tl", "tr", "bl", "br"].includes(String(candidate.position))
+    ? (String(candidate.position) as "tl" | "tr" | "bl" | "br")
+    : "br";
+  return {
+    dataUrl: candidate.dataUrl,
+    position,
+    opacity: Math.max(0.05, Math.min(1, Number(candidate.opacity) || 0.5)),
+    width: Math.max(32, Math.min(320, Number(candidate.width) || 96)),
+  };
+}
+
 function normalizeAnnotations(value: unknown): ChartAnnotation[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -722,6 +756,7 @@ function normalizeProject(input: unknown): ProjectState | null {
 
   return {
     tableData: normalizeTableData(source.tableData, base.tableData),
+    watermark: normalizeWatermark(source.watermark),
     chartType,
     fieldRoles: normalizeFieldRoles(source.fieldRoles, base.fieldRoles),
     seriesKind: normalizeSeriesKind(source.seriesKind, base.seriesKind),
@@ -1058,6 +1093,7 @@ export default function Home() {
   const [annotations, setAnnotations] = useState<ChartAnnotation[]>(
     DEFAULT_PROJECT.annotations,
   );
+  const [watermark, setWatermark] = useState(DEFAULT_PROJECT.watermark);
   const [importUrl, setImportUrl] = useState(
     // SSR has no window; the localStorage read only happens on the client.
     () =>
@@ -1412,6 +1448,7 @@ export default function Home() {
         y2AxisTitle: y2AxisTitle || undefined,
         comboAxisSync: comboAxisSync || undefined,
         annotations: annotations.length ? annotations : undefined,
+        watermark: watermark ?? undefined,
         streamTimeAxis: streamTimeAxis || undefined,
         markOpacity,
         areaOpacity,
@@ -1445,6 +1482,7 @@ export default function Home() {
     [
       annotations,
       areaOpacity,
+      watermark,
       axisLabelRotation,
       pictorialUnitValueInput,
       quadrantCenter,
@@ -1749,6 +1787,7 @@ export default function Home() {
       tableData: tableData.map((row) => [...row]),
       chartType,
       annotations: annotations.map((a) => ({ ...a })),
+      watermark: watermark ? { ...watermark } : null,
       quadrantCenter,
       pictorialUnitValue:
         Number(pictorialUnitValueInput) > 0
@@ -1875,6 +1914,32 @@ export default function Home() {
     return () => window.cancelAnimationFrame(frame);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when the signed-in user changes
   }, [authUser]);
+
+  function updateWatermark(patch: Partial<ProjectState["watermark"]>) {
+    if (!patch) return;
+    const next = {
+      dataUrl: "",
+      position: "br" as const,
+      opacity: 0.5,
+      width: 96,
+      ...watermark,
+      ...patch,
+    };
+    if (!next.dataUrl) return;
+    setWatermark(next);
+  }
+
+  function handleWatermarkUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateWatermark({ dataUrl: String(reader.result) });
+      setStatus("已添加水印");
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  }
 
   async function saveCloudProject(asNew = false) {
     if (cloudSaving) return;
@@ -2052,6 +2117,7 @@ export default function Home() {
     setY2AxisTitle(project.y2AxisTitle);
     setComboAxisSync(project.comboAxisSync);
     setAnnotations(project.annotations.map((a) => ({ ...a })));
+    setWatermark(project.watermark ? { ...project.watermark } : null);
     setStreamTimeAxis(project.streamTimeAxis);
     setMarkOpacity(project.markOpacity);
     setAreaOpacity(project.areaOpacity);
@@ -3000,6 +3066,92 @@ export default function Home() {
                 >
                   {marginsLinked ? <Lock size={14} /> : <LockOpen size={14} />}
                 </button>
+              </div>
+              <div className="watermark-block">
+                <div className="watermark-head">
+                  <span>水印 Logo</span>
+                  {watermark && (
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={() => setWatermark(null)}
+                    >
+                      清除
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handleWatermarkUpload}
+                  aria-label="上传水印图片"
+                />
+                <button
+                  type="button"
+                  className="button button-secondary watermark-upload"
+                  onClick={(event) => {
+                    const input = event.currentTarget
+                      .previousElementSibling as HTMLInputElement | null;
+                    input?.click();
+                  }}
+                >
+                  {watermark ? "更换水印图片" : "上传水印图片"}
+                </button>
+                {watermark && (
+                  <>
+                    <label className="field">
+                      <span>位置</span>
+                      <select
+                        value={watermark.position}
+                        onChange={(event) =>
+                          updateWatermark({
+                            position: event.target.value as
+                              | "tl"
+                              | "tr"
+                              | "bl"
+                              | "br",
+                          })
+                        }
+                      >
+                        <option value="tl">左上</option>
+                        <option value="tr">右上</option>
+                        <option value="bl">左下</option>
+                        <option value="br">右下</option>
+                      </select>
+                    </label>
+                    <label className="range-field">
+                      <span>
+                        透明度 <strong>{Math.round(watermark.opacity * 100)}%</strong>
+                      </span>
+                      <input
+                        type="range"
+                        min={5}
+                        max={100}
+                        value={Math.round(watermark.opacity * 100)}
+                        onChange={(event) =>
+                          updateWatermark({
+                            opacity: Number(event.target.value) / 100,
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="range-field">
+                      <span>
+                        宽度 <strong>{watermark.width}px</strong>
+                      </span>
+                      <input
+                        type="range"
+                        min={40}
+                        max={240}
+                        value={watermark.width}
+                        onChange={(event) =>
+                          updateWatermark({ width: Number(event.target.value) })
+                        }
+                      />
+                    </label>
+                  </>
+                )}
               </div>
               <div className="margin-grid">
                 {(

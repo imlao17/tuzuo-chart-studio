@@ -183,6 +183,19 @@ export type ParsedTable = {
   error?: string;
 };
 
+export type ChartAnnotation =
+  | {
+      id: string;
+      kind: "text";
+      x: number;
+      y: number;
+      text: string;
+      fontSize?: number;
+      color?: string;
+    }
+  | { id: string; kind: "arrow"; x1: number; y1: number; x2: number; y2: number; color?: string }
+  | { id: string; kind: "rect"; x: number; y: number; width: number; height: number; color?: string };
+
 export type ChartConfig = {
   type: ChartType;
   parsed: ParsedTable;
@@ -275,6 +288,16 @@ export type ChartConfig = {
   sizeColumn?: string;
   colorColumn?: string;
   shapeColumn?: string;
+  // Universal annotation layer: canvas-pixel-positioned text/arrow/rect
+  // glyphs rendered through the shared graphic channel on every template.
+  annotations?: ChartAnnotation[];
+  // Brand watermark: a data-URL image placed in one of the four corners.
+  watermark?: {
+    dataUrl: string;
+    position: "tl" | "tr" | "bl" | "br";
+    opacity: number;
+    width: number;
+  };
   // Labels drawn on colored shapes (treemap, sunburst, funnel, radial bars,
   // heatmap cells, pie-inside) auto-switch between dark and white text for
   // contrast. On by default; an explicit 数据标签颜色 always wins.

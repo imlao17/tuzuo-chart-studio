@@ -2320,3 +2320,31 @@ test("P100-ANN: annotations render through the shared graphic channel", () => {
   // Coordinate fidelity.
   assert.equal(rects[0]?.shape?.x, 150);
 });
+
+test("P100-WM: watermark renders a data-URL image graphic in the chosen corner", () => {
+  const watermark = {
+    dataUrl: "data:image/png;base64,iVBORw0KGgo=",
+    position: "br" as const,
+    opacity: 0.6,
+    width: 120,
+  };
+  const option = buildChartOption(baseConfig({ type: "line", watermark }));
+  const graphic = (option.graphic ?? []) as Array<{
+    type?: string;
+    style?: { image?: string; opacity?: number; width?: number };
+    right?: number;
+    bottom?: number;
+  }>;
+  const images = graphic.filter((el) => el.type === "image");
+  assert.equal(images.length, 1, "one watermark image");
+  assert.equal(images[0]?.style?.image, watermark.dataUrl);
+  assert.equal(images[0]?.style?.opacity, 0.6);
+  assert.equal(images[0]?.style?.width, 120);
+  assert.ok(images[0]?.bottom !== undefined, "br position pins to the bottom");
+  // 未设水印 → 无 watermark 图形
+  const plain = buildChartOption(baseConfig({ type: "line" }));
+  const plainImages = ((plain.graphic ?? []) as Array<{ type?: string }>).filter(
+    (el) => el.type === "image",
+  );
+  assert.equal(plainImages.length, 0);
+});

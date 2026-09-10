@@ -540,6 +540,75 @@ function assembleOption(
   // capabilities.axes === false, and singleAxis (streamgraph-family) is only
   // returned by templates that still run legacy today. Mirror the legacy
   // condition accordingly.
+  // Universal annotation layer: convert config.annotations (canvas-pixel
+  // text/arrow/rect) into graphic elements, merged after any template-provided
+  // graphic so both render.
+  const annotationGraphics: Array<Record<string, unknown>> = [];
+  if (!compact && config.annotations?.length) {
+    const ink = config.theme.text;
+    for (const item of config.annotations) {
+      if (item.kind === "text" && item.text) {
+        annotationGraphics.push({
+          type: "text",
+          x: item.x,
+          y: item.y,
+          style: {
+            text: item.text,
+            fill: item.color || ink,
+            font: `${Math.round(item.fontSize ?? Math.max(12, fontSize))}px "Inter", "PingFang SC", sans-serif`,
+          },
+        });
+      } else if (item.kind === "arrow") {
+        annotationGraphics.push({
+          type: "line",
+          shape: { x1: item.x1, y1: item.y1, x2: item.x2, y2: item.y2 },
+          style: {
+            stroke: item.color || ink,
+            lineWidth: 2,
+            endArrow: { length: 10, width: 8 },
+          },
+        });
+      } else if (item.kind === "rect" && item.width > 0 && item.height > 0) {
+        annotationGraphics.push({
+          type: "rect",
+          shape: { x: item.x, y: item.y, width: item.width, height: item.height },
+          style: {
+            fill: "transparent",
+            stroke: item.color || config.theme.text,
+            lineWidth: 1.5,
+          },
+        });
+      }
+    }
+  }
+  const templateGraphic = Array.isArray(patched.graphic)
+    ? patched.graphic
+    : patched.graphic
+      ? [patched.graphic]
+      : [];
+  // Brand watermark: data-URL image in a corner, included in exports.
+  const watermark = config.watermark;
+  const watermarkGraphics: Array<Record<string, unknown>> = [];
+  if (watermark?.dataUrl) {
+    const margin = Math.max(8, Math.round(config.margins.right / 2));
+    const width = Math.max(32, Math.min(320, watermark.width || 96));
+    const isRight = watermark.position === "tr" || watermark.position === "br";
+    const isBottom = watermark.position === "bl" || watermark.position === "br";
+    watermarkGraphics.push({
+      type: "image",
+      ...(isRight ? { right: margin } : { left: margin }),
+      ...(isBottom ? { bottom: margin } : { top: margin }),
+      style: {
+        image: watermark.dataUrl,
+        width,
+        height: width,
+        opacity: Math.max(0.05, Math.min(1, watermark.opacity)),
+      },
+    });
+  }
+
+  const mergedGraphic = [...templateGraphic, ...annotationGraphics, ...watermarkGraphics];
+
   const hasSingleAxis = Boolean(patched.singleAxis);
   let computedGrid = {
     top: gridTop,
@@ -651,7 +720,7 @@ function assembleOption(
       polar: patched.polar,
       angleAxis: patched.angleAxis,
       radiusAxis: patched.radiusAxis,
-      graphic: patched.graphic,
+      graphic: mergedGraphic.length ? mergedGraphic : undefined,
       parallel: patched.parallel,
       parallelAxis: patched.parallelAxis,
       calendar: patched.calendar,

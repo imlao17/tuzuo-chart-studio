@@ -2966,3 +2966,26 @@ button:disabled {
   color: inherit;
   background: var(--surface);
 }
+
+/* --- Watermark controls ----------------------------------------------------- */
+
+.watermark-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--line-soft);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.watermark-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+
+.watermark-upload {
+  justify-content: center;
+}
