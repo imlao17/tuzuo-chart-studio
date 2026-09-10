@@ -225,7 +225,10 @@ const GROUP_X_AXIS: SettingsGroup = SETTINGS_SECTION_META.xAxis;
 const GROUP_Y_AXIS: SettingsGroup = SETTINGS_SECTION_META.yAxis;
 const GROUP_LEGEND: SettingsGroup = SETTINGS_SECTION_META.legend;
 const GROUP_NUMBERS: SettingsGroup = SETTINGS_SECTION_META.numbers;
+const ANNOTATIONS_GROUP: SettingsGroup = SETTINGS_SECTION_META.annotations;
+
 const CARTESIAN_GROUPS: SettingsGroup[] = [
+  ANNOTATIONS_GROUP,
   GROUP_COLORS,
   GROUP_MARKS,
   GROUP_LABELS,
@@ -236,6 +239,7 @@ const CARTESIAN_GROUPS: SettingsGroup[] = [
 ];
 
 const CARTESIAN_GROUPS_NO_LEGEND: SettingsGroup[] = [
+  ANNOTATIONS_GROUP,
   GROUP_COLORS,
   GROUP_MARKS,
   GROUP_LABELS,
@@ -246,6 +250,7 @@ const CARTESIAN_GROUPS_NO_LEGEND: SettingsGroup[] = [
 ];
 
 const CARTESIAN_BASIC_GROUPS_NO_LEGEND: SettingsGroup[] = [
+  ANNOTATIONS_GROUP,
   GROUP_COLORS,
   GROUP_LABELS,
   GROUP_X_AXIS,
@@ -255,6 +260,7 @@ const CARTESIAN_BASIC_GROUPS_NO_LEGEND: SettingsGroup[] = [
 ];
 
 const PIE_GROUPS: SettingsGroup[] = [
+  ANNOTATIONS_GROUP,
   GROUP_COLORS,
   GROUP_MARKS,
   GROUP_LABELS,
@@ -263,6 +269,7 @@ const PIE_GROUPS: SettingsGroup[] = [
 ];
 
 const NON_CARTESIAN_GROUPS_NO_LEGEND: SettingsGroup[] = [
+  ANNOTATIONS_GROUP,
   GROUP_COLORS,
   GROUP_MARKS,
   GROUP_LABELS,
@@ -271,6 +278,7 @@ const NON_CARTESIAN_GROUPS_NO_LEGEND: SettingsGroup[] = [
 ];
 
 const NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND: SettingsGroup[] = [
+  ANNOTATIONS_GROUP,
   GROUP_COLORS,
   GROUP_LABELS,
   GROUP_LEGEND,
@@ -278,6 +286,7 @@ const NON_CARTESIAN_BASIC_GROUPS_NO_LEGEND: SettingsGroup[] = [
 ];
 
 const RADAR_GROUPS: SettingsGroup[] = [
+  ANNOTATIONS_GROUP,
   GROUP_COLORS,
   GROUP_MARKS,
   GROUP_LABELS,
@@ -335,7 +344,7 @@ const CAP_GRAPHIC: Capabilities = {
   svgExport: true,
 };
 
-const GRAPHIC_GROUPS: SettingsGroup[] = [GROUP_COLORS, GROUP_NUMBERS];
+const GRAPHIC_GROUPS: SettingsGroup[] = [GROUP_COLORS, GROUP_NUMBERS, ANNOTATIONS_GROUP];
 
 // --- Shared data-binding presets (task 3 will specialize these per template) -
 

@@ -10,7 +10,9 @@ export type ImportTableResult = {
   source: string;
 };
 
-/** Fetch a remote CSV/TSV/text table. Throws with a readable message. */
+/** Fetch a remote CSV/TSV/text table. Throws with a readable message.
+ *  Relayed through /api/import because most data hosts do not send CORS
+ *  headers, which would make a direct client-side fetch useless. */
 export async function fetchTableFromUrl(url: string): Promise<ImportTableResult> {
   let parsedUrl: URL;
   try {
@@ -24,21 +26,24 @@ export async function fetchTableFromUrl(url: string): Promise<ImportTableResult>
 
   let response: Response;
   try {
-    response = await fetch(url, { redirect: "follow" });
+    response = await fetch("/api/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ url }),
+    });
   } catch {
     throw new Error("链接无法访问，请检查地址或网络");
   }
+  const body = (await response.json().catch(() => ({}))) as {
+    text?: string;
+    message?: string;
+  };
   if (!response.ok) {
-    throw new Error(`链接返回 ${response.status}，请确认链接可公开访问`);
+    throw new Error(body.message || `链接返回 ${response.status}，请确认链接可公开访问`);
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
-  if (/xlsx|xls|spreadsheet/i.test(contentType) || /\.xlsx?(\?|$)/i.test(parsedUrl.pathname)) {
-    const buffer = await response.arrayBuffer();
-    return { table: parseWorkbook(buffer), source: url };
-  }
-
-  const text = await response.text();
+  const text = body.text ?? "";
   if (!text.trim()) {
     throw new Error("链接内容为空");
   }

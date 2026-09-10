@@ -43,6 +43,11 @@ export const SETTINGS_SECTION_META = {
     title: "数字格式",
     keywords: "小数 千分位 前缀 后缀 单位 金额 百分比",
   },
+  annotations: {
+    id: "annotations",
+    title: "图形标注",
+    keywords: "标注 注释 文字 箭头 矩形 高亮",
+  },
 } as const;
 
 export type SettingsSectionId = keyof typeof SETTINGS_SECTION_META;
@@ -56,6 +61,7 @@ export const DEFAULT_SETTINGS_OPEN: Record<SettingsSectionId, boolean> = {
   yAxis: false,
   legend: false,
   numbers: false,
+  annotations: true,
 };
 
 export function settingsSectionMatches(id: SettingsSectionId, query: string) {
