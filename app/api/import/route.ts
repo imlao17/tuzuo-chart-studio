@@ -3,6 +3,19 @@ import { NextResponse } from "next/server";
 export const runtime = "edge";
 
 const MAX_BYTES = 5_000_000;
+
+/** Local dev mode (same flag as the dev verification links) allows loopback
+ *  and private targets so developers can import from local services. */
+async function isLocalDev() {
+  try {
+    const runtimeModule = (await import("cloudflare:workers")) as {
+      env?: { AUTH_DEV_SHOW_VERIFICATION_LINK?: string };
+    };
+    return runtimeModule.env?.AUTH_DEV_SHOW_VERIFICATION_LINK === "true";
+  } catch {
+    return false;
+  }
+}
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
 
@@ -74,7 +87,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (isBlockedHost(parsed.hostname)) {
+    if (!await isLocalDev() && isBlockedHost(parsed.hostname)) {
       return NextResponse.json(
         { error: "URL_BLOCKED", message: "该链接指向内部地址，已被拒绝" },
         { status: 400 },
@@ -94,7 +107,7 @@ export async function POST(request: Request) {
       const location = upstream.headers.get("location");
       if (!location) break;
       const next = new URL(location, parsed.toString());
-      if (isBlockedHost(next.hostname)) {
+      if (!await isLocalDev() && isBlockedHost(next.hostname)) {
         return NextResponse.json(
           { error: "URL_BLOCKED", message: "重定向指向内部地址，已被拒绝" },
           { status: 400 },
