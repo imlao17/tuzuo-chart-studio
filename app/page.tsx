@@ -2445,6 +2445,10 @@ export default function Home() {
 
     try {
       if (/\.xlsx?$/i.test(file.name)) {
+        if (file.size > 10_000_000) {
+          setStatus("工作簿超过 10MB，请精简后再导入");
+          return;
+        }
         const matrix = parseWorkbook(await file.arrayBuffer());
         setTableData(matrix);
         setWorkspaceMode("data");

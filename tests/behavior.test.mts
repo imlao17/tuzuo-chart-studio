@@ -2348,3 +2348,4 @@ test("P100-WM: watermark renders a data-URL image graphic in the chosen corner",
   );
   assert.equal(plainImages.length, 0);
 });
+
