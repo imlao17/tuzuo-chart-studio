@@ -77,7 +77,16 @@ type ResolvedTextStyle = {
 };
 
 export function dataLabelColor(config: ChartConfig) {
+  if (config.textOnDark && !config.labelStyle?.color && !config.labelColor) {
+    return "#f5f7fa";
+  }
   return config.labelStyle?.color || config.labelColor || config.theme.text;
+}
+
+/** Ink for free-standing text (axes, titles, category labels): light when
+ *  textOnDark is on and the user hasn't forced a color. */
+export function themeInk(config: ChartConfig) {
+  return config.textOnDark ? "#f5f7fa" : config.theme.text;
 }
 
 function resolveTextStyle(
@@ -132,10 +141,10 @@ export function inShapeLabelColor(
     return dataLabelColor(config);
   }
   if (config.labelAutoContrast === false) {
-    return config.theme.text;
+    return themeInk(config);
   }
   const luminance = hexLuminance(fillColor);
-  return luminance < 0.4 ? "#ffffff" : config.theme.text;
+  return luminance < 0.4 ? "#ffffff" : themeInk(config);
 }
 
 /** Label text style for in-shape labels (auto contrast + user overrides). */
@@ -445,7 +454,6 @@ function assembleOption(
     title,
     subtitle,
     margins,
-    theme,
     backgroundColor,
     transparent,
     showLegend,
@@ -499,7 +507,7 @@ function assembleOption(
         (legendVisible && legendPosition === "right"
           ? LEGEND_VERTICAL_SPACE
           : 0);
-  const textColor = theme.text;
+  const textColor = themeInk(config);
   const legendTopOffset = margins.top + (title || subtitle ? titleBlock - 6 : 3);
   const sideLegendTopOffset = margins.top + titleBlock;
   const horizontalLegend =
@@ -545,7 +553,7 @@ function assembleOption(
   // graphic so both render.
   const annotationGraphics: Array<Record<string, unknown>> = [];
   if (!compact && config.annotations?.length) {
-    const ink = config.theme.text;
+    const ink = themeInk(config);
     for (const item of config.annotations) {
       if (item.kind === "text" && item.text) {
         annotationGraphics.push({
@@ -681,7 +689,7 @@ function assembleOption(
       subtext: subtitle,
       itemGap: 7,
       textStyle: titleTextStyle(config, textColor, fontSize),
-      subtextStyle: subtitleTextStyle(config, "#68727d", fontSize),
+      subtextStyle: subtitleTextStyle(config, config.textOnDark ? "#aab3bd" : "#68727d", fontSize),
     },
     legend: {
       show: legendVisible,

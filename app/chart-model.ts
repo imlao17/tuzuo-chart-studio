@@ -302,6 +302,10 @@ export type ChartConfig = {
   // heatmap cells, pie-inside) auto-switch between dark and white text for
   // contrast. On by default; an explicit 数据标签颜色 always wins.
   labelAutoContrast?: boolean;
+  // For transparent exports destined for dark backgrounds: render all
+  // free-standing text (titles, axis labels, category names, data labels)
+  // in light ink instead of the theme's dark text color.
+  textOnDark?: boolean;
   // Quadrant chart only: reference lines use the median (default) or the mean.
   quadrantCenter?: "median" | "mean";
   // Pictorial column only: value each unit glyph represents. Undefined lets

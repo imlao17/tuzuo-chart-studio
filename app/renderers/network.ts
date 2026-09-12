@@ -12,6 +12,7 @@ import type { SeriesOption } from "echarts";
 import { columnIndex, toNumber } from "../chart-model";
 import type { RenderContext } from "../template-definition";
 import {
+  themeInk,
   buildCategoryAxis,
   colorFor,
   dataLabelTextStyle,
@@ -155,7 +156,7 @@ export function buildChordOption(ctx: RenderContext): RendererResult {
 /** 邻接矩阵图: heatmap over the source×target grid of flows. */
 export function buildAdjacencyMatrixOption(ctx: RenderContext): RendererResult {
   const { config } = ctx;
-  const { compact = false, theme, fontSize } = config;
+  const { compact = false, fontSize } = config;
   const { nodeNames, endpoints } = resolveEndpoints(ctx);
   const indexOf: Record<string, number> = {};
   nodeNames.forEach((name, index) => {
@@ -169,7 +170,7 @@ export function buildAdjacencyMatrixOption(ctx: RenderContext): RendererResult {
     axisTick: { show: false },
     axisLabel: {
       show: !compact,
-      color: theme.text,
+      color: themeInk(config),
       fontSize,
       rotate: 45,
       formatter: undefined as undefined | ((value: string) => string),
@@ -177,7 +178,7 @@ export function buildAdjacencyMatrixOption(ctx: RenderContext): RendererResult {
     splitLine: { show: false },
   };
   const xAxis = {
-    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact),
     ...categoryAxisStyle,
     data: nodeNames,
   };
@@ -225,7 +226,7 @@ export function buildAdjacencyMatrixOption(ctx: RenderContext): RendererResult {
       inRange: {
         color: [config.backgroundColor === "#ffffff" ? "#f0f4fa" : config.backgroundColor, colorFor(0, config)],
       },
-      textStyle: { color: theme.text, fontSize },
+      textStyle: { color: themeInk(config), fontSize },
     },
     tooltipTrigger: "item",
   };

@@ -13,6 +13,7 @@ import type { SeriesOption } from "echarts";
 import { columnIndex, toNumber } from "../chart-model";
 import type { RenderContext, ValidationContext } from "../template-definition";
 import {
+  themeInk,
   colorFor,
   dataLabelTextStyle,
   type RendererResult,
@@ -291,7 +292,7 @@ const PROVINCE_FALLBACK_COLOR = "#e8edf4";
 
 function choroplethFrame(ctx: RenderContext) {
   const { config } = ctx;
-  const { compact = false, theme, fontSize } = config;
+  const { compact = false, fontSize } = config;
   return {
     min: 0,
     max: Math.max(1, ...(dataSeriesOf(ctx).map((value) => (Number.isFinite(value) ? value : 0)))),
@@ -306,7 +307,7 @@ function choroplethFrame(ctx: RenderContext) {
         colorFor(0, config),
       ],
     },
-    textStyle: { color: theme.text, fontSize },
+    textStyle: { color: themeInk(config), fontSize },
   };
 }
 
@@ -462,7 +463,7 @@ export function buildGeoHeatmapOption(ctx: RenderContext): RendererResult {
           colorFor(0, config),
         ],
       },
-      textStyle: { color: config.theme.text, fontSize: config.fontSize },
+      textStyle: { color: themeInk(config), fontSize: config.fontSize },
     },
   };
 }

@@ -16,6 +16,7 @@
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
 import {
+  themeInk,
   colorFor,
   dataLabelTextStyle,
   resolveDataLabelPosition,
@@ -28,7 +29,7 @@ import {
 
 export function buildComboOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries, formatNumber } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
 
   // Legacy style defaults (legacy lines 399-404).
   const lineWidth = config.lineWidth ?? 3;
@@ -41,7 +42,7 @@ export function buildComboOption(ctx: RenderContext): RendererResult {
   // P1-5 dual Y axis: when comboDualAxis is on, split bar/line series across
   // left (index 0) and right (index 1) value axes. Default (undefined) keeps a
   // single yAxis so default output is unchanged.
-  const textColor = theme.text;
+  const textColor = themeInk(config);
   const labelTextStyle = dataLabelTextStyle(config);
   const xAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
   const dualAxis = !compact && config.comboDualAxis;
@@ -127,7 +128,7 @@ export function buildComboOption(ctx: RenderContext): RendererResult {
  *  right axis. Flourish parity batch 1. */
 export function buildParetoOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries, categories } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
 
   const barWidth = config.barWidth ?? 48;
   const barRadius = config.barRadius ?? 3;
@@ -135,7 +136,7 @@ export function buildParetoOption(ctx: RenderContext): RendererResult {
   const pointSize = config.pointSize ?? 7;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const labelTextStyle = dataLabelTextStyle(config);
-  const textColor = theme.text;
+  const textColor = themeInk(config);
 
   // Pareto always ranks categories by value descending unless the user picked
   // an explicit sort (which buildRenderContext has already applied).

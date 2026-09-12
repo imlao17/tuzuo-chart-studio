@@ -2349,3 +2349,21 @@ test("P100-WM: watermark renders a data-URL image graphic in the chosen corner",
   assert.equal(plainImages.length, 0);
 });
 
+
+test("P100-DARK: textOnDark renders light ink for transparent exports", () => {
+  const dark = buildChartOption(
+    baseConfig({ type: "groupedBar", transparent: true, textOnDark: true }),
+  );
+  // 全局 textStyle 的 color（所有自由文字继承它）应为浅色
+  const textStyle = (dark.textStyle as { color?: string }).color;
+  assert.equal(textStyle, "#f5f7fa", "global text ink goes light");
+  // 轴标签（经 axisLabelTextStyle）也应为浅色
+  const yAxis = dark.yAxis as { axisLabel?: { color?: string } };
+  assert.equal(yAxis.axisLabel?.color, "#f5f7fa", "axis labels go light");
+  // 默认（未开）保持主题暗墨
+  const plain = buildChartOption(baseConfig({ type: "groupedBar", transparent: true }));
+  assert.equal((plain.textStyle as { color?: string }).color, THEMES[0].text);
+  // 数据标签颜色未自定义时 dataLabelColor 也走浅色
+  const [series] = (dark.series as Array<{ label?: { color?: string } }>);
+  assert.equal(series.label?.color, "#f5f7fa");
+});

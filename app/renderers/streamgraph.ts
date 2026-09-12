@@ -15,6 +15,7 @@
 import type { EChartsOption, SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
 import {
+  themeInk,
   axisLabelTextStyle,
   LEGEND_HORIZONTAL_SPACE,
   LEGEND_VERTICAL_SPACE,
@@ -25,7 +26,7 @@ export function buildStreamgraphOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
   const { title, subtitle, margins, theme, fontSize, compact = false } = config;
 
-  const textColor = theme.text;
+  const textColor = themeInk(config);
   const singleAxisTextStyle = axisLabelTextStyle(
     config.xAxisLabelStyle,
     config,

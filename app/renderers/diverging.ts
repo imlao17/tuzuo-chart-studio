@@ -17,6 +17,7 @@
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
 import {
+  themeInk,
   colorFor,
   dataLabelTextStyle,
   resolveDataLabelPosition,
@@ -29,14 +30,14 @@ import {
 
 export function buildDivergingOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries, formatNumber } = ctx;
-  const { type, theme, fontSize, compact = false } = config;
+  const { type, fontSize, compact = false } = config;
 
   // Legacy style defaults.
   const barWidth = config.barWidth ?? 48;
   const barRadius = config.barRadius ?? 3;
   const markOpacity = (config.markOpacity ?? 100) / 100;
 
-  const textColor = theme.text;
+  const textColor = themeInk(config);
   const defaultLabelTextStyle = dataLabelTextStyle(config);
   const labelTextStyle = {
     ...defaultLabelTextStyle,

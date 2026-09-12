@@ -18,6 +18,7 @@
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
 import {
+  themeInk,
   colorFor,
   dataLabelTextStyle,
   resolveDataLabelPosition,
@@ -46,7 +47,7 @@ const SMOOTH_BY_DEFAULT = new Set([
 
 export function buildLineAreaOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries, formatNumber } = ctx;
-  const { type, theme, fontSize, compact = false } = config;
+  const { type, fontSize, compact = false } = config;
 
   // Legacy style defaults (legacy lines 399-404).
   const lineWidth = config.lineWidth ?? 3;
@@ -60,7 +61,7 @@ export function buildLineAreaOption(ctx: RenderContext): RendererResult {
 
   // Legacy axes (legacy lines 465-466): line/area are vertical, so
   // xAxis=categoryAxis, yAxis=valueAxis.
-  const textColor = theme.text;
+  const textColor = themeInk(config);
   const labelTextStyle = dataLabelTextStyle(config);
   const xAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
   const yAxis = buildValueAxis(ctx, textColor, fontSize, compact);
@@ -180,13 +181,13 @@ export function buildLineAreaOption(ctx: RenderContext): RendererResult {
 export function buildDualAxisLineOption(ctx: RenderContext): RendererResult {
   const result = buildLineAreaOption(ctx);
   const { config } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const series = result.series.map((item, index) =>
     index === 0
       ? item
       : ({ ...item, yAxisIndex: 1 } as SeriesOption),
   );
-  const rightAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const rightAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
   return {
     ...result,
     series,
@@ -197,7 +198,7 @@ export function buildDualAxisLineOption(ctx: RenderContext): RendererResult {
 /** 斜率图: one line per row across exactly two period columns. */
 export function buildSlopeOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const lineWidth = config.lineWidth ?? 3;
   const pointSize = config.pointSize ?? 7;
   const markOpacity = (config.markOpacity ?? 100) / 100;
@@ -206,10 +207,10 @@ export function buildSlopeOption(ctx: RenderContext): RendererResult {
   const left = dataSeries[0] ?? { name: "期初", data: [] };
   const right = dataSeries[1] ?? { name: "期末", data: [] };
   const categoryAxis = {
-    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact),
     data: [left.name, right.name],
   };
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
 
   // Transpose: each row (entity) becomes its own two-point series.
   const series: SeriesOption[] = categories.map((entity, rowIndex) => {
@@ -240,7 +241,7 @@ export function buildSlopeOption(ctx: RenderContext): RendererResult {
 /** 区间面积图: shaded band between lower/upper with a mid line on top. */
 export function buildBandAreaOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const lineWidth = config.lineWidth ?? 3;
   const pointSize = config.pointSize ?? 7;
   const labelTextStyle = dataLabelTextStyle(config);
@@ -253,8 +254,8 @@ export function buildBandAreaOption(ctx: RenderContext): RendererResult {
     Math.max(0, (Number.isFinite(value) ? value : 0) - (Number.isFinite(lower.data[i]) ? lower.data[i] : 0)),
   );
 
-  const xAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
-  const yAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const xAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
+  const yAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [
     {
       name: lower.name,
@@ -310,7 +311,7 @@ export function buildBandAreaOption(ctx: RenderContext): RendererResult {
  *  synthetic transparent base so each ridge sits below the previous one. */
 export function buildRidgelineOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const lineWidth = config.lineWidth ?? 3;
   const pointSize = config.pointSize ?? 7;
   const areaOpacity = compact ? 0.5 : Math.min(0.9, (config.areaOpacity ?? 22) / 100 + 0.35);
@@ -319,8 +320,8 @@ export function buildRidgelineOption(ctx: RenderContext): RendererResult {
   const maxAbs = allValues.length ? Math.max(...allValues.map(Math.abs)) : 1;
   const offsetStep = maxAbs * 0.45;
 
-  const xAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
-  const yAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const xAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
+  const yAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [];
   dataSeries.forEach((item, index) => {
     const color = colorFor(index, config, item.name);
@@ -366,20 +367,20 @@ export function buildRidgelineOption(ctx: RenderContext): RendererResult {
  *  so rank 1 rides the top. */
 export function buildBumpOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const lineWidth = config.lineWidth ?? 3;
   const pointSize = config.pointSize ?? 7;
   const labelTextStyle = dataLabelTextStyle(config);
   const rowCount = categories.length || 1;
 
-  const xAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const xAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const valueAxis = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     min: 1,
     max: rowCount,
     inverse: true,
     axisLabel: {
-      ...(buildValueAxis(ctx, theme.text, fontSize, compact) as { axisLabel?: Record<string, unknown> }).axisLabel,
+      ...(buildValueAxis(ctx, themeInk(config), fontSize, compact) as { axisLabel?: Record<string, unknown> }).axisLabel,
       formatter: (value: number) => `#${value}`,
     },
   };

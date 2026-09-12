@@ -15,6 +15,7 @@ import type { SeriesOption } from "echarts";
 import { columnIndex, toNumber } from "../chart-model";
 import type { RenderContext } from "../template-definition";
 import {
+  themeInk,
   colorFor,
   dataLabelTextStyle,
   resolveDataLabelPosition,
@@ -23,7 +24,7 @@ import { buildValueAxis, type RendererResult } from "./shared";
 
 export function buildScatterOption(ctx: RenderContext): RendererResult {
   const { config, categories } = ctx;
-  const { parsed, theme, fontSize, compact = false } = config;
+  const { parsed, fontSize, compact = false } = config;
 
   // Legacy style defaults.
   const pointSize = config.pointSize ?? 7;
@@ -39,7 +40,7 @@ export function buildScatterOption(ctx: RenderContext): RendererResult {
     ? validSeriesColumns
     : parsed.numericHeaders.slice(0, 1);
 
-  const textColor = theme.text;
+  const textColor = themeInk(config);
   const labelTextStyle = dataLabelTextStyle(config);
   // Both axes are value axes (legacy lines 543-544).
   const xAxis = buildValueAxis(ctx, textColor, fontSize, compact);
@@ -286,14 +287,14 @@ export function buildQuadrantOption(ctx: RenderContext): RendererResult {
  *  their own palette slot. */
 export function buildGroupedScatterOption(ctx: RenderContext): RendererResult {
   const { config, categories } = ctx;
-  const { parsed, theme, fontSize, compact = false } = config;
+  const { parsed, fontSize, compact = false } = config;
   const pointSize = config.pointSize ?? 7;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const selected = selectedNumericColumns(ctx);
   const xIndex = columnIndex(parsed.headers, selected[0] ?? "");
   const yIndex = columnIndex(parsed.headers, selected[1] ?? "");
 
-  const textColor = theme.text;
+  const textColor = themeInk(config);
   const labelTextStyle = dataLabelTextStyle(config);
   const xAxis = buildValueAxis(ctx, textColor, fontSize, compact);
   const yAxis = buildValueAxis(ctx, textColor, fontSize, compact);
@@ -333,7 +334,7 @@ export function buildGroupedScatterOption(ctx: RenderContext): RendererResult {
  *  points are sorted and greedily nudged sideways so circles never overlap. */
 export function buildBeeswarmOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const pointSize = config.pointSize ?? 7;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const values = dataSeries[0]?.data ?? [];
@@ -383,7 +384,7 @@ export function buildBeeswarmOption(ctx: RenderContext): RendererResult {
     return [(categoryIndex[category] ?? 0) + chosenX / slotWidth, value];
   });
 
-  const textColor = theme.text;
+  const textColor = themeInk(config);
   const labelTextStyle = dataLabelTextStyle(config);
   const xAxis = {
     ...buildValueAxis(ctx, textColor, fontSize, compact),

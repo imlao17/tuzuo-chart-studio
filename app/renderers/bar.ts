@@ -17,6 +17,7 @@
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
 import {
+  themeInk,
   colorFor,
   dataLabelTextStyle,
   resolveDataLabelPosition,
@@ -43,7 +44,7 @@ const STACKED_TYPES = new Set([
 
 export function buildBarOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries, formatNumber } = ctx;
-  const { type, theme, fontSize, compact = false } = config;
+  const { type, fontSize, compact = false } = config;
 
   // Legacy style defaults (legacy lines 390-400).
   const barWidth = config.barWidth ?? 48;
@@ -57,8 +58,8 @@ export function buildBarOption(ctx: RenderContext): RendererResult {
   const stacked = STACKED_TYPES.has(type);
 
   // Legacy axes (legacy lines 465-466).
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
-  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const xAxis = isHorizontal ? valueAxis : categoryAxis;
   const yAxis = isHorizontal ? categoryAxis : valueAxis;
 
@@ -247,16 +248,16 @@ function rankOrdered(ctx: RenderContext) {
 /** 直方图: bins a single numeric column into equal-width interval bars. */
 export function buildHistogramOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const barWidth = config.barWidth ?? 48;
   const barRadius = config.barRadius ?? 3;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const values = dataSeries[0]?.data ?? [];
   const bins = computeHistogramBins(values);
 
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
   const categoryAxis = {
-    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact),
     data: bins.labels,
   };
   const series: SeriesOption[] = [
@@ -319,7 +320,7 @@ export function buildDensityHistogramOption(ctx: RenderContext): RendererResult 
  *  via a transparent stacked base. */
 export function buildRangeOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const { type } = config;
   const barWidth = config.barWidth ?? 48;
   const barRadius = config.barRadius ?? 3;
@@ -328,8 +329,8 @@ export function buildRangeOption(ctx: RenderContext): RendererResult {
   const upper = dataSeries[1] ?? { name: "上限", data: [] };
   const color = colorFor(0, config);
 
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
-  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const xAxis = isHorizontal ? valueAxis : categoryAxis;
   const yAxis = isHorizontal ? categoryAxis : valueAxis;
   const visibleRadius: [number, number, number, number] = isHorizontal
@@ -373,15 +374,15 @@ export function buildRangeOption(ctx: RenderContext): RendererResult {
 /** 子弹图: a wide actual bar with a narrow target strip overlaid on it. */
 export function buildBulletOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const barWidth = config.barWidth ?? 48;
   const barRadius = config.barRadius ?? 3;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const actual = dataSeries[0] ?? { name: "实际值", data: [] };
   const target = dataSeries[1] ?? { name: "目标值", data: [] };
 
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
-  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [
     {
       name: actual.name,
@@ -418,14 +419,14 @@ export function buildBulletOption(ctx: RenderContext): RendererResult {
 /** 滑珠图: thin stems with a bead at each value; one stem+bead pair per series. */
 export function buildLollipopOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const barWidth = config.barWidth ?? 48;
   const pointSize = config.pointSize ?? 7;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const stemWidth = Math.min(12, Math.max(2, Math.round(barWidth * 0.18)));
 
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
-  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const labelTextStyle = dataLabelTextStyle(config);
   const series: SeriesOption[] = [];
   dataSeries.forEach((item, index) => {
@@ -463,7 +464,7 @@ export function buildLollipopOption(ctx: RenderContext): RendererResult {
 /** 象形柱状图: repeated unit glyphs clipped to each value. */
 export function buildPictorialOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const barWidth = config.barWidth ?? 48;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const item = dataSeries[0] ?? { name: "数值", data: [] };
@@ -479,8 +480,8 @@ export function buildPictorialOption(ctx: RenderContext): RendererResult {
       ? config.pictorialUnitValue
       : adaptiveUnit;
 
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
-  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [
     {
       name: item.name,
@@ -525,10 +526,10 @@ export function buildProgressOption(ctx: RenderContext): RendererResult {
   const withinHundred = values.every((v) => !Number.isFinite(v) || v <= 100);
 
   const valueAxis = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     max: withinHundred ? 100 : undefined,
   };
-  const categoryAxis = { ...buildCategoryAxis(ctx, theme.text, fontSize, compact), data: ordered.categories };
+  const categoryAxis = { ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact), data: ordered.categories };
   const series: SeriesOption[] = [
     {
       name: ordered.dataSeries[0]?.name ?? "进度",
@@ -591,7 +592,7 @@ export function buildCapsuleOption(ctx: RenderContext): RendererResult {
 /** 箭头条形图: bars tipped with an arrow marker at each value end. */
 export function buildArrowOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const barWidth = config.barWidth ?? 48;
   const barRadius = config.barRadius ?? 3;
   const markOpacity = (config.markOpacity ?? 100) / 100;
@@ -600,8 +601,8 @@ export function buildArrowOption(ctx: RenderContext): RendererResult {
   const color = colorFor(0, config, item.name);
   const labelTextStyle = dataLabelTextStyle(config);
 
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
-  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [
     {
       name: item.name,
@@ -648,8 +649,8 @@ export function buildDumbbellOption(ctx: RenderContext): RendererResult {
   const endColor = colorFor(1, config, end.name);
   const labelTextStyle = dataLabelTextStyle(config);
 
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
-  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [
     {
       name: "连接线",
@@ -712,7 +713,7 @@ export function buildDumbbellOption(ctx: RenderContext): RendererResult {
 /** 堆叠点图: each point is one unit, stacked per category (isotype dots). */
 export function buildStackedDotOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const pointSize = config.pointSize ?? 7;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const values = dataSeries[0]?.data ?? [];
@@ -728,14 +729,14 @@ export function buildStackedDotOption(ctx: RenderContext): RendererResult {
   });
 
   const valueAxis = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     max: Math.max(1, ...values.map((v) => Math.min(MAX_UNITS, Math.round(Number.isFinite(v) ? v : 0)))) + 1,
     min: 0,
     interval: 1,
     axisLabel: { show: false },
     splitLine: { show: false },
   };
-  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [
     {
       name: dataSeries[0]?.name ?? "计数",
@@ -762,7 +763,7 @@ export function buildStackedDotOption(ctx: RenderContext): RendererResult {
 /** 甘特图: horizontal bars floating between start and end columns. */
 export function buildGanttOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const barWidth = config.barWidth ?? 48;
   const barRadius = config.barRadius ?? 3;
   const start = dataSeries[0] ?? { name: "开始", data: [] };
@@ -772,8 +773,8 @@ export function buildGanttOption(ctx: RenderContext): RendererResult {
   );
   const labelTextStyle = dataLabelTextStyle(config);
 
-  const valueAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
-  const categoryAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const valueAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
+  const categoryAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [
     {
       name: start.name,
@@ -828,11 +829,11 @@ export function buildSplitAxisOption(ctx: RenderContext): RendererResult {
   const bottomMax = Math.max(threshold, ...bottomData.filter((v): v is number => v !== null && Number.isFinite(v)));
 
   const categoryAxisBottom = {
-    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact),
     position: "bottom" as const,
   };
   const categoryAxisTop = {
-    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact),
     show: false,
     axisLine: { show: false },
     axisTick: { show: false },
@@ -840,12 +841,12 @@ export function buildSplitAxisOption(ctx: RenderContext): RendererResult {
     position: "top" as const,
   };
   const valueAxisBottom = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     max: bottomMax,
     splitLine: { show: !compact && config.showGrid, lineStyle: { color: theme.grid, type: (config.gridLineType ?? "dashed") as "solid" | "dashed" | "dotted" } },
   };
   const valueAxisTop = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     min: bottomMax * 0.98,
     splitLine: { show: false },
   };

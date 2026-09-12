@@ -10,6 +10,7 @@ import { buildPieOption } from "./pie";
 import { columnIndex, toNumber } from "../chart-model";
 import type { RenderContext } from "../template-definition";
 import {
+  themeInk,
   buildCategoryAxis,
   buildValueAxis,
   colorFor,
@@ -108,11 +109,11 @@ function labelOption(
 
 export function buildDotPlotOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const primary = dataSeries[0] ?? { name: "数值", data: [] };
   const pointSize = compact ? 6 : config.pointSize ?? 9;
   const markOpacity = (config.markOpacity ?? 100) / 100;
-  const textColor = theme.text;
+  const textColor = themeInk(config);
 
   const xAxis = buildValueAxis(ctx, textColor, fontSize, compact);
   const yAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
@@ -135,9 +136,9 @@ export function buildDotPlotOption(ctx: RenderContext): RendererResult {
 
 export function buildWaterfallOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries, formatNumber } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const primary = dataSeries[0] ?? { name: "变化", data: [] };
-  const textColor = theme.text;
+  const textColor = themeInk(config);
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const xAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
   const yAxis = buildValueAxis(ctx, textColor, fontSize, compact);
@@ -201,8 +202,8 @@ export function buildWaterfallOption(ctx: RenderContext): RendererResult {
 
 export function buildHeatmapOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries, formatNumber } = ctx;
-  const { theme, fontSize, compact = false } = config;
-  const textColor = theme.text;
+  const { fontSize, compact = false } = config;
+  const textColor = themeInk(config);
   const xAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
   const yAxis = {
     ...buildCategoryAxis(ctx, textColor, fontSize, compact),
@@ -399,7 +400,7 @@ export function buildGaugeOption(ctx: RenderContext): RendererResult {
         detail: {
           show: !config.compact,
           offsetCenter: [0, "20%"],
-          color: config.theme.text,
+          color: themeInk(config),
           fontSize: Math.max(config.fontSize + 10, 22),
           fontWeight: 700,
           formatter: (raw: number) => formatNumber(raw),
@@ -434,7 +435,7 @@ export function buildRadarOption(ctx: RenderContext): RendererResult {
       radius,
       indicator,
       axisName: {
-        color: config.theme.text,
+        color: themeInk(config),
         fontSize: config.compact ? 9 : config.fontSize,
       },
       splitLine: {
@@ -491,8 +492,8 @@ function boxStats(values: number[]) {
 
 export function buildBoxplotOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
-  const textColor = theme.text;
+  const { fontSize, compact = false } = config;
+  const textColor = themeInk(config);
   const xAxis = {
     ...buildCategoryAxis(ctx, textColor, fontSize, compact),
     data: dataSeries.map((series) => series.name),
@@ -520,8 +521,8 @@ export function buildBoxplotOption(ctx: RenderContext): RendererResult {
 
 export function buildCandlestickOption(ctx: RenderContext): RendererResult {
   const { config } = ctx;
-  const { parsed, theme, fontSize, compact = false } = config;
-  const textColor = theme.text;
+  const { parsed, fontSize, compact = false } = config;
+  const textColor = themeInk(config);
   const xAxis = buildCategoryAxis(ctx, textColor, fontSize, compact);
   const yAxis = buildValueAxis(ctx, textColor, fontSize, compact);
   const columns = config.seriesColumns
@@ -651,7 +652,7 @@ function gaussianKde(values: number[], points: number[], std: number) {
 /** 平行坐标图: each numeric column is a dimension; each row a polyline. */
 export function buildParallelOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { compact = false, theme, fontSize } = config;
+  const { compact = false, fontSize } = config;
   const lineWidth = config.lineWidth ?? 3;
   const markOpacity = (config.markOpacity ?? 100) / 100;
 
@@ -668,10 +669,10 @@ export function buildParallelOption(ctx: RenderContext): RendererResult {
       name: compact ? "" : series.name,
       min: values.length ? Math.min(...values) : 0,
       max: values.length ? Math.max(...values) : 1,
-      nameTextStyle: { color: theme.text, fontSize },
+      nameTextStyle: { color: themeInk(config), fontSize },
       axisLine: { show: !compact, lineStyle: { color: "#aeb6bf" } },
       axisTick: { show: false },
-      axisLabel: { show: !compact, color: theme.text, fontSize },
+      axisLabel: { show: !compact, color: themeInk(config), fontSize },
     };
   });
 
@@ -721,9 +722,9 @@ export function buildCalendarHeatmapOption(ctx: RenderContext): RendererResult {
     cellSize: (compact ? ["auto", 8] : ["auto", 20]) as (number | "auto")[],
     range,
     itemStyle: { color: "transparent", borderColor: theme.grid, borderWidth: 1 },
-    yearLabel: { show: !compact, color: theme.text, fontSize },
-    monthLabel: { show: !compact, color: theme.text, fontSize: Math.max(9, fontSize - 1) },
-    dayLabel: { show: !compact, color: theme.text, fontSize: Math.max(8, fontSize - 2), firstDay: 1 },
+    yearLabel: { show: !compact, color: themeInk(config), fontSize },
+    monthLabel: { show: !compact, color: themeInk(config), fontSize: Math.max(9, fontSize - 1) },
+    dayLabel: { show: !compact, color: themeInk(config), fontSize: Math.max(8, fontSize - 2), firstDay: 1 },
     splitLine: { show: false },
   };
 
@@ -761,7 +762,7 @@ export function buildCalendarHeatmapOption(ctx: RenderContext): RendererResult {
       inRange: {
         color: [config.backgroundColor === "#ffffff" ? "#f0f4fa" : config.backgroundColor, colorFor(0, config)],
       },
-      textStyle: { color: theme.text, fontSize },
+      textStyle: { color: themeInk(config), fontSize },
     },
     tooltipTrigger: "item",
   };
@@ -770,7 +771,7 @@ export function buildCalendarHeatmapOption(ctx: RenderContext): RendererResult {
 /** 累计分布图: ECDF — step line of the sorted column's cumulative percent. */
 export function buildEcdfOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const lineWidth = config.lineWidth ?? 3;
   const pointSize = config.pointSize ?? 7;
   const labelTextStyle = dataLabelTextStyle(config);
@@ -780,11 +781,11 @@ export function buildEcdfOption(ctx: RenderContext): RendererResult {
   const data = values.map((value, index) => [value, ((index + 1) / n) * 100]);
 
   const xAxis = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     name: compact ? "" : dataSeries[0]?.name ?? "",
   };
   const yAxis = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     min: 0,
     max: 100,
   };
@@ -816,7 +817,7 @@ export function buildEcdfOption(ctx: RenderContext): RendererResult {
 /** 误差线图: bars with custom-drawn whiskers for lower/upper error columns. */
 export function buildErrorBarOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const barWidth = config.barWidth ?? 48;
   const barRadius = config.barRadius ?? 3;
   const markOpacity = (config.markOpacity ?? 100) / 100;
@@ -824,8 +825,8 @@ export function buildErrorBarOption(ctx: RenderContext): RendererResult {
   const lower = dataSeries[1]?.data ?? [];
   const upper = dataSeries[2]?.data ?? [];
 
-  const xAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
-  const yAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const xAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
+  const yAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [
     {
       name: dataSeries[0]?.name ?? "数值",
@@ -868,7 +869,7 @@ export function buildErrorBarOption(ctx: RenderContext): RendererResult {
         const line = {
           type: "line",
           shape: { x1: x, y1: high[1], x2: x, y2: low[1] },
-          style: { stroke: theme.text, lineWidth: 1.5 },
+          style: { stroke: themeInk(config), lineWidth: 1.5 },
         };
         return {
           type: "group",
@@ -877,12 +878,12 @@ export function buildErrorBarOption(ctx: RenderContext): RendererResult {
             {
               type: "line",
               shape: { x1: x - cap / 2, y1: high[1], x2: x + cap / 2, y2: high[1] },
-              style: { stroke: theme.text, lineWidth: 1.5 },
+              style: { stroke: themeInk(config), lineWidth: 1.5 },
             },
             {
               type: "line",
               shape: { x1: x - cap / 2, y1: low[1], x2: x + cap / 2, y2: low[1] },
-              style: { stroke: theme.text, lineWidth: 1.5 },
+              style: { stroke: themeInk(config), lineWidth: 1.5 },
             },
           ],
         };
@@ -895,7 +896,7 @@ export function buildErrorBarOption(ctx: RenderContext): RendererResult {
 /** 相关性矩阵图: pairwise Pearson correlation rendered as a heatmap. */
 export function buildCorrelationMatrixOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { compact = false, theme, fontSize } = config;
+  const { compact = false, fontSize } = config;
   const names = dataSeries.map((series) => series.name);
   const columns = dataSeries.map((series) => series.data);
   const labelTextStyle = dataLabelTextStyle(config);
@@ -930,7 +931,7 @@ export function buildCorrelationMatrixOption(ctx: RenderContext): RendererResult
   const categoryAxisStyle = {
     axisLine: { show: !compact, lineStyle: { color: "#aeb6bf" } },
     axisTick: { show: false },
-    axisLabel: { show: !compact, color: theme.text, fontSize, rotate: 30 },
+    axisLabel: { show: !compact, color: themeInk(config), fontSize, rotate: 30 },
     splitLine: { show: false },
   };
   const xAxis = {
@@ -981,7 +982,7 @@ export function buildCorrelationMatrixOption(ctx: RenderContext): RendererResult
       left: "center",
       bottom: 0,
       inRange: { color: ["#2166ac", "#f7f7f7", "#b2182b"] },
-      textStyle: { color: theme.text, fontSize },
+      textStyle: { color: themeInk(config), fontSize },
     },
     tooltipTrigger: "item",
   };
@@ -990,7 +991,7 @@ export function buildCorrelationMatrixOption(ctx: RenderContext): RendererResult
 /** 小提琴图: mirrored KDE polygons per category, drawn as a custom series. */
 export function buildViolinOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { compact = false, theme, fontSize } = config;
+  const { compact = false, fontSize } = config;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const values = dataSeries[0]?.data ?? [];
 
@@ -1025,12 +1026,12 @@ export function buildViolinOption(ctx: RenderContext): RendererResult {
   const maxDensity = Math.max(1e-6, ...curves.flatMap((curve) => curve.density));
 
   const xAxis = {
-    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact),
     data: groups.map((group) => group.name),
     min: -0.5,
     max: Math.max(0.5, groups.length - 0.5),
   };
-  const yAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const yAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
 
   const series: SeriesOption[] = [
     {
@@ -1079,7 +1080,7 @@ export function buildViolinOption(ctx: RenderContext): RendererResult {
       name: "数据点",
       type: "scatter",
       symbolSize: compact ? 0 : 5,
-      itemStyle: { color: theme.text, opacity: 0.45 },
+      itemStyle: { color: themeInk(config), opacity: 0.45 },
       data: (() => {
         const points: [number, number][] = [];
         curves.forEach((curve, groupIndex) => {
@@ -1129,7 +1130,7 @@ export function buildMarimekkoOption(ctx: RenderContext): RendererResult {
     axisTick: { show: false },
     axisLabel: {
       show: !compact,
-      color: theme.text,
+      color: themeInk(config),
       fontSize,
       formatter: (value: number) => {
         // Label each row at its interval midpoint.
@@ -1149,7 +1150,7 @@ export function buildMarimekkoOption(ctx: RenderContext): RendererResult {
     min: 0,
     max: 100,
     show: !compact,
-    axisLabel: { show: true, color: theme.text, fontSize, formatter: (value: number) => `${value}%` },
+    axisLabel: { show: true, color: themeInk(config), fontSize, formatter: (value: number) => `${value}%` },
     splitLine: config.showGrid
       ? { show: true, lineStyle: { color: theme.grid, type: (config.gridLineType ?? "dashed") as "solid" | "dashed" | "dotted" } }
       : { show: false },
@@ -1208,7 +1209,7 @@ export function buildMarimekkoOption(ctx: RenderContext): RendererResult {
 /** OHLC 条形图: classic open-high-low-close bars via a custom series. */
 export function buildOhlcBarOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { compact = false, theme, fontSize } = config;
+  const { compact = false, fontSize } = config;
   const barWidth = config.barWidth ?? 48;
   const open = dataSeries[0]?.data ?? [];
   const close = dataSeries[1]?.data ?? [];
@@ -1217,8 +1218,8 @@ export function buildOhlcBarOption(ctx: RenderContext): RendererResult {
   const upColor = colorFor(0, config);
   const downColor = colorFor(1, config);
 
-  const xAxis = buildCategoryAxis(ctx, theme.text, fontSize, compact);
-  const yAxis = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const xAxis = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
+  const yAxis = buildValueAxis(ctx, themeInk(config), fontSize, compact);
   const series: SeriesOption[] = [
     {
       name: "OHLC",
@@ -1279,7 +1280,7 @@ export function buildOhlcBarOption(ctx: RenderContext): RendererResult {
 /** 蜡烛+成交量组合图: candlestick over a bar volume panel (two grids). */
 export function buildCandleVolumeOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { compact = false, theme, fontSize } = config;
+  const { compact = false, fontSize } = config;
   const barWidth = config.barWidth ?? 48;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   // Pad to exactly four OHLC columns so partial selections render (validators
@@ -1299,19 +1300,19 @@ export function buildCandleVolumeOption(ctx: RenderContext): RendererResult {
   const maxVolume = Math.max(1, ...volume);
   const labelTextStyle = dataLabelTextStyle(config);
 
-  const categoryAxisBottom = buildCategoryAxis(ctx, theme.text, fontSize, compact);
+  const categoryAxisBottom = buildCategoryAxis(ctx, themeInk(config), fontSize, compact);
   const categoryAxisTop = {
-    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact),
     show: false,
     axisLine: { show: false },
     axisLabel: { show: false },
   };
-  const valueAxisTop = buildValueAxis(ctx, theme.text, fontSize, compact);
+  const valueAxisTop = buildValueAxis(ctx, themeInk(config), fontSize, compact);
   const valueAxisBottom = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     max: maxVolume * 3.2,
     axisLabel: {
-      ...((buildValueAxis(ctx, theme.text, fontSize, compact) as { axisLabel?: Record<string, unknown> }).axisLabel ?? {}),
+      ...((buildValueAxis(ctx, themeInk(config), fontSize, compact) as { axisLabel?: Record<string, unknown> }).axisLabel ?? {}),
       formatter: (value: number) => ctx.formatNumber(value),
     },
   };
@@ -1456,8 +1457,8 @@ export function buildMultiRingOption(ctx: RenderContext): RendererResult {
 /** 水平箱线图: the boxplot path with value/category axes swapped. */
 export function buildBoxplotHorizontalOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
-  const textColor = theme.text;
+  const { fontSize, compact = false } = config;
+  const textColor = themeInk(config);
   const xAxis = buildValueAxis(ctx, textColor, fontSize, compact);
   const yAxis = {
     ...buildCategoryAxis(ctx, textColor, fontSize, compact),
@@ -1490,7 +1491,7 @@ function formatBinBound(value: number) {
 /** 密度热力散点图: 2-D binning of x/y pairs rendered as a heatmap. */
 export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { compact = false, theme, fontSize } = config;
+  const { compact = false, fontSize } = config;
   const xs = dataSeries[0]?.data ?? [];
   const ys = dataSeries[1]?.data ?? [];
   const BINS = 10;
@@ -1528,7 +1529,7 @@ export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
   );
 
   const xAxis = {
-    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact),
     data: xLabels,
     name: compact ? "" : dataSeries[0]?.name ?? "",
   };
@@ -1538,12 +1539,12 @@ export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
     show: !compact,
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: { show: !compact, color: theme.text, fontSize },
+    axisLabel: { show: !compact, color: themeInk(config), fontSize },
     splitLine: { show: false },
     name: compact ? "" : dataSeries[1]?.name ?? "",
     nameLocation: "middle" as const,
     nameGap: 45,
-    nameTextStyle: { color: theme.text, fontSize },
+    nameTextStyle: { color: themeInk(config), fontSize },
   };
   const series: SeriesOption[] = [
     {
@@ -1583,7 +1584,7 @@ export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
       inRange: {
         color: [config.backgroundColor === "#ffffff" ? "#f0f4fa" : config.backgroundColor, colorFor(0, config)],
       },
-      textStyle: { color: theme.text, fontSize },
+      textStyle: { color: themeInk(config), fontSize },
     },
     tooltipTrigger: "item",
   };
@@ -1596,20 +1597,20 @@ export function buildDensityHeatmapOption(ctx: RenderContext): RendererResult {
 /** 时间线图: events plotted along a horizontal axis with alternating labels. */
 export function buildTimelineOption(ctx: RenderContext): RendererResult {
   const { config, categories, dataSeries } = ctx;
-  const { theme, fontSize, compact = false } = config;
+  const { fontSize, compact = false } = config;
   const pointSize = config.pointSize ?? 7;
   const values = dataSeries[0]?.data ?? [];
   const labelTextStyle = dataLabelTextStyle(config);
 
   const xAxis = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     min: Math.min(0, ...values.filter(Number.isFinite)),
     splitLine: { show: false },
     axisLine: { show: !compact, lineStyle: { color: "#aeb6bf" } },
     axisTick: { show: false },
   };
   const yAxis = {
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     min: -1,
     max: 1,
     splitLine: { show: false },
@@ -1642,7 +1643,7 @@ export function buildTimelineOption(ctx: RenderContext): RendererResult {
 /** 小倍数分面图: one mini chart (grid) per numeric column, bar sub-shape. */
 export function buildSmallMultiplesOption(ctx: RenderContext): RendererResult {
   const { config, dataSeries } = ctx;
-  const { compact = false, theme, fontSize } = config;
+  const { compact = false, fontSize } = config;
   const barWidth = config.barWidth ?? 48;
   const markOpacity = (config.markOpacity ?? 100) / 100;
   const panelCount = Math.max(1, dataSeries.length);
@@ -1658,7 +1659,7 @@ export function buildSmallMultiplesOption(ctx: RenderContext): RendererResult {
     containLabel: !compact,
   }));
   const xAxes = dataSeries.map((_, index) => ({
-    ...buildCategoryAxis(ctx, theme.text, fontSize, compact),
+    ...buildCategoryAxis(ctx, themeInk(config), fontSize, compact),
     gridIndex: index,
     axisLabel: {
       show: false,
@@ -1666,12 +1667,12 @@ export function buildSmallMultiplesOption(ctx: RenderContext): RendererResult {
     axisTick: { show: false },
   }));
   const yAxes = dataSeries.map((series, index) => ({
-    ...buildValueAxis(ctx, theme.text, fontSize, compact),
+    ...buildValueAxis(ctx, themeInk(config), fontSize, compact),
     gridIndex: index,
     name: compact ? "" : series.name,
     nameLocation: "middle" as const,
     nameGap: compact ? 12 : 24,
-    nameTextStyle: { color: theme.text, fontSize: Math.max(9, fontSize - 1) },
+    nameTextStyle: { color: themeInk(config), fontSize: Math.max(9, fontSize - 1) },
   }));
   const series: SeriesOption[] = dataSeries.map((item, index) => ({
     name: item.name,

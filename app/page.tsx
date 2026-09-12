@@ -124,6 +124,7 @@ type FieldRoles = Partial<Record<DataBindingRole, string | string[]>>;
 // `DEFAULT_PROJECT` is the single source of truth — collect/apply both
 // derive from it so a field is never accidentally dropped.
 type ProjectState = {
+  textOnDark: boolean;
   annotations: ChartAnnotation[];
   watermark: {
     dataUrl: string;
@@ -287,6 +288,7 @@ const DEFAULT_PROJECT: ProjectState = {
   streamTimeAxis: false,
   annotations: [],
   watermark: null,
+  textOnDark: false,
 };
 
 const PROJECT_STORAGE_KEY = "tuzuo-current-project";
@@ -757,6 +759,7 @@ function normalizeProject(input: unknown): ProjectState | null {
   return {
     tableData: normalizeTableData(source.tableData, base.tableData),
     watermark: normalizeWatermark(source.watermark),
+    textOnDark: booleanValue(source.textOnDark, base.textOnDark),
     chartType,
     fieldRoles: normalizeFieldRoles(source.fieldRoles, base.fieldRoles),
     seriesKind: normalizeSeriesKind(source.seriesKind, base.seriesKind),
@@ -1094,6 +1097,7 @@ export default function Home() {
     DEFAULT_PROJECT.annotations,
   );
   const [watermark, setWatermark] = useState(DEFAULT_PROJECT.watermark);
+  const [textOnDark, setTextOnDark] = useState(DEFAULT_PROJECT.textOnDark);
   const [importUrl, setImportUrl] = useState(
     // SSR has no window; the localStorage read only happens on the client.
     () =>
@@ -1449,6 +1453,7 @@ export default function Home() {
         comboAxisSync: comboAxisSync || undefined,
         annotations: annotations.length ? annotations : undefined,
         watermark: watermark ?? undefined,
+        textOnDark: textOnDark || undefined,
         streamTimeAxis: streamTimeAxis || undefined,
         markOpacity,
         areaOpacity,
@@ -1482,6 +1487,7 @@ export default function Home() {
     [
       annotations,
       areaOpacity,
+      textOnDark,
       watermark,
       axisLabelRotation,
       pictorialUnitValueInput,
@@ -1788,6 +1794,7 @@ export default function Home() {
       chartType,
       annotations: annotations.map((a) => ({ ...a })),
       watermark: watermark ? { ...watermark } : null,
+      textOnDark,
       quadrantCenter,
       pictorialUnitValue:
         Number(pictorialUnitValueInput) > 0
@@ -2118,6 +2125,7 @@ export default function Home() {
     setComboAxisSync(project.comboAxisSync);
     setAnnotations(project.annotations.map((a) => ({ ...a })));
     setWatermark(project.watermark ? { ...project.watermark } : null);
+    setTextOnDark(project.textOnDark);
     setStreamTimeAxis(project.streamTimeAxis);
     setMarkOpacity(project.markOpacity);
     setAreaOpacity(project.areaOpacity);
@@ -3071,6 +3079,13 @@ export default function Home() {
                   {marginsLinked ? <Lock size={14} /> : <LockOpen size={14} />}
                 </button>
               </div>
+              {transparent && (
+                <Toggle
+                  label="深色背景优化（文字用浅色）"
+                  checked={textOnDark}
+                  onChange={setTextOnDark}
+                />
+              )}
               <div className="watermark-block">
                 <div className="watermark-head">
                   <span>水印 Logo</span>

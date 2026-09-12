@@ -12,6 +12,7 @@
 import type { SeriesOption } from "echarts";
 import type { RenderContext } from "../template-definition";
 import {
+  themeInk,
   colorFor,
   dataLabelTextStyle,
   inShapeLabelTextStyle,
@@ -195,7 +196,7 @@ export function buildProgressRingOption(ctx: RenderContext): RendererResult {
         text: `${Math.round(percent)}%`,
         textAlign: "center",
         textVerticalAlign: "middle",
-        fill: theme.text,
+        fill: themeInk(config),
         font: `${Math.round(fontSize * 2)}px "Inter", "PingFang SC", sans-serif`,
       },
     },
