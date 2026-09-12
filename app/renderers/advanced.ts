@@ -712,8 +712,14 @@ export function buildCalendarHeatmapOption(ctx: RenderContext): RendererResult {
     .map((date) => new Date(date))
     .filter((d) => !Number.isNaN(d.getTime()))
     .sort((a, b) => a.getTime() - b.getTime());
+  // Non-date categories must never produce an invalid calendar range — an
+  // unparseable range string crashes the whole chart (ECharts reads .0 off it).
   const years = [...new Set(parsed.map((d) => d.getFullYear()).filter((year) => year > 1990))];
-  const range = years.length === 1 ? String(years[0]) : years.length > 1 ? [String(years[0]), String(years[years.length - 1])] : dates[0]?.slice(0, 4) || "2026";
+  const range = years.length === 1
+    ? String(years[0])
+    : years.length > 1
+      ? [String(years[0]), String(years[years.length - 1])]
+      : `${new Date().getFullYear()}`;
 
   const calendar = {
     top: compact ? "10%" : "16%",

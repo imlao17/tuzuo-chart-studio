@@ -2367,3 +2367,25 @@ test("P100-DARK: textOnDark renders light ink for transparent exports", () => {
   const [series] = (dark.series as Array<{ label?: { color?: string } }>);
   assert.equal(series.label?.color, "#f5f7fa");
 });
+
+
+test("P100-C1: calendar heatmap survives non-date categories", () => {
+  const option = buildChartOption(
+    baseConfig({
+      type: "calendarHeatmap",
+      parsed: tableToParsed([
+        ["类目", "数值"],
+        ["这是一段二十个字长度极强的超长类目名", "5"],
+        ["另一个完全不是日期的长类目名称", "8"],
+      ]),
+      categoryColumn: "类目",
+      seriesColumns: ["数值"],
+    }),
+  );
+  const calendar = option.calendar as { range?: string | string[] };
+  assert.ok(calendar?.range, "calendar coordinate present");
+  // range 必须是合法年份，绝不能是类目名片段
+  assert.match(String(calendar.range), /^20\d{2}$/, "range falls back to a valid year");
+  const series = seriesList(option)[0] as { type?: string };
+  assert.equal(series.type, "heatmap");
+});
