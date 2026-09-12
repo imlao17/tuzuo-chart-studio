@@ -2051,10 +2051,10 @@ export default function Home() {
     const cy = Math.round(height / 2);
     const next: ChartAnnotation =
       kind === "text"
-        ? { id, kind, x: cx - 60, y: cy, text: "标注文字", color: theme.text, fontSize: 14 }
+        ? { id, kind, x: cx - 60, y: cy, text: "标注文字", fontSize: 14 }
         : kind === "arrow"
-          ? { id, kind, x1: cx - 80, y1: cy, x2: cx + 80, y2: cy, color: theme.text }
-          : { id, kind, x: cx - 80, y: cy - 30, width: 160, height: 60, color: theme.text };
+          ? { id, kind, x1: cx - 80, y1: cy, x2: cx + 80, y2: cy }
+          : { id, kind, x: cx - 80, y: cy - 30, width: 160, height: 60 };
     commitAnnotations([...annotations, next], `已添加${kind === "text" ? "文字" : kind === "arrow" ? "箭头" : "矩形"}标注`);
   }
 

@@ -2389,3 +2389,24 @@ test("P100-C1: calendar heatmap survives non-date categories", () => {
   const series = seriesList(option)[0] as { type?: string };
   assert.equal(series.type, "heatmap");
 });
+
+test("P100-ANN2: annotations without explicit color follow the text mode", () => {
+  const noColor = buildChartOption(
+    baseConfig({
+      type: "line",
+      textOnDark: true,
+      annotations: [
+        { id: "t", kind: "text", x: 10, y: 10, text: "浅色标注" },
+        { id: "a", kind: "arrow", x1: 0, y1: 0, x2: 50, y2: 50 },
+      ],
+    }),
+  );
+  const graphic = (noColor.graphic ?? []) as Array<{
+    type?: string;
+    style?: { fill?: string; stroke?: string };
+  }>;
+  const texts = graphic.filter((el) => el.type === "text");
+  assert.equal(texts[0]?.style?.fill, "#f5f7fa", "text follows textOnDark");
+  const arrows = graphic.filter((el) => el.type === "line");
+  assert.equal(arrows[0]?.style?.stroke, "#f5f7fa", "arrow follows textOnDark");
+});

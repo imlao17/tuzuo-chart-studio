@@ -582,7 +582,7 @@ function assembleOption(
           shape: { x: item.x, y: item.y, width: item.width, height: item.height },
           style: {
             fill: "transparent",
-            stroke: item.color || config.theme.text,
+            stroke: item.color || ink,
             lineWidth: 1.5,
           },
         });
