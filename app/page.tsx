@@ -256,7 +256,9 @@ const DEFAULT_PROJECT: ProjectState = {
   useThousandsSeparator: true,
   titleAlign: "left",
   titleStyle: { fontSize: 24, color: "", bold: true, italic: false },
-  subtitleStyle: { fontSize: 13, color: "#68727d", bold: false, italic: false },
+  // Empty color = follow the mode fallback (dark ink, or light under
+  // textOnDark). The old hardcoded #68727d defeated the dark-background mode.
+  subtitleStyle: { fontSize: 13, color: "", bold: false, italic: false },
   xAxisTitleStyle: { fontSize: 14, color: "", bold: false, italic: false },
   yAxisTitleStyle: { fontSize: 14, color: "", bold: false, italic: false },
   xAxisLabelStyle: { fontSize: 14, color: "", bold: false, italic: false },
