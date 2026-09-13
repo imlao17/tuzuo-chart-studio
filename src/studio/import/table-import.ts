@@ -2,7 +2,7 @@
  * Data import helpers: fetch a delimiter table from a public URL and parse
  * Excel workbooks entirely in the browser (no network round-trip for xlsx).
  */
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import { parseDelimitedTable } from "../../../app/chart-model";
 
 export type ImportTableResult = {

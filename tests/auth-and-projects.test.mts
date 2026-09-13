@@ -168,7 +168,7 @@ test("export: isFreeExportAction enforces freemium tiered permissions", () => {
 
 
 import { parseWorkbook } from "../src/studio/import/table-import";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 
 test("import: xlsx workbook parses to a string table (round trip)", () => {
   const rows = [
