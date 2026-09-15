@@ -31,8 +31,8 @@ test("server-renders the chart studio", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>图作 · 透明图表工具<\/title>/);
-  assert.match(html, /图作/);
+  assert.match(html, /<title>知图 · 透明图表工具<\/title>/);
+  assert.match(html, /知图/);
   assert.match(html, /透明图表工具/);
   assert.match(html, /上传 CSV/);
   assert.match(html, /100(?:<!-- -->)?\s*种图表/);
@@ -242,8 +242,8 @@ test("includes the complete chart studio implementation", async () => {
   assert.match(authSessionHook, /requireDownloadAuth/);
   assert.match(page, /NEXT_PUBLIC_TUZUO_REQUIRE_AUTH/);
   assert.match(authSessionHook, /\/api\/auth\/session/);
-  assert.match(authDialog, /登录图作账号/);
-  assert.match(authDialog, /注册图作账号/);
+  assert.match(authDialog, /登录知图账号/);
+  assert.match(authDialog, /注册知图账号/);
   assert.match(authDialog, /useDialogFocus/);
   assert.match(dialogFocusHook, /restoreFocus/);
   assert.match(dialogFocusHook, /event\.key !== "Tab"/);

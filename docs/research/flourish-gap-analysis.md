@@ -1,14 +1,14 @@
-# 图作与 Flourish 的模板、功能和菜单差距调研
+# 知图与 Flourish 的模板、功能和菜单差距调研
 
 > 调研日期：2026-07-26  
-> 调研对象：当前项目中的“图作”本地版本，以及 Flourish 官方公开帮助中心  
+> 调研对象：当前项目中的“知图”本地版本，以及 Flourish 官方公开帮助中心  
 > 用途：为下一阶段的模板扩充、菜单重构、数据绑定和细节优化提供产品与技术依据
 
 > 2026-08-09 注记：本文保留为早期差距调研，文内大量“20 个模板”的描述是历史口径。当前代码已经扩展到 30 个起始样式，完成模板注册表、每家族 renderer、字段角色绑定、模板校验、设置组动态显示、示例数据、行为回归测试和最小账号闭环。最新阶段判断见 `docs/product/project-stage-and-control.md`，部署说明见 `docs/engineering/deployment.md`。
 
 ## 1. 结论先行
 
-当前“图作”已经具备一个透明图表导出工具的基本闭环：
+当前“知图”已经具备一个透明图表导出工具的基本闭环：
 
 - 可在 20 个图表起始样式之间切换；
 - 可直接编辑表格、粘贴数据、上传 CSV/TSV；
@@ -19,20 +19,20 @@
 但它与 Flourish 的主要差距不是“20 和 43”这个数字本身，而是以下四层：
 
 1. **模板层级不同**  
-   图作的 20 项主要是同一套通用渲染器的不同 `chartType`；Flourish 官方帮助中心目前至少记录了 **43 个独立模板家族**，每个家族有自己的数据结构、设置菜单和交互能力。
+   知图的 20 项主要是同一套通用渲染器的不同 `chartType`；Flourish 官方帮助中心目前至少记录了 **43 个独立模板家族**，每个家族有自己的数据结构、设置菜单和交互能力。
 
 2. **菜单没有真正按模板变化**  
-   图作大部分模板共用同一套右侧菜单，部分控件在某些模板中没有实际效果。Flourish 则把“通用设置”和“模板专属设置”分开，例如散点图有 X/Y/大小/颜色/形状/趋势线，Sankey 有源、目标、步骤、节点排序，地图有投影、区域、点、线和视口。
+   知图大部分模板共用同一套右侧菜单，部分控件在某些模板中没有实际效果。Flourish 则把“通用设置”和“模板专属设置”分开，例如散点图有 X/Y/大小/颜色/形状/趋势线，Sankey 有源、目标、步骤、节点排序，地图有投影、区域、点、线和视口。
 
 3. **数据字段只是被勾选，还没有被赋予角色**  
-   图作目前主要通过“分类列 + 数值系列”驱动图表。组合图、散点图、人口金字塔等需要明确角色的图表，只能依赖列的勾选顺序推断，用户无法清楚指定“哪列是 X、哪列是 Y、哪列在左侧、哪列作为折线”。
+   知图目前主要通过“分类列 + 数值系列”驱动图表。组合图、散点图、人口金字塔等需要明确角色的图表，只能依赖列的勾选顺序推断，用户无法清楚指定“哪列是 X、哪列是 Y、哪列在左侧、哪列作为折线”。
 
 4. **当前优先级应是做深，而不是立刻做满 43 类**  
-   图作的核心定位是“快速生成可复用的透明图表图片”，无需复制 Flourish 的发布平台、团队协作和完整故事系统。更合理的目标是：先把现有 20 个起始样式收敛为 **7 个可靠的渲染家族**，建立模板专属字段与菜单，再扩展到 **12-15 个高质量模板家族、35-50 个起始样式**。
+   知图的核心定位是“快速生成可复用的透明图表图片”，无需复制 Flourish 的发布平台、团队协作和完整故事系统。更合理的目标是：先把现有 20 个起始样式收敛为 **7 个可靠的渲染家族**，建立模板专属字段与菜单，再扩展到 **12-15 个高质量模板家族、35-50 个起始样式**。
 
 ## 2. 数量口径：20 个起始样式不等于 20 个模板家族
 
-### 2.1 当前图作
+### 2.1 当前知图
 
 代码中定义了 20 个模板卡片，见 [`app/chart-model.ts`](../app/chart-model.ts#L150)。
 
@@ -58,17 +58,17 @@
 
 Flourish 没有在公开帮助中心给出一个稳定的“全部 starting points 卡片总数”。用户提供的 Line/Bar/Pie 模板选择器截图中，单这一家族就能看到 **至少 45 个起始样式**，页面底部仍未结束。因此：
 
-- “图作 20 项 vs Flourish 43 家族”不能直接当作同一层级比较；
+- “知图 20 项 vs Flourish 43 家族”不能直接当作同一层级比较；
 - Flourish 的总起始样式数量明显高于 43；
 - 真正值得对齐的是“模板家族的数据模型和专属设置”，而不仅是选择器卡片数量。
 
 ![Flourish Line、Bar、Pie 家族中可见的起始样式](../research/flourish-gap-audit/04-user-reference-flourish-line-bar-pie-chooser.png)
 
-## 3. 当前图作界面与工作流
+## 3. 当前知图界面与工作流
 
 ### 3.1 已具备的完整工作流
 
-当前图作已经覆盖：
+当前知图已经覆盖：
 
 1. 选择图表模板；
 2. 编辑标题和副标题；
@@ -78,15 +78,15 @@ Flourish 没有在公开帮助中心给出一个稳定的“全部 starting poin
 6. 设置画布尺寸、边距、图例、坐标轴、数据标签；
 7. 预览并导出 SVG/PNG。
 
-![图作当前编辑器](../research/flourish-gap-audit/01-current-tuzuo-editor.png)
+![知图当前编辑器](../research/flourish-gap-audit/01-current-tuzuo-editor.png)
 
-![图作当前模板库](../research/flourish-gap-audit/02-current-tuzuo-template-library.png)
+![知图当前模板库](../research/flourish-gap-audit/02-current-tuzuo-template-library.png)
 
-![图作当前数据表](../research/flourish-gap-audit/03-current-tuzuo-data-table.png)
+![知图当前数据表](../research/flourish-gap-audit/03-current-tuzuo-data-table.png)
 
 ### 3.2 当前菜单结构
 
-图作右侧目前有 8 个通用设置区：
+知图右侧目前有 8 个通用设置区：
 
 1. 配色；
 2. 线条、数据点与面积；
@@ -104,20 +104,20 @@ Flourish 没有在公开帮助中心给出一个稳定的“全部 starting poin
 
 ### 3.3 与 Flourish 的工作流差别
 
-| 环节 | 图作 | Flourish | 差距 |
+| 环节 | 知图 | Flourish | 差距 |
 | --- | --- | --- | --- |
 | 模板选择 | 20 张卡片，一层选择 | 家族 + 多个 starting points | 缺分类、搜索、最近使用、模板说明和数据要求 |
 | 数据输入 | 通用表格 | 每个模板有专属 sheet 和 column bindings | 缺字段角色、必填/可选说明和模板级校验 |
-| 自动识别 | 识别分类列和数值列 | 部分模板自动匹配 columns，仍允许明确绑定 | 图作无法理解 X/Y/size/color/source/target 等语义 |
+| 自动识别 | 识别分类列和数值列 | 部分模板自动匹配 columns，仍允许明确绑定 | 知图无法理解 X/Y/size/color/source/target 等语义 |
 | 设置菜单 | 大部分模板共用 8 组 | 共享设置 + 模板专属设置 | 无模板设置 schema，导致无效或误导控件 |
 | 交互 | tooltip、图例等基础交互 | 筛选、搜索、选择、缩放、钻取、时间轴、故事视图 | 当前以静态导出为主 |
 | 响应式 | 固定画布尺寸和缩放预览 | 桌面/平板/手机预览、断点与独立比例 | 可作为后续网页发布能力，而非首要导出能力 |
 | 标注 | 标题、标签 | annotations、popups、panels、captions、highlights | 缺叙事性标注 |
-| 输出 | SVG、PNG、复制 PNG | 发布、嵌入、图片、HTML、故事视频等 | 图作静态导出已形成差异化，不必全部追平 |
+| 输出 | SVG、PNG、复制 PNG | 发布、嵌入、图片、HTML、故事视频等 | 知图静态导出已形成差异化，不必全部追平 |
 | 可访问性 | 暂无独立设置 | 屏幕阅读说明、可读内容、键盘/对比度等 | 建议至少补 alt description 和色盲检查 |
 | 项目管理 | 浏览器当前状态为主 | 保存、复制、版本、发布、团队和权限 | 若继续本地工具定位，可先做本地项目文件保存 |
 
-## 4. 图作 20 个模板逐项审计
+## 4. 知图 20 个模板逐项审计
 
 ### 4.1 折线与面积类
 
@@ -183,13 +183,13 @@ Flourish 没有在公开帮助中心给出一个稳定的“全部 starting poin
 - 下表家族数量来自 Flourish 官方帮助中心分类页；
 - “典型专属设置”基于各家族 overview 和 how-to 页面中明确出现的数据绑定、设置项和操作能力归纳；
 - Flourish 会持续更新，菜单的精确英文名称可能变化，因此此处记录的是产品能力组，而不是逐字复刻界面；
-- 对图作而言，表中的“建议优先级”按“透明图片导出工具”的定位评估，并非按 Flourish 的商业平台定位。
+- 对知图而言，表中的“建议优先级”按“透明图片导出工具”的定位评估，并非按 Flourish 的商业平台定位。
 
 ### 5.1 Charts：23 个家族
 
-| # | Flourish 家族 | 专属数据绑定 | 典型专属设置与功能 | 图作现状 / 优先级 |
+| # | Flourish 家族 | 专属数据绑定 | 典型专属设置与功能 | 知图现状 / 优先级 |
 | ---: | --- | --- | --- | --- |
-| 1 | [Line, bar and pie](https://helpcenter.flourish.studio/hc/en-us/articles/8761567940495-Line-bar-and-pie-charts-an-overview) | 标签/时间、多个系列、筛选/分面字段 | chart type、线/点/面积、轴、图例、标签、预测线、网格小图、组合图、时间滑块 | 图作主要覆盖对象；**P0 做深** |
+| 1 | [Line, bar and pie](https://helpcenter.flourish.studio/hc/en-us/articles/8761567940495-Line-bar-and-pie-charts-an-overview) | 标签/时间、多个系列、筛选/分面字段 | chart type、线/点/面积、轴、图例、标签、预测线、网格小图、组合图、时间滑块 | 知图主要覆盖对象；**P0 做深** |
 | 2 | [Bar chart race](https://helpcenter.flourish.studio/hc/en-us/articles/8761566757647-Bar-chart-race-an-overview) | 实体 + 多时间阶段、图片、说明 | 最大可见条数、排序、时间轴、速度、暂停、图片、caption、轴高亮 | 未支持；P3 动画 |
 | 3 | [Bubble chart](https://helpcenter.flourish.studio/hc/en-us/articles/8761547086735-Bubble-chart-An-overview) | 标签、大小、位置、颜色、图片 | 气泡布局/间距、大小/颜色/位置图例、图片、轴定位、高亮 | 未支持；**P2** |
 | 4 | [Chord](https://helpcenter.flourish.studio/hc/en-us/articles/8761539049743-Chord-An-overview) | source、target、value | 有向/无向、弦、弧、排序、高亮、popup | 未支持；P3 |
@@ -206,7 +206,7 @@ Flourish 没有在公开帮助中心给出一个稳定的“全部 starting poin
 | 15 | [Pictogram](https://helpcenter.flourish.studio/hc/en-us/articles/8761540123407-Pictogram-an-overview) | category、subcategory、value、icon、color | 图标库/自定义 SVG path、方向、每图标数值、填充方式 | 未支持；**P2，适合图片导出** |
 | 16 | [Radar](https://helpcenter.flourish.studio/hc/en-us/articles/8761575550351-Radar-an-overview) | 指标、系列、类别/筛选 | radar/star/radial bar、网格/组合、比较线、径向轴 | 未支持；**P2** |
 | 17 | [Sankey](https://helpcenter.flourish.studio/hc/en-us/articles/8761554356879-Sankey-diagram-an-overview) | source、target、value、step | Sankey/alluvial、节点顺序、spread、筛选、分面、popup | 未支持；**P2/P3** |
-| 18 | [Scatter plot](https://helpcenter.flourish.studio/hc/en-us/articles/8761582471439-Scatter-plot-an-overview) | X、Y、size、color、shape、time、filter | scatter/bubble/box/beeswarm/violin、趋势线、选择性标签、动画 | 图作只有基础点位；**P0 做深** |
+| 18 | [Scatter plot](https://helpcenter.flourish.studio/hc/en-us/articles/8761582471439-Scatter-plot-an-overview) | X、Y、size、color、shape、time、filter | scatter/bubble/box/beeswarm/violin、趋势线、选择性标签、动画 | 知图只有基础点位；**P0 做深** |
 | 19 | [Slope](https://helpcenter.flourish.studio/hc/en-us/articles/8761582577551-Slope-an-overview) | 实体 + 多期间 | 线/圆/曲线、scores/ranks/% change、highlight、标签避让 | 未独立支持；**P2** |
 | 20 | [Sports](https://helpcenter.flourish.studio/hc/en-us/articles/8761554628367-Sports-an-overview) | 球员、位置、图片、信息 | 场地、阵型、自定义 X/Y、球员样式、动画 | 非核心 |
 | 21 | [Sports race](https://helpcenter.flourish.studio/hc/en-us/articles/8761554645263-Sports-race-an-overview) | 参与者、时间/圈速、图片 | 赛道、自定义 SVG、镜头、圈/分段、奖牌、动画 | 非核心 |
@@ -215,7 +215,7 @@ Flourish 没有在公开帮助中心给出一个稳定的“全部 starting poin
 
 ### 5.2 Maps：6 个家族
 
-| # | Flourish 家族 | 专属数据绑定 | 典型专属设置与功能 | 图作现状 / 优先级 |
+| # | Flourish 家族 | 专属数据绑定 | 典型专属设置与功能 | 知图现状 / 优先级 |
 | ---: | --- | --- | --- | --- |
 | 24 | [Arc map](https://helpcenter.flourish.studio/hc/en-us/articles/8761566736015-Arc-map-an-overview) | source、destination、value、category、locations | 弧宽/色/透明度、地点、底图、inset、popup | 未支持；P3 |
 | 25 | [Connections globe](https://helpcenter.flourish.studio/hc/en-us/articles/8761574167439-Connections-globe-An-overview) | locations + source/destination values | globe surface、旋转/缩放、箭头、筛选、story 焦点 | 未支持；P4 |
@@ -226,14 +226,14 @@ Flourish 没有在公开帮助中心给出一个稳定的“全部 starting poin
 
 ### 5.3 Tables and heatmaps：2 个家族
 
-| # | Flourish 家族 | 专属数据绑定 | 典型专属设置与功能 | 图作现状 / 优先级 |
+| # | Flourish 家族 | 专属数据绑定 | 典型专属设置与功能 | 知图现状 / 优先级 |
 | ---: | --- | --- | --- | --- |
 | 30 | [Table](https://helpcenter.flourish.studio/hc/en-us/articles/8761554867983-Table-an-overview) | 表格列、搜索/筛选字段 | 单元格/表头、列宽、手机模式、搜索、mini bar/line、着色、popup | 未支持；P3 |
 | 31 | [Heatmap](https://helpcenter.flourish.studio/hc/en-us/articles/8761546958479-Heatmap-an-overview) | X、Y、value、filter、popup info | 分类/数值轴、分类/连续色板、筛选、controls、popup | 未支持；**P2** |
 
 ### 5.4 Content-based：12 个家族
 
-| # | Flourish 家族 | 专属数据或内容 | 典型专属设置与功能 | 图作现状 / 优先级 |
+| # | Flourish 家族 | 专属数据或内容 | 典型专属设置与功能 | 知图现状 / 优先级 |
 | ---: | --- | --- | --- | --- |
 | 32 | [Calculator](https://helpcenter.flourish.studio/hc/en-us/articles/8761547152783-Calculator-an-overview) | 输入项、变量、公式、结果 | 多种 input、Excel 类函数、结果模板、提交结果 | 非核心 |
 | 33 | [Calendar](https://helpcenter.flourish.studio/hc/en-us/articles/10242475125007-Calendar-an-overview) | date、event、icon、filter、popup | 年/月/周、连续模式、locale、导航、单元格和图标 | 非核心 |
@@ -248,11 +248,11 @@ Flourish 没有在公开帮助中心给出一个稳定的“全部 starting poin
 | 42 | [Word cloud](https://helpcenter.flourish.studio/hc/en-us/articles/8761569717647-Word-cloud-an-overview) | 原文或 word/frequency/category | 排除词、词数、词形处理、布局、尺度、动画、popup | P3 |
 | 43 | [3D viewer](https://helpcenter.flourish.studio/hc/en-us/articles/8761538217615-3D-viewer-an-overview) | GLB/glTF/OBJ/FBX/ZIP 模型 | environment、lighting、background、camera、controls、story annotations | 非核心；模型上限 25 MB |
 
-## 6. Flourish 的共享能力，图作需要选哪些
+## 6. Flourish 的共享能力，知图需要选哪些
 
 Flourish 的强大不只来自模板本身，还来自跨模板的共享平台能力。
 
-| 共享能力 | Flourish | 图作建议 |
+| 共享能力 | Flourish | 知图建议 |
 | --- | --- | --- |
 | 配色 | 预设色板、自定义 palette、数值/分类色阶 | 已有基础；补系列级颜色、色阶、色盲检查 |
 | 标题与页脚 | header/footer、字体、链接、来源 | 增加来源、注释和品牌角标即可 |
@@ -264,7 +264,7 @@ Flourish 的强大不只来自模板本身，还来自跨模板的共享平台�
 | Responsive preview | desktop/tablet/mobile/custom | 先保留画布尺寸；发布能力出现后再做断点 |
 | Stories/scrollies | 多视图、动画、滚动叙事、音视频 | 不属于当前核心定位 |
 | Accessibility | screen-reader description、可读内容 | 增加描述字段、对比度提示、键盘可操作 |
-| Export/publish | 页面、embed、HTML、图片、故事视频 | 图作应继续突出透明 PNG/SVG 和本地使用 |
+| Export/publish | 页面、embed、HTML、图片、故事视频 | 知图应继续突出透明 PNG/SVG 和本地使用 |
 | AI Assistant | 调整样式/布局/可访问性，不直接改数据 | 后续可做“自然语言改样式”，但不是当前瓶颈 |
 
 ### 6.1 导出能力并非所有 Flourish 模板完全一致
@@ -276,13 +276,13 @@ Flourish 的“功能多”也伴随着模板和套餐限制，比较时不能�
 - 部分使用 WebGL 的 3D 或高性能模板不支持同样的图片导出；
 - HTML 下载只向 Business、Enterprise 和部分旧套餐开放；
 - 视频导出发生在 Story 层，是 premium 功能，单个 Story 最长 300 秒，当前导出不包含音频；
-- 发布网页、响应式 embed 和故事播放是 Flourish 的平台优势，但不是图作当前必须复制的能力。
+- 发布网页、响应式 embed 和故事播放是 Flourish 的平台优势，但不是知图当前必须复制的能力。
 
-因此，图作在导出方向更适合坚持一个清楚的承诺：
+因此，知图在导出方向更适合坚持一个清楚的承诺：
 
 > 所有被列为“静态图片模板”的家族，都必须稳定支持透明 PNG 和 SVG；如果某个渲染器无法输出 SVG，应在模板选择和导出区明确说明，而不是点击后才失败。
 
-这会比追求完整发布平台更符合图作的使用场景，也可以形成比 Flourish 更简单、可预期的体验。
+这会比追求完整发布平台更符合知图的使用场景，也可以形成比 Flourish 更简单、可预期的体验。
 
 ## 7. 推荐的菜单与模板架构
 
@@ -428,7 +428,7 @@ interface TemplateDefinition {
 
 建议不要把目标写成“复制 Flourish 的 43 个模板”，而改成：
 
-> 在保持图作快速、轻量、本地和透明导出的前提下，完成 12-15 个可靠模板家族、35-50 个高质量起始样式；每个家族拥有独立的数据字段、校验、菜单和示例，所有可见控件都能真实影响预览与导出。
+> 在保持知图快速、轻量、本地和透明导出的前提下，完成 12-15 个可靠模板家族、35-50 个高质量起始样式；每个家族拥有独立的数据字段、校验、菜单和示例，所有可见控件都能真实影响预览与导出。
 
 可量化验收标准：
 
@@ -456,7 +456,7 @@ interface TemplateDefinition {
 8. 给 20 个起始样式补齐示例、错误提示和回归测试；
 9. 完成后再增加热力图、雷达图和气泡图。
 
-这一轮完成后，图作的模板数量仍可能是 20，但产品质量会发生结构性变化：模板不再只是缩略图和条件分支，而会真正拥有自己的数据规则、菜单和行为。
+这一轮完成后，知图的模板数量仍可能是 20，但产品质量会发生结构性变化：模板不再只是缩略图和条件分支，而会真正拥有自己的数据规则、菜单和行为。
 
 ## 11. 调研依据与限制
 
@@ -492,4 +492,4 @@ interface TemplateDefinition {
 - 43 是官方帮助中心当前记录的模板家族数，不等于全部 starting points 数；
 - 起始样式会持续新增或调整，因此截图中的卡片数量只作为“至少可见数量”；
 - 某些菜单名称来自官方 overview/how-to 页面中的能力归纳，实际界面文字可能随版本变化；
-- 本文目的是帮助图作确定下一步产品边界，不建议逐像素或逐功能复制 Flourish。
+- 本文目的是帮助知图确定下一步产品边界，不建议逐像素或逐功能复制 Flourish。

@@ -2178,7 +2178,7 @@ export default function Home() {
       new Blob([JSON.stringify(payload, null, 2)], {
         type: "application/json;charset=utf-8",
       }),
-      `${safeFilename(title || "图作项目")}.tuzuo.json`,
+      `${safeFilename(title || "知图项目")}.tuzuo.json`,
     );
     setStatus("项目文件已保存");
   }
@@ -2751,7 +2751,7 @@ export default function Home() {
                 priority
               />
             </span>
-            <span className="brand-name">图作</span>
+            <span className="brand-name">知图</span>
             <span className="brand-subtitle">透明图表工具</span>
             <span className="save-state" aria-live="polite">
               {saveState}

@@ -6,10 +6,10 @@ import test from "node:test";
 const applicationBinary = resolve(
   "release",
   "mac-arm64",
-  "图作.app",
+  "知图.app",
   "Contents",
   "MacOS",
-  "图作",
+  "知图",
 );
 
 test("packaged macOS application opens the editor and exits cleanly", async () => {
@@ -43,5 +43,5 @@ test("packaged macOS application opens the editor and exits cleanly", async () =
   });
 
   assert.equal(exitCode, 0, output);
-  assert.match(output, /TUZUO_DESKTOP_READY:图作 · 透明图表工具/);
+  assert.match(output, /TUZUO_DESKTOP_READY:知图 · 透明图表工具/);
 });

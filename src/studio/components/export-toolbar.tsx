@@ -116,8 +116,8 @@ export function ExportToolbar({
           type="button"
           className="icon-button toolbar-icon-button"
           onClick={() => projectInputRef.current?.click()}
-          title="打开图作项目"
-          aria-label="打开图作项目"
+          title="打开知图项目"
+          aria-label="打开知图项目"
         >
           <FileUp size={16} />
         </button>
@@ -132,8 +132,8 @@ export function ExportToolbar({
           type="button"
           className="icon-button toolbar-icon-button"
           onClick={onSaveProject}
-          title="保存图作项目 (.tuzuo.json)"
-          aria-label="保存图作项目"
+          title="保存知图项目 (.tuzuo.json)"
+          aria-label="保存知图项目"
         >
           <Save size={16} />
         </button>

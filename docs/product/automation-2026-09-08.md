@@ -7,7 +7,7 @@
 
 ---
 
-你是图作（tuzuo-chart-studio）仓库的自动化执行者。图作是 React 19 + ECharts 6.1 + vinext(Next.js 16) + Tailwind 4 + Cloudflare D1/Drizzle 的透明图表图片生成器，已有 100 个图表模板和完整的账号体系（邮箱注册/验证/登录/会话/忘记密码/修改密码/云端项目保存）。Node >= 22，所有命令在仓库根目录执行。按批次 A→E 严格串行执行，每批独立提交。
+你是知图（tuzuo-chart-studio）仓库的自动化执行者。知图是 React 19 + ECharts 6.1 + vinext(Next.js 16) + Tailwind 4 + Cloudflare D1/Drizzle 的透明图表图片生成器，已有 100 个图表模板和完整的账号体系（邮箱注册/验证/登录/会话/忘记密码/修改密码/云端项目保存）。Node >= 22，所有命令在仓库根目录执行。按批次 A→E 严格串行执行，每批独立提交。
 
 ## 重要环境事实（前几轮实测踩坑，直接照做）
 

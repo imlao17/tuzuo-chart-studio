@@ -4,7 +4,7 @@
 
 ---
 
-你是图作（tuzuo-chart-studio）仓库的自动化执行者。图作是 React 19 + ECharts 6.1 + vinext(Next.js 16) + Tailwind 4 + Cloudflare D1/Drizzle 的透明图表图片生成器，已有 100 个图表模板（14 类目）、账号体系（注册/验证/登录/忘记密码/修改密码）、云端项目保存（50 个/1MB）。Node >= 22，所有命令在仓库根目录执行。
+你是知图（tuzuo-chart-studio）仓库的自动化执行者。知图是 React 19 + ECharts 6.1 + vinext(Next.js 16) + Tailwind 4 + Cloudflare D1/Drizzle 的透明图表图片生成器，已有 100 个图表模板（14 类目）、账号体系（注册/验证/登录/忘记密码/修改密码）、云端项目保存（50 个/1MB）。Node >= 22，所有命令在仓库根目录执行。
 
 本轮任务来自竞品差距分析 docs/product/competitive-gap-analysis-2026-09.md 的 P0/P1 项：**通用图形标注层、CSV URL 导入、xlsx 导入、Logo 水印**。按批次 1→4 严格串行，每批独立提交。
 

@@ -40,8 +40,8 @@ export function AuthDialog({
 }) {
   const isMainMode = mode === "login" || mode === "register";
   const titleByMode: Record<AuthMode, string> = {
-    login: "登录图作账号",
-    register: "注册图作账号",
+    login: "登录知图账号",
+    register: "注册知图账号",
     forgot: "重置密码",
     change: "修改密码",
   };
@@ -81,7 +81,7 @@ export function AuthDialog({
                   : mode === "change"
                     ? "修改后其他设备需要重新登录"
                     : mode === "register"
-                      ? "免费注册图作账号，享受超高清导出与云端保存"
+                      ? "免费注册知图账号，享受超高清导出与云端保存"
                       : "登录后解锁 4x 印刷级超高清导出与云端工程同步"}
               </p>
             </div>

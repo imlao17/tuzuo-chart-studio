@@ -186,7 +186,7 @@ export async function startLocalServer({
     } catch (error) {
       console.error("Local application request failed", error);
       response.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
-      response.end("图作启动失败，请重新打开应用。");
+      response.end("知图启动失败，请重新打开应用。");
     }
   });
 

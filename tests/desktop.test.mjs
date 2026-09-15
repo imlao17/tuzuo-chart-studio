@@ -93,7 +93,7 @@ test("desktop local server renders the app and bundled assets", async (context) 
   assert.equal(page.status, 200);
   assert.match(page.headers.get("content-type") ?? "", /^text\/html/);
   const html = await page.text();
-  assert.match(html, /图作/);
+  assert.match(html, /知图/);
   const stylesheetPath = html.match(/href="([^"]+\.css)"/)?.[1];
   assert.ok(stylesheetPath);
   const stylesheet = await fetch(new URL(stylesheetPath, server.origin), requestOptions);

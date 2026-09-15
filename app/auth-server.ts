@@ -661,9 +661,9 @@ async function sendVerificationEmail(
     body: JSON.stringify({
       from: runtimeEnv.EMAIL_FROM,
       to: email,
-      subject: "验证你的图作账号",
-      text: `点击链接完成图作账号验证：${verificationUrl}`,
-      html: `<p>点击下面的链接完成图作账号验证：</p><p><a href="${escapeHtml(
+      subject: "验证你的知图账号",
+      text: `点击链接完成知图账号验证：${verificationUrl}`,
+      html: `<p>点击下面的链接完成知图账号验证：</p><p><a href="${escapeHtml(
         verificationUrl,
       )}">验证邮箱</a></p><p>链接 24 小时内有效。</p>`,
     }),
@@ -703,9 +703,9 @@ async function sendPasswordResetEmail(
     body: JSON.stringify({
       from: runtimeEnv.EMAIL_FROM,
       to: email,
-      subject: "重置你的图作密码",
-      text: `点击链接重置图作账号密码：${resetUrl}`,
-      html: `<p>点击下面的链接重置图作账号密码：</p><p><a href="${escapeHtml(
+      subject: "重置你的知图密码",
+      text: `点击链接重置知图账号密码：${resetUrl}`,
+      html: `<p>点击下面的链接重置知图账号密码：</p><p><a href="${escapeHtml(
         resetUrl,
       )}">重置密码</a></p><p>链接 30 分钟内有效。如果这不是你的操作，请忽略这封邮件。</p>`,
     }),

@@ -1,6 +1,6 @@
 # 部署说明
 
-图作支持两种使用方式：本地自用和公开托管。默认优先保证本地部署顺滑，公开托管时再打开账号与下载权限。
+知图支持两种使用方式：本地自用和公开托管。默认优先保证本地部署顺滑，公开托管时再打开账号与下载权限。
 
 ## 本地模式
 
@@ -35,12 +35,12 @@ NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=false
 NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=true
 APP_BASE_URL=https://your-domain.example
 RESEND_API_KEY=...
-EMAIL_FROM="图作 <no-reply@your-domain.example>"
+EMAIL_FROM="知图 <no-reply@your-domain.example>"
 ```
 
 ### 渐进式分级权益模型（Freemium）
 
-为了兼顾“极低试用门槛”与“高价值权益引导注册”，开启 `NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=true` 后，图作采用分级策略：
+为了兼顾“极低试用门槛”与“高价值权益引导注册”，开启 `NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=true` 后，知图采用分级策略：
 
 | 功能操作 | 免登录（游客/试用） | 登录用户（免费注册） | 说明 |
 | --- | :---: | :---: | --- |

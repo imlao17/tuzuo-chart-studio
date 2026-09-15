@@ -25,7 +25,7 @@
 NEXT_PUBLIC_TUZUO_REQUIRE_AUTH=true
 APP_BASE_URL=https://your-domain.example
 RESEND_API_KEY=...
-EMAIL_FROM="图作 <no-reply@your-domain.example>"
+EMAIL_FROM="知图 <no-reply@your-domain.example>"
 ```
 
 生产环境不要开启 `AUTH_DEV_SHOW_VERIFICATION_LINK=true`。

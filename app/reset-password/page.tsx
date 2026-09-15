@@ -66,10 +66,10 @@ export default function ResetPasswordPage() {
               {done ? <ShieldCheck size={16} /> : <Mail size={16} />}
             </span>
             <div>
-              <h2 id="reset-title">{done ? "密码已重置" : "重置图作密码"}</h2>
+              <h2 id="reset-title">{done ? "密码已重置" : "重置知图密码"}</h2>
               <p>
                 {done
-                  ? "请返回图作使用新密码登录"
+                  ? "请返回知图使用新密码登录"
                   : "设置新密码后，所有设备需要重新登录"}
               </p>
             </div>
@@ -79,7 +79,7 @@ export default function ResetPasswordPage() {
         {done ? (
           <div className="auth-form reset-done">
             <Link className="button button-primary" href="/?reset=1">
-              返回图作登录
+              返回知图登录
             </Link>
           </div>
         ) : (

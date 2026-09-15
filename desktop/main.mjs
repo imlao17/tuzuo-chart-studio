@@ -45,13 +45,13 @@ function installApplicationMenu() {
     {
       label: app.name,
       submenu: [
-        { role: "about", label: "关于图作" },
+        { role: "about", label: "关于知图" },
         { type: "separator" },
-        { role: "hide", label: "隐藏图作" },
+        { role: "hide", label: "隐藏知图" },
         { role: "hideOthers", label: "隐藏其他" },
         { role: "unhide", label: "全部显示" },
         { type: "separator" },
-        { role: "quit", label: "退出图作" },
+        { role: "quit", label: "退出知图" },
       ],
     },
     {
@@ -87,7 +87,7 @@ function installApplicationMenu() {
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
-    title: "图作",
+    title: "知图",
     width: 1440,
     height: 940,
     minWidth: 980,
@@ -136,7 +136,7 @@ app.on("second-instance", () => {
 });
 
 app.whenReady().then(async () => {
-  app.setName("图作");
+  app.setName("知图");
   session.defaultSession.setPermissionCheckHandler(() => false);
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false);
@@ -149,10 +149,10 @@ app.whenReady().then(async () => {
     if (!BrowserWindow.getAllWindows().length) void createWindow();
   });
 }).catch((error) => {
-  console.error("Unable to start 图作", error);
+  console.error("Unable to start 知图", error);
   dialog.showErrorBox(
-    "图作无法启动",
-    "本机运行环境启动失败，请退出图作后重新打开。",
+    "知图无法启动",
+    "本机运行环境启动失败，请退出知图后重新打开。",
   );
   app.quit();
 });

@@ -13,7 +13,7 @@ function metadataOrigin() {
 
 export function generateMetadata(): Metadata {
   const origin = metadataOrigin();
-  const title = "图作 · 透明图表工具";
+  const title = "知图 · 透明图表工具";
   const description = "导入数据，制作图表，并导出透明背景 PNG 或 SVG。";
 
   return {
@@ -32,7 +32,7 @@ export function generateMetadata(): Metadata {
           url: `${origin}/og.png`,
           width: 1200,
           height: 630,
-          alt: "图作透明图表工具",
+          alt: "知图透明图表工具",
         },
       ],
     },
