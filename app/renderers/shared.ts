@@ -626,16 +626,25 @@ function assembleOption(
     containLabel: !compact,
   };
   // Horizontal bar layouts draw data labels past each bar's end, i.e. beyond
-  // the largest value at the grid's right edge. Without extra room the canvas
-  // edge clips those labels, so reserve roughly one label width.
+  // the largest value at the grid's right edge — but ONLY when the labels sit
+  // outside the bars. Inside-positioned labels (用户选"内部") live within the
+  // bars themselves and must NOT shrink the plot area.
   const horizontalLayout =
     (patched.xAxis as { type?: string })?.type === "value" &&
     (patched.yAxis as { type?: string })?.type === "category";
+  const labelPos = resolveDataLabelPosition(config, "right");
+  const labelInside =
+    labelPos === "inside" ||
+    labelPos === "insideLeft" ||
+    labelPos === "insideRight" ||
+    labelPos === "insideTop" ||
+    labelPos === "insideBottom";
   if (
     !compact &&
     capabilities.labels &&
     config.showLabels &&
-    horizontalLayout
+    horizontalLayout &&
+    !labelInside
   ) {
     computedGrid = {
       ...computedGrid,
