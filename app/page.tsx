@@ -509,6 +509,13 @@ function normalizeAnnotations(value: unknown): ChartAnnotation[] {
     .map((item) => ({ ...item }));
 }
 
+
+function roleAsListSafe(current: string | string[] | undefined, column: string) {
+  const list = Array.isArray(current) ? [...current] : typeof current === "string" && current ? [current] : [];
+  if (!list.includes(column)) list.push(column);
+  return list;
+}
+
 function roleAsList(value: string | string[] | undefined): string[] {
   if (Array.isArray(value)) return value;
   if (typeof value === "string" && value) return [value];
@@ -2260,6 +2267,15 @@ export default function Home() {
       firstText;
     const nextRoles: FieldRoles = {};
 
+    // Templates with several single-value bindings (区间/子弹/甘特/误差线…)
+    // need an ORDERED list of numeric columns — a single string here would
+    // collapse them all onto one column and blank out the chart.
+    const singleValueBindings = def.dataBindings.filter(
+      (binding) => binding.role === "value" && !binding.multiple,
+    );
+    const multiValue = singleValueBindings.length > 1;
+    let singleValueSeen = 0;
+
     for (const binding of def.dataBindings) {
       const roleDefault = sampleData.roleDefaults?.[binding.role];
       const stringDefault =
@@ -2267,11 +2283,18 @@ export default function Home() {
       if (binding.role === "category") {
         nextRoles.category = stringDefault ?? sampleData.categoryColumn;
       } else if (binding.role === "value") {
-        nextRoles.value = binding.multiple
-          ? Array.isArray(roleDefault)
+        if (binding.multiple) {
+          nextRoles.value = Array.isArray(roleDefault)
             ? roleDefault
-            : [...sampleNumeric]
-          : stringDefault ?? sampleNumeric[0] ?? "";
+            : [...sampleNumeric];
+        } else if (multiValue) {
+          // Ordered slot i of N: keep every binding on its own column.
+          const column = sampleNumeric[singleValueSeen] ?? sampleNumeric[0] ?? "";
+          singleValueSeen += 1;
+          nextRoles.value = roleAsListSafe(nextRoles.value, column);
+        } else {
+          nextRoles.value = stringDefault ?? sampleNumeric[0] ?? "";
+        }
       } else if (binding.role === "x") {
         nextRoles.x = stringDefault ?? sampleNumeric[0] ?? "";
       } else if (binding.role === "y") {
@@ -2288,9 +2311,17 @@ export default function Home() {
       }
     }
 
+    // Scatter-family dimension roles live outside fieldRoles; restore them
+    // from the sample defaults so 气泡图 keeps its size column after a switch.
+    const sizeDefault = sampleData.roleDefaults?.size;
+    const colorDefault = sampleData.roleDefaults?.color;
+    const shapeDefault = sampleData.roleDefaults?.shape;
     const sampleProject = cloneProject(currentProject);
     sampleProject.tableData = sampleData.table.map((row) => [...row]);
     sampleProject.fieldRoles = cloneFieldRoles(nextRoles);
+    sampleProject.sizeColumn = typeof sizeDefault === "string" ? sizeDefault : null;
+    sampleProject.colorColumn = typeof colorDefault === "string" ? colorDefault : null;
+    sampleProject.shapeColumn = typeof shapeDefault === "string" ? shapeDefault : null;
     if (type) sampleProject.chartType = type;
     applyCheckpoint(sampleProject, JSON.stringify(sampleProject), label);
   }
