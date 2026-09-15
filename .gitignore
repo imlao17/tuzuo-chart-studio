@@ -53,3 +53,5 @@ tsconfig.tsbuildinfo
 .omx/
 .dev.vars
 .env.local
+
+.tmptest/
