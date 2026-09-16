@@ -1027,6 +1027,7 @@ const SAMPLE_BUBBLE: SampleData = {
   ],
   categoryColumn: "城市",
   seriesColumns: ["平均收入 万", "生活成本 万", "人口 万"],
+  roleDefaults: { size: "人口 万" },
 };
 
 const SAMPLE_GROUPED_SCATTER: SampleData = {

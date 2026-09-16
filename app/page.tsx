@@ -1348,12 +1348,25 @@ export default function Home() {
       resolvedRoles.target = target;
       resolvedRoles.value = value;
     } else if (roles.has("x") || roles.has("y")) {
-      // scatter: X then Y, mirroring the renderer's selectedColumns[0]/[1].
+      // scatter/bubble: X then Y, mirroring the renderer's selectedColumns[0]/[1].
       const x = resolveSingle("x", 0);
       const y = resolveSingle("y", 1) || x;
-      seriesColumns = [x, y];
+      // A declared size role (bubble requires it, scatter allows it) counts as
+      // the third numeric series column so column-count validators see it. The
+      // renderer itself reads the bound column via config.sizeColumn.
+      const sizeBound =
+        typeof sizeColumn === "string" && numeric.includes(sizeColumn)
+          ? sizeColumn
+          : numeric[2];
+      seriesColumns =
+        roles.has("size") && sizeBound !== undefined
+          ? [x, y, sizeBound]
+          : [x, y];
       resolvedRoles.x = x;
       resolvedRoles.y = y;
+      if (roles.has("size") && sizeBound !== undefined) {
+        resolvedRoles.size = sizeBound;
+      }
     } else if (roles.has("leftValue") || roles.has("rightValue")) {
       // diverging / pyramid: left then right, mirroring dataSeries[0]/[1].
       const left = resolveSingle("leftValue", 0);
@@ -1375,6 +1388,7 @@ export default function Home() {
     parsed.headers,
     parsed.numericHeaders,
     templateDefinition.dataBindings,
+    sizeColumn,
   ]);
 
   // P1-2 reference marks: parse the text inputs into structured arrays.
@@ -2630,7 +2644,7 @@ export default function Home() {
         // Scatter optional roles (size/color/shape) bind to dedicated
         // ChartConfig fields with a "无" option, not the generic role map.
         if (
-          chartType === "scatter" &&
+          (chartType === "scatter" || chartType === "bubble") &&
           (binding.role === "size" ||
             binding.role === "color" ||
             binding.role === "shape")
