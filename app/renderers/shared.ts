@@ -646,9 +646,22 @@ function assembleOption(
     horizontalLayout &&
     !labelInside
   ) {
+    // Size the reserve by the number-format settings (prefix/suffix/separator/
+    // decimals) — an approximation that adapts to user configuration without
+    // needing access to the actual data values.
+    const decimals = config.numberDecimals ?? 0;
+    const prefixLen = (config.numberPrefix ?? "").length;
+    const suffixLen = (config.numberSuffix ?? "").length;
+    const separatorBonus = config.useThousandsSeparator === false ? 0 : 1;
+    // Estimate: integer part (up to 6 digits) + decimals + separators + prefix/suffix
+    const estimatedChars = 6 + decimals + separatorBonus + prefixLen + suffixLen;
+    const reserve = Math.max(
+      24,
+      Math.min(160, Math.round(estimatedChars * 0.62 * fontSize + 12)),
+    );
     computedGrid = {
       ...computedGrid,
-      right: computedGrid.right + Math.round(fontSize * 5.5),
+      right: computedGrid.right + reserve,
     };
   }
   // Line charts with end labels have the same overflow: the label sits just
