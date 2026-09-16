@@ -584,7 +584,10 @@ export function buildSankeyOption(ctx: RenderContext): RendererResult {
     const source = row[sourceIndex]?.trim();
     const target = row[targetIndex]?.trim();
     const value = Math.max(0, finiteValue(toNumber(row[valueIndex] ?? "")));
-    if (!source || !target || value <= 0) continue;
+    // Degenerate bindings (single-column table, stale role fallbacks) can put
+    // source and target on the same column; a self-link makes ECharts abort
+    // with "Sankey is a DAG ... has cycle", so drop it here.
+    if (!source || !target || source === target || value <= 0) continue;
     nodeNames.add(source);
     nodeNames.add(target);
     links.push({ source, target, value });

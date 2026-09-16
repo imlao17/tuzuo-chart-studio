@@ -49,7 +49,9 @@ function resolveEndpoints(ctx: RenderContext) {
     const source = row[sourceIndex]?.trim();
     const target = row[targetIndex]?.trim();
     const value = toNumber(row[valueIndex] ?? "");
-    if (!source || !target || !Number.isFinite(value)) continue;
+    // Self-links (degenerate source/target fallbacks) abort the sankey-based
+    // layouts with a DAG-cycle error — skip them like any unusable row.
+    if (!source || !target || source === target || !Number.isFinite(value)) continue;
     for (const name of [source, target]) {
       if (!seen.has(name)) {
         seen.add(name);
