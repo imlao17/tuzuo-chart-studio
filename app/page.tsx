@@ -1351,20 +1351,24 @@ export default function Home() {
       // scatter/bubble: X then Y, mirroring the renderer's selectedColumns[0]/[1].
       const x = resolveSingle("x", 0);
       const y = resolveSingle("y", 1) || x;
-      // A declared size role (bubble requires it, scatter allows it) counts as
-      // the third numeric series column so column-count validators see it. The
-      // renderer itself reads the bound column via config.sizeColumn.
+      // Only a REQUIRED size role (bubble) counts toward the numeric-column
+      // total — its validator needs three columns and its renderer falls back
+      // to seriesColumns[2]. Scatter's optional size must not leak a phantom
+      // third column into series-driven UI (e.g. the category-sort dropdown).
+      const sizeRequired = templateDefinition.dataBindings.some(
+        (binding) => binding.role === "size" && binding.required,
+      );
       const sizeBound =
         typeof sizeColumn === "string" && numeric.includes(sizeColumn)
           ? sizeColumn
           : numeric[2];
       seriesColumns =
-        roles.has("size") && sizeBound !== undefined
-          ? [x, y, sizeBound]
-          : [x, y];
+        sizeRequired && sizeBound !== undefined ? [x, y, sizeBound] : [x, y];
       resolvedRoles.x = x;
       resolvedRoles.y = y;
-      if (roles.has("size") && sizeBound !== undefined) {
+      // Display-only: the required-size dropdown shows this fallback when the
+      // user's data has not bound a size column yet.
+      if (sizeRequired && sizeBound !== undefined) {
         resolvedRoles.size = sizeBound;
       }
     } else if (roles.has("leftValue") || roles.has("rightValue")) {
@@ -2663,14 +2667,22 @@ export default function Home() {
               : binding.role === "color"
                 ? setColorColumn
                 : setShapeColumn;
+          // Required roles fall back to the resolver's pick when unbound, so
+          // the dropdown always mirrors what the renderer will receive.
+          const selectedValue =
+            binding.required && !value
+              ? (resolvedRoles[binding.role] ?? "")
+              : (value ?? "");
           return (
             <label key={binding.role} className="field">
               <span>{binding.label}</span>
               <select
-                value={value ?? ""}
+                value={selectedValue}
                 onChange={(event) => setValue(event.target.value || null)}
               >
-                <option value="">无</option>
+                {/* Required roles (bubble's size) have no "无" — unbinding would
+                    blank the chart while the renderer silently re-picks a column. */}
+                {!binding.required && <option value="">无</option>}
                 {roleOptions.map((header) => (
                   <option key={header} value={header}>
                     {header}

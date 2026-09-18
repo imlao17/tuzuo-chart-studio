@@ -508,6 +508,16 @@ const BIND_SIZE: DataBinding = {
   hint: "留空使用统一点大小",
 };
 
+// Bubble drives point size from a numeric column by definition — the binding
+// is required, so the resolver counts it toward the numeric-column total and
+// the field dropdown offers no "无" option.
+const BIND_SIZE_REQUIRED: DataBinding = {
+  role: "size",
+  label: "气泡大小（数值列）",
+  required: true,
+  multiple: false,
+};
+
 const BIND_COLOR: DataBinding = {
   role: "color",
   label: "点颜色（分类，可选）",
@@ -2184,7 +2194,7 @@ export const TEMPLATE_REGISTRY: Record<ChartType, TemplateDefinition> = {
   bubble: {
     id: "bubble",
     family: "other",
-    dataBindings: [BIND_CATEGORY_SINGLE, BIND_X, BIND_Y, BIND_SIZE],
+    dataBindings: [BIND_CATEGORY_SINGLE, BIND_X, BIND_Y, BIND_SIZE_REQUIRED],
     validators: [
       ...BASE_VALIDATORS,
       requireThreeNumericColumns("气泡图需要 3 个数值列（X、Y 和大小）"),
