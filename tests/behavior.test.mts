@@ -195,6 +195,87 @@ test("label color and precise label positions flow into rendered labels", () => 
   assert.equal(pieLabel?.position, "outside");
 });
 
+// --- Outside-label reserve sizing (on-demand, value-based) -------------------
+
+const BAR_SMALL = {
+  parsed: tableToParsed([
+    ["项目", "数值"],
+    ["A", "3"],
+    ["B", "7"],
+    ["C", "9"],
+  ]),
+  categoryColumn: "项目",
+  seriesColumns: ["数值"],
+} satisfies Partial<ChartConfig>;
+
+const BAR_BIG = {
+  parsed: tableToParsed([
+    ["项目", "数值"],
+    ["A", "3200000"],
+    ["B", "7100000"],
+    ["C", "9800000"],
+  ]),
+  categoryColumn: "项目",
+  seriesColumns: ["数值"],
+} satisfies Partial<ChartConfig>;
+
+test("outside-label reserve scales with the formatted data maximum", () => {
+  const off = gridBox(
+    buildChartOption(baseConfig({ type: "bar", ...BAR_SMALL, showLabels: false })),
+  );
+  const small = gridBox(buildChartOption(baseConfig({ type: "bar", ...BAR_SMALL })));
+  const big = gridBox(buildChartOption(baseConfig({ type: "bar", ...BAR_BIG })));
+
+  // "9" → 1 char → 1×0.62×13+12 rounds to 20, clamped up to the 24px floor.
+  assert.equal(small.right - off.right, 24, "single-digit values use the floor reserve");
+  // "9,800,000" → 9 chars → 9×0.62×13+12 = 84.54 → 85px.
+  assert.equal(big.right - off.right, 85, "millions-scale values reserve 85px");
+  assert.ok(small.right < big.right, "bigger labels must reserve more width");
+});
+
+test("outside-label reserve respects the format config and the 160px cap", () => {
+  // 24 formatted chars (long prefix + millions + decimals + suffix) would need
+  // ~205px unclamped — the cap holds it at 160.
+  const capped = gridBox(
+    buildChartOption(
+      baseConfig({
+        type: "bar",
+        ...BAR_BIG,
+        numberPrefix: "≈≈≈≈≈≈≈≈≈≈",
+        numberSuffix: "美元",
+        numberDecimals: 2,
+      }),
+    ),
+  );
+  const off = gridBox(
+    buildChartOption(baseConfig({ type: "bar", ...BAR_BIG, showLabels: false })),
+  );
+  assert.equal(capped.right - off.right, 160, "reserve caps at 160px");
+});
+
+test("inside labels keep the labels-off grid width on horizontal bars", () => {
+  const off = gridBox(
+    buildChartOption(baseConfig({ type: "bar", ...BAR_BIG, showLabels: false })),
+  );
+  const inside = gridBox(
+    buildChartOption(
+      baseConfig({ type: "bar", ...BAR_BIG, labelPosition: "inside" }),
+    ),
+  );
+  assert.equal(inside.right, off.right, "inside labels must not shrink the plot");
+});
+
+test("registry: bubble's size role is required while scatter's stays optional", () => {
+  const bubbleSize = getTemplateDefinition("bubble").dataBindings.find(
+    (binding) => binding.role === "size",
+  );
+  assert.equal(bubbleSize?.required, true, "bubble drives size from a column by definition");
+  const scatterSize = getTemplateDefinition("scatter").dataBindings.find(
+    (binding) => binding.role === "size",
+  );
+  assert.equal(scatterSize?.required, false, "scatter size is an optional styling role");
+});
+
 test("text style controls flow into title, axes, and data labels", () => {
   const option = renderSample("groupedColumn", {
     title: "收入",

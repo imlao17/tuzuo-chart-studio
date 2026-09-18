@@ -625,6 +625,11 @@ function assembleOption(
     left: gridLeft,
     containLabel: !compact,
   };
+  const seriesList = Array.isArray(patched.series)
+    ? patched.series
+    : patched.series
+      ? [patched.series]
+      : [];
   // Horizontal bar layouts draw data labels past each bar's end, i.e. beyond
   // the largest value at the grid's right edge — but ONLY when the labels sit
   // outside the bars. Inside-positioned labels (用户选"内部") live within the
@@ -646,19 +651,33 @@ function assembleOption(
     horizontalLayout &&
     !labelInside
   ) {
-    // Size the reserve by the number-format settings (prefix/suffix/separator/
-    // decimals) — an approximation that adapts to user configuration without
-    // needing access to the actual data values.
-    const decimals = config.numberDecimals ?? 0;
-    const prefixLen = (config.numberPrefix ?? "").length;
-    const suffixLen = (config.numberSuffix ?? "").length;
-    const separatorBonus = config.useThousandsSeparator === false ? 0 : 1;
-    // Estimate: integer part (up to 6 digits) + decimals + separators + prefix/suffix
-    const estimatedChars = 6 + decimals + separatorBonus + prefixLen + suffixLen;
-    const reserve = Math.max(
-      24,
-      Math.min(160, Math.round(estimatedChars * 0.62 * fontSize + 12)),
-    );
+    // Size the reserve by the widest label the bars will actually draw:
+    // formatNumber(max |value|) under the user's number format (decimals,
+    // separators, prefix/suffix), measured in characters and converted at
+    // ~0.62 em per digit. Small-value charts keep almost all of the width;
+    // huge formats stop at the 160px cap. Data here is the renderer's final
+    // series payload, so proportional bars see their normalized 0-100 values.
+    let maxAbs = 0;
+    for (const series of seriesList) {
+      const data = (series as { data?: unknown[] }).data ?? [];
+      for (const point of data) {
+        const raw =
+          typeof point === "number"
+            ? point
+            : Number((point as { value?: unknown })?.value);
+        if (Number.isFinite(raw)) maxAbs = Math.max(maxAbs, Math.abs(raw));
+      }
+    }
+    const proportional =
+      config.type === "proportionalBar" || config.type === "proportionalColumn";
+    const formatted =
+      maxAbs > 0 ? numberFormatter(config, proportional)(maxAbs) : "";
+    const reserve = formatted
+      ? Math.max(
+          24,
+          Math.min(160, Math.round(formatted.length * 0.62 * fontSize + 12)),
+        )
+      : 24;
     computedGrid = {
       ...computedGrid,
       right: computedGrid.right + reserve,
@@ -666,11 +685,6 @@ function assembleOption(
   }
   // Line charts with end labels have the same overflow: the label sits just
   // past the last point, which touches the grid's right edge.
-  const seriesList = Array.isArray(patched.series)
-    ? patched.series
-    : patched.series
-      ? [patched.series]
-      : [];
   const usesEndLabel = !compact && seriesList.some((series) => {
     const endLabel = (series as { endLabel?: { show?: boolean } }).endLabel;
     return endLabel?.show === true;
